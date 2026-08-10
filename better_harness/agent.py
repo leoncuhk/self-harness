@@ -9,14 +9,16 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from better_harness.core import Experiment, Proposal, RunLayout, SplitResult, Variant
+from better_harness.ledger import parse_prediction
 from better_harness.patching import build_variant, prepend_pythonpath
+from better_harness.signatures import FailureCluster
 
 DEFAULT_SYSTEM_PROMPT = """You are Better Agent, an outer-loop Deep Agent that improves another agent harness.
 
@@ -35,7 +37,21 @@ Rules:
 - Keep changes concise and coherent.
 - Make the smallest set of edits needed for the visible train failures in this iteration.
 - Stop as soon as /current and /proposal.md are updated.
-- When done, write a short explanation to /proposal.md."""
+- When done, write a short explanation to /proposal.md.
+
+Every edit is a falsifiable claim, so /proposal.md must end with exactly one fenced JSON block:
+
+```json
+{
+  "root_cause": "why the visible failures happen, not what happened",
+  "evidence": ["case ids or trace excerpts that support the root cause"],
+  "flip_to_pass": ["case ids you expect this edit to turn from failing to passing"],
+  "at_risk": ["case ids you think this edit could regress"]
+}
+```
+
+Predict honestly rather than optimistically. The next evaluation grades this block against the
+flips that actually happen, and a prediction that never holds is evidence the edit was a guess."""
 
 
 @dataclass(frozen=True)
@@ -48,16 +64,19 @@ class ProposerWorkspace:
     surface_files: dict[str, Path]
 
 
-def build_proposer_workspace(
+def build_proposer_workspace(  # noqa: PLR0913 - one workspace needs the whole iteration context
     *,
     experiment: Experiment,
     current: Variant,
     train_result: SplitResult,
     layout: RunLayout,
     iteration: int,
+    candidate_index: int | None = None,
+    clusters: Sequence[FailureCluster] = (),
+    total_candidates: int = 1,
 ) -> ProposerWorkspace:
     """Create one proposer workspace for the current iteration."""
-    root = layout.proposer_workspace_dir(iteration)
+    root = layout.proposer_workspace_dir(iteration, candidate_index)
     if root.exists():
         shutil.rmtree(root)
     current_dir = root / "current"
@@ -84,18 +103,29 @@ def build_proposer_workspace(
     )
     _write_visible_history(layout=layout, root=root)
     _copy_prior_visible_artifacts(layout=layout, root=root, iteration=iteration)
+    (root / "failure_clusters.json").write_text(
+        json.dumps([cluster.to_dict() for cluster in clusters], indent=2) + "\n"
+    )
     _write_task_file(
         experiment=experiment,
         current=current,
         train_result=train_result,
         root=root,
+        clusters=clusters,
+        candidate_index=candidate_index,
+        total_candidates=total_candidates,
     )
     proposal_file = root / "proposal.md"
     proposal_file.write_text(
         "# Proposal\n\n"
         "- Summary:\n"
         "- Why this should help:\n"
-        "- Surfaces changed:\n"
+        "- Surfaces changed:\n\n"
+        "## Prediction\n\n"
+        "Replace this block with your own values. It is graded against the next run.\n\n"
+        "```json\n"
+        '{\n  "root_cause": "",\n  "evidence": [],\n  "flip_to_pass": [],\n  "at_risk": []\n}\n'
+        "```\n"
     )
     return ProposerWorkspace(
         root=root,
@@ -120,21 +150,28 @@ def read_proposal_summary(workspace: ProposerWorkspace) -> str:
     return workspace.proposal_file.read_text().strip()
 
 
-def propose_variant(
+def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration context
     *,
     experiment: Experiment,
     current: Variant,
     train_result: SplitResult,
     layout: RunLayout,
     iteration: int,
+    candidate_index: int = 0,
+    clusters: Sequence[FailureCluster] = (),
+    total_candidates: int = 1,
 ) -> tuple[Proposal, Variant]:
     """Run the outer Deep Agent once and return its candidate variant."""
+    scoped_index = candidate_index if total_candidates > 1 else None
     workspace = build_proposer_workspace(
         experiment=experiment,
         current=current,
         train_result=train_result,
         layout=layout,
         iteration=iteration,
+        candidate_index=scoped_index,
+        clusters=clusters,
+        total_candidates=total_candidates,
     )
     final_message = invoke_deepagents_proposer(
         experiment=experiment,
@@ -149,15 +186,21 @@ def propose_variant(
         )
     )
     summary = read_proposal_summary(workspace)
+    target_cluster = (
+        clusters[candidate_index % len(clusters)].signature.key if clusters else None
+    )
     proposal = Proposal(
         changed_surfaces=changed_surfaces,
         workspace_dir=str(workspace.root),
         summary=summary,
         final_message=final_message,
+        prediction=parse_prediction(summary, final_message),
+        target_cluster=target_cluster,
     )
+    label = f"iter-{iteration:03d}" if total_candidates <= 1 else f"iter-{iteration:03d}-k{candidate_index:02d}"
     candidate = build_variant(
         experiment=experiment,
-        label=f"iter-{iteration:03d}",
+        label=label,
         values=values,
     )
     (workspace.root / "result.json").write_text(
@@ -288,7 +331,7 @@ def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
     history_dir = root / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
     summaries: list[str] = []
-    for path in sorted(layout.visible_iterations_dir.glob("*/decision.json")):
+    for path in sorted(layout.visible_iterations_dir.rglob("decision.json")):
         payload = json.loads(path.read_text())
         summaries.append(
             f"- Iteration {payload['iteration']}: {payload['decision']} "
@@ -336,13 +379,38 @@ def _copy_prior_visible_artifacts(*, layout: RunLayout, root: Path, iteration: i
                     shutil.copy2(source, proposer_target / name)
 
 
-def _write_task_file(
+def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iteration context
     *,
     experiment: Experiment,
     current: Variant,
     train_result: SplitResult,
     root: Path,
+    clusters: Sequence[FailureCluster] = (),
+    candidate_index: int | None = None,
+    total_candidates: int = 1,
 ) -> None:
+    cluster_lines = [f"- {cluster.describe()}" for cluster in clusters] or [
+        "- No clustered train failures."
+    ]
+    focus_lines: list[str] = []
+    if clusters:
+        # Round-robin the candidates across clusters so K proposals attack
+        # different root causes instead of restating the same fix K times.
+        target = clusters[(candidate_index or 0) % len(clusters)]
+        focus_lines = [
+            "",
+            f"Target this failure cluster: `{target.signature.key}`",
+            f"- Cases: {', '.join(target.case_ids)}",
+            f"- Mechanism to address: `{target.signature.mechanism}`",
+            "- Fix this cluster's root cause. Do not try to fix every cluster at once.",
+        ]
+    if total_candidates > 1:
+        focus_lines += [
+            "",
+            f"You are candidate {(candidate_index or 0) + 1} of {total_candidates} for this iteration.",
+            "Other candidates target other clusters. Your edit must be materially different from",
+            "a generic instruction tweak: prefer the mechanism your cluster actually exposes.",
+        ]
     surface_lines = [
         f"- `{name}` -> `current/{surface.filename}` ({surface.kind}, target `{surface.target}`)"
         for name, surface in experiment.surfaces.items()
@@ -371,13 +439,19 @@ def _write_task_file(
                 "- Use `surface_manifest.json` to understand how each editable file maps back to the target harness.",
                 "- Use the visible train failures and train case files to decide what to change.",
                 "- Keep changes concise and coherent.",
-                "- When you finish, update `proposal.md` with a short summary.",
+                "- When you finish, update `proposal.md` with a short summary and the prediction JSON block.",
+                "- The prediction block is graded against the next run. Predict honestly, not optimistically.",
                 "",
                 f"Current variant: `{current.key}`",
-                f"Current train score: `{train_result.passed}/{train_result.total}`",
+                f"Current train score: `{train_result.passed}/{train_result.total}` "
+                "(counts are attempts across repeats, not cases)",
+                *focus_lines,
                 "",
                 "Editable surfaces:",
                 *surface_lines,
+                "",
+                "Failure clusters (signature `cause|causal_status|mechanism`):",
+                *cluster_lines,
                 "",
                 "Visible train failures:",
                 *failure_lines,

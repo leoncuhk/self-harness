@@ -32,9 +32,29 @@ repeats = 3
 #   combined     -> (Δ_in + Δ_ho) > 0   (upstream; lets holdout regress)
 gate = "conservative"
 
+# P2-5: proposals per iteration. Each candidate targets a different failure
+# cluster and costs a full train+holdout evaluation, so raising this buys
+# proposal diversity with eval spend.
+candidates = 1
+
 [better_agent]
 model = "claude-sonnet-4-6"
 max_turns = 11000
+
+# P1-3: static edit guard. Rejects a candidate before it costs an evaluation.
+[guards]
+enabled = true
+max_growth = 3.0        # harness size ceiling, relative to the baseline
+min_bloat_bytes = 4096  # ratios are meaningless below this absolute size
+# forbidden_patterns = [...]  # overrides the built-in list entirely
+
+# P1-4: cost veto. A candidate that clears the correctness gate is still
+# rejected if it bought that gain with spend or latency.
+[budget]
+enabled = true
+max_cost_growth = 1.5
+max_latency_growth = 1.5
+min_latency_s = 30.0  # below this, wall-clock ratios are machine noise
 
 [runner.pytest]
 project_root = "${DEEPAGENTS_ROOT}/libs/evals"

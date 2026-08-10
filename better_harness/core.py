@@ -11,11 +11,29 @@ import tomllib
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, replace
+from dataclasses import field as dc_field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from better_harness.cost import (
+    DEFAULT_MAX_COST_GROWTH,
+    DEFAULT_MAX_LATENCY_GROWTH,
+    DEFAULT_MIN_LATENCY_S,
+    CostProfile,
+    check_budget,
+    profile_split,
+)
 from better_harness.gate import VALID_GATES, GateDecision, decide
+from better_harness.guards import GuardReport, check_variant
+from better_harness.ledger import (
+    LedgerEntry,
+    Prediction,
+    compute_flips,
+    score_prediction,
+    write_ledger,
+)
+from better_harness.signatures import cluster_split
 
 VALID_SPLITS = ("train", "holdout", "scorecard")
 SPLIT_ALIASES = {
@@ -31,6 +49,10 @@ VALID_RUNNERS = ("pytest", "harbor")
 DEFAULT_REPEATS = 3
 # P0-2: Self-Harness promotion rule by default; "combined" reproduces upstream.
 DEFAULT_GATE = "conservative"
+# P2-5: candidates proposed per iteration. Every extra candidate costs a full
+# train+holdout evaluation, so the default stays at 1 and raising it is a
+# deliberate spend on proposal diversity.
+DEFAULT_CANDIDATES = 1
 ENV_PATTERN = re.compile(r"\$\{([^}]+)\}")
 URL_PATTERN = re.compile(r"https?://[^\s\"'>]+")
 UUID_PATTERN = re.compile(
@@ -81,6 +103,19 @@ class Experiment:
     cases: tuple[EvalCase, ...]
     repeats: int = DEFAULT_REPEATS
     gate: str = DEFAULT_GATE
+    candidates: int = DEFAULT_CANDIDATES
+    guards: dict[str, Any] = dc_field(default_factory=dict)
+    budget: dict[str, Any] = dc_field(default_factory=dict)
+
+    @property
+    def guards_enabled(self) -> bool:
+        """Return whether the static edit guard runs."""
+        return bool(self.guards.get("enabled", True))
+
+    @property
+    def budget_enabled(self) -> bool:
+        """Return whether the cost veto runs."""
+        return bool(self.budget.get("enabled", True))
 
     def cases_for_split(self, split: str) -> list[EvalCase]:
         """Return cases for one split."""
@@ -265,6 +300,8 @@ class Proposal:
     workspace_dir: str
     summary: str
     final_message: str | None
+    prediction: Prediction = dc_field(default_factory=Prediction)
+    target_cluster: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the proposal."""
@@ -282,6 +319,9 @@ class CandidateEvaluation:
     accepted: bool
     reason: str
     gate_decision: GateDecision | None = None
+    guard: GuardReport | None = None
+    budget: Any | None = None
+    cost: tuple[CostProfile, ...] = ()
 
     def combined_passed(self) -> int:
         """Return the combined pass count."""
@@ -445,8 +485,9 @@ class RunLayout:
     def runtime_dir(self) -> Path:
         return self.root / "_runtime"
 
-    def proposer_workspace_dir(self, iteration: int) -> Path:
-        return self.visible_iterations_dir / f"{iteration:03d}" / "proposer_workspace"
+    def proposer_workspace_dir(self, iteration: int, candidate: int | None = None) -> Path:
+        base = self.visible_iterations_dir / f"{iteration:03d}" / "proposer_workspace"
+        return base if candidate is None else base / f"k{candidate:02d}"
 
     def iteration_dir(self, iteration: int) -> Path:
         return self.visible_iterations_dir / f"{iteration:03d}"
@@ -476,13 +517,17 @@ class RunLayout:
         starting_variant: str,
         proposal: Proposal,
         candidate: CandidateEvaluation,
+        candidate_index: int | None = None,
     ) -> None:
         """Persist one iteration summary."""
         iteration_dir = self.iteration_dir(iteration)
+        if candidate_index is not None:
+            iteration_dir = iteration_dir / f"k{candidate_index:02d}"
         iteration_dir.mkdir(parents=True, exist_ok=True)
         decision = "accepted" if candidate.accepted else "rejected"
         payload = {
             "iteration": iteration,
+            "candidate_index": candidate_index,
             "starting_variant": starting_variant,
             "candidate_variant": candidate.variant,
             "decision": decision,
@@ -493,6 +538,11 @@ class RunLayout:
             "holdout_passed": candidate.holdout.passed,
             "holdout_total": candidate.holdout.total,
             "gate": None if candidate.gate_decision is None else candidate.gate_decision.to_dict(),
+            "guard": None if candidate.guard is None else candidate.guard.to_dict(),
+            "budget": None if candidate.budget is None else candidate.budget.to_dict(),
+            "cost": [profile.to_dict() for profile in candidate.cost],
+            "prediction": proposal.prediction.to_dict(),
+            "target_cluster": proposal.target_cluster,
             "summary": proposal.summary,
             "final_message": proposal.final_message,
         }
@@ -602,6 +652,9 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     max_iterations = int(experiment.get("max_iterations", 3))
     repeats = int(experiment.get("repeats", DEFAULT_REPEATS))
     gate = str(experiment.get("gate", DEFAULT_GATE))
+    candidates = int(experiment.get("candidates", DEFAULT_CANDIDATES))
+    guards = dict(raw.get("guards", {}))
+    budget = dict(raw.get("budget", {}))
 
     better_agent = raw.get("better_agent", {})
     better_agent_model = str(better_agent.get("model", model))
@@ -674,6 +727,9 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         cases=cases,
         repeats=repeats,
         gate=gate,
+        candidates=candidates,
+        guards=guards,
+        budget=budget,
     )
     validate_experiment(loaded)
     return loaded
@@ -698,6 +754,9 @@ def validate_experiment(experiment: Experiment) -> None:
         raise ValueError(msg)
     if experiment.gate not in VALID_GATES:
         msg = f"invalid gate {experiment.gate!r}; expected one of {VALID_GATES}"
+        raise ValueError(msg)
+    if experiment.candidates < 1:
+        msg = "candidates must be at least 1"
         raise ValueError(msg)
 
     for surface in experiment.surfaces.values():
@@ -936,17 +995,127 @@ def run_experiment(
     current_holdout = baseline_holdout
 
     iterations: list[IterationRecord] = []
+    ledger: list[LedgerEntry] = []
     for index in range(1, iteration_limit + 1):
         if current_train.passed == current_train.total and current_holdout.passed == current_holdout.total:
             break
-        proposal, candidate_variant = propose_variant(
-            experiment=experiment,
-            current=current,
-            train_result=current_train,
-            layout=layout,
-            iteration=index,
-        )
-        if not proposal.changed_surfaces:
+        clusters = cluster_split(current_train)
+        current_cost = [profile_split(current_train), profile_split(current_holdout)]
+
+        evaluated: list[tuple[CandidateEvaluation, Variant, SplitResult, SplitResult]] = []
+        proposed_any = False
+        for candidate_index in range(experiment.candidates):
+            proposal, candidate_variant = propose_variant(
+                experiment=experiment,
+                current=current,
+                train_result=current_train,
+                layout=layout,
+                iteration=index,
+                candidate_index=candidate_index,
+                clusters=clusters,
+                total_candidates=experiment.candidates,
+            )
+            if not proposal.changed_surfaces:
+                continue
+            proposed_any = True
+
+            guard_report: GuardReport | None = None
+            if experiment.guards_enabled:
+                guard_report = check_variant(
+                    experiment=experiment,
+                    baseline=baseline,
+                    candidate=candidate_variant,
+                    forbidden_patterns=experiment.guards.get("forbidden_patterns"),
+                    max_growth=experiment.guards.get("max_growth"),
+                    min_bloat_bytes=experiment.guards.get("min_bloat_bytes"),
+                )
+                if not guard_report.ok:
+                    # Rejected statically: never spend an evaluation on it.
+                    evaluated.append(
+                        (
+                            CandidateEvaluation(
+                                variant=candidate_variant.key,
+                                proposal=proposal,
+                                train=current_train,
+                                holdout=current_holdout,
+                                accepted=False,
+                                reason=guard_report.reason(),
+                                guard=guard_report,
+                            ),
+                            candidate_variant,
+                            current_train,
+                            current_holdout,
+                        )
+                    )
+                    continue
+
+            train = run_split_repeated(
+                runner,
+                experiment=experiment,
+                variant=candidate_variant,
+                split="train",
+                layout=layout,
+                reuse_existing=reuse_existing,
+            )
+            holdout = run_split_repeated(
+                runner,
+                experiment=experiment,
+                variant=candidate_variant,
+                split="holdout",
+                layout=layout,
+                reuse_existing=reuse_existing,
+            )
+            gate_decision = decide(
+                gate=experiment.gate,
+                current_train=current_train,
+                current_holdout=current_holdout,
+                candidate_train=train,
+                candidate_holdout=holdout,
+            )
+            candidate_cost = [profile_split(train), profile_split(holdout)]
+            budget_decision = None
+            accepted = gate_decision.accepted
+            reason = gate_decision.reason
+            if accepted and experiment.budget_enabled:
+                budget_decision = check_budget(
+                    current=current_cost,
+                    candidate=candidate_cost,
+                    max_cost_growth=float(
+                        experiment.budget.get("max_cost_growth", DEFAULT_MAX_COST_GROWTH)
+                    ),
+                    max_latency_growth=float(
+                        experiment.budget.get("max_latency_growth", DEFAULT_MAX_LATENCY_GROWTH)
+                    ),
+                    min_latency_s=float(
+                        experiment.budget.get("min_latency_s", DEFAULT_MIN_LATENCY_S)
+                    ),
+                )
+                if not budget_decision.within_budget:
+                    # Correctness improved but it was bought, not earned.
+                    accepted = False
+                    reason = f"{gate_decision.reason} | {budget_decision.reason}"
+
+            evaluated.append(
+                (
+                    CandidateEvaluation(
+                        variant=candidate_variant.key,
+                        proposal=proposal,
+                        train=train,
+                        holdout=holdout,
+                        accepted=accepted,
+                        reason=reason,
+                        gate_decision=gate_decision,
+                        guard=guard_report,
+                        budget=budget_decision,
+                        cost=tuple(candidate_cost),
+                    ),
+                    candidate_variant,
+                    train,
+                    holdout,
+                )
+            )
+
+        if not proposed_any:
             iterations.append(
                 IterationRecord(
                     iteration=index,
@@ -956,56 +1125,40 @@ def run_experiment(
             )
             break
 
-        train = run_split_repeated(
-            runner,
-            experiment=experiment,
-            variant=candidate_variant,
-            split="train",
-            layout=layout,
-            reuse_existing=reuse_existing,
-        )
-        holdout = run_split_repeated(
-            runner,
-            experiment=experiment,
-            variant=candidate_variant,
-            split="holdout",
-            layout=layout,
-            reuse_existing=reuse_existing,
-        )
-        gate_decision = decide(
-            gate=experiment.gate,
-            current_train=current_train,
-            current_holdout=current_holdout,
-            candidate_train=train,
-            candidate_holdout=holdout,
-        )
-        accepted = gate_decision.accepted
-        candidate = CandidateEvaluation(
-            variant=candidate_variant.key,
-            proposal=proposal,
-            train=train,
-            holdout=holdout,
-            accepted=accepted,
-            reason=gate_decision.reason,
-            gate_decision=gate_decision,
-        )
-        layout.write_iteration_decision(
-            iteration=index,
-            starting_variant=current.key,
-            proposal=proposal,
-            candidate=candidate,
-        )
-        iterations.append(
-            IterationRecord(
+        winner = _select_winner(evaluated)
+        for position, (candidate, _candidate_variant, train, holdout) in enumerate(evaluated):
+            is_winner = winner is not None and position == winner
+            ledger.append(
+                _build_ledger_entry(
+                    iteration=index,
+                    candidate=candidate,
+                    promoted=is_winner,
+                    clusters=clusters,
+                    current_train=current_train,
+                    current_holdout=current_holdout,
+                    train=train,
+                    holdout=holdout,
+                )
+            )
+            layout.write_iteration_decision(
                 iteration=index,
                 starting_variant=current.key,
+                proposal=candidate.proposal,
                 candidate=candidate,
+                candidate_index=position if experiment.candidates > 1 else None,
             )
-        )
-        if accepted:
-            current = candidate_variant
-            current_train = train
-            current_holdout = holdout
+            iterations.append(
+                IterationRecord(
+                    iteration=index,
+                    starting_variant=current.key,
+                    candidate=candidate,
+                )
+            )
+
+        if winner is not None:
+            _, current, current_train, current_holdout = evaluated[winner]
+
+    write_ledger(layout.root / "ledger.json", ledger)
 
     baseline_scorecard = _run_optional_scorecard(
         experiment=experiment,
@@ -1041,6 +1194,60 @@ def run_experiment(
     )
     layout.write_report(report)
     return report
+
+
+def _select_winner(
+    evaluated: list[tuple[CandidateEvaluation, Any, SplitResult, SplitResult]],
+) -> int | None:
+    """Pick which accepted candidate to promote.
+
+    Among candidates that cleared the gate and the cost veto, prefer the largest
+    holdout gain and use the train gain only to break ties. Holdout is the split
+    the proposer could not read, so it is the better estimate of which edit
+    actually generalizes.
+    """
+    best: int | None = None
+    best_key: tuple[int, int] | None = None
+    for position, (candidate, _variant, _train, _holdout) in enumerate(evaluated):
+        if not candidate.accepted or candidate.gate_decision is None:
+            continue
+        key = (candidate.gate_decision.delta_ho, candidate.gate_decision.delta_in)
+        if best_key is None or key > best_key:
+            best_key = key
+            best = position
+    return best
+
+
+def _build_ledger_entry(  # noqa: PLR0913 - a ledger row records the full iteration context
+    *,
+    iteration: int,
+    candidate: CandidateEvaluation,
+    promoted: bool,
+    clusters: list[Any],
+    current_train: SplitResult,
+    current_holdout: SplitResult,
+    train: SplitResult,
+    holdout: SplitResult,
+) -> LedgerEntry:
+    """Grade one candidate's prediction against the flips it actually caused."""
+    flips = compute_flips(
+        current=[current_train, current_holdout],
+        candidate=[train, holdout],
+    )
+    prediction = candidate.proposal.prediction
+    return LedgerEntry(
+        iteration=iteration,
+        variant=candidate.variant,
+        accepted=promoted,
+        gate_reason=candidate.reason,
+        changed_surfaces=candidate.proposal.changed_surfaces,
+        prediction=prediction,
+        flips=flips,
+        score=score_prediction(prediction, flips),
+        guard=None if candidate.guard is None else candidate.guard.to_dict(),
+        budget=None if candidate.budget is None else candidate.budget.to_dict(),
+        signature_clusters=[cluster.to_dict() for cluster in clusters],
+    )
 
 
 def _run_optional_scorecard(
