@@ -10,10 +10,12 @@ import sys
 import tomllib
 import urllib.error
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from better_harness.gate import VALID_GATES, GateDecision, decide
 
 VALID_SPLITS = ("train", "holdout", "scorecard")
 SPLIT_ALIASES = {
@@ -24,6 +26,11 @@ VISIBLE_SPLITS = {"train"}
 PRIVATE_SPLITS = {"holdout", "scorecard"}
 VALID_SURFACE_KINDS = ("module_attr", "workspace_file")
 VALID_RUNNERS = ("pytest", "harbor")
+# P0-1: repeat every split this many times unless the config overrides it. One
+# rollout per candidate cannot separate a real gain from run-to-run noise.
+DEFAULT_REPEATS = 3
+# P0-2: Self-Harness promotion rule by default; "combined" reproduces upstream.
+DEFAULT_GATE = "conservative"
 ENV_PATTERN = re.compile(r"\$\{([^}]+)\}")
 URL_PATTERN = re.compile(r"https?://[^\s\"'>]+")
 UUID_PATTERN = re.compile(
@@ -72,6 +79,8 @@ class Experiment:
     runner_config: dict[str, Any]
     surfaces: dict[str, Surface]
     cases: tuple[EvalCase, ...]
+    repeats: int = DEFAULT_REPEATS
+    gate: str = DEFAULT_GATE
 
     def cases_for_split(self, split: str) -> list[EvalCase]:
         """Return cases for one split."""
@@ -272,6 +281,7 @@ class CandidateEvaluation:
     holdout: SplitResult
     accepted: bool
     reason: str
+    gate_decision: GateDecision | None = None
 
     def combined_passed(self) -> int:
         """Return the combined pass count."""
@@ -304,6 +314,8 @@ class RunReport:
     baseline_scorecard: SplitResult | None
     final_scorecard: SplitResult | None
     iterations: tuple[IterationRecord, ...]
+    repeats: int = 1
+    gate: str = DEFAULT_GATE
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the report."""
@@ -312,6 +324,8 @@ class RunReport:
             "config_path": self.config_path,
             "model": self.model,
             "better_agent_model": self.better_agent_model,
+            "repeats": self.repeats,
+            "gate": self.gate,
             "baseline": self.baseline.to_dict(),
             "final": self.final.to_dict(),
             "baseline_train": self.baseline_train.to_dict(),
@@ -331,6 +345,9 @@ class RunReport:
                         "proposal": iteration.candidate.proposal.to_dict(),
                         "accepted": iteration.candidate.accepted,
                         "reason": iteration.candidate.reason,
+                        "gate": None
+                        if iteration.candidate.gate_decision is None
+                        else iteration.candidate.gate_decision.to_dict(),
                         "train": iteration.candidate.train.to_dict(),
                         "holdout": iteration.candidate.holdout.to_dict(),
                     },
@@ -346,6 +363,10 @@ class RunReport:
             "",
             f"- Target model: `{self.model}`",
             f"- Better-agent model: `{self.better_agent_model}`",
+            f"- Repeats per split: `{self.repeats}`"
+            + ("" if self.repeats >= 3 else "  ⚠️ **fewer than 3 repeats: deltas are not separable from noise**"),
+            f"- Promotion gate: `{self.gate}`"
+            + ("" if self.gate == "conservative" else "  ⚠️ **combined gate allows one split to regress**"),
             f"- Baseline changed surfaces: `{', '.join(self.baseline.changed_surfaces) or 'none'}`",
             f"- Final changed surfaces: `{', '.join(self.final.changed_surfaces) or 'none'}`",
             "",
@@ -469,6 +490,9 @@ class RunLayout:
             "changed_surfaces": list(proposal.changed_surfaces),
             "train_passed": candidate.train.passed,
             "train_total": candidate.train.total,
+            "holdout_passed": candidate.holdout.passed,
+            "holdout_total": candidate.holdout.total,
+            "gate": None if candidate.gate_decision is None else candidate.gate_decision.to_dict(),
             "summary": proposal.summary,
             "final_message": proposal.final_message,
         }
@@ -480,6 +504,7 @@ class RunLayout:
             f"- Candidate variant: `{candidate.variant}`",
             f"- Decision: `{decision}`",
             f"- Train: `{candidate.train.passed}/{candidate.train.total}`",
+            f"- Holdout: `{candidate.holdout.passed}/{candidate.holdout.total}`",
             f"- Changed surfaces: `{', '.join(proposal.changed_surfaces) or 'none'}`",
             f"- Reason: {candidate.reason}",
             "",
@@ -575,6 +600,8 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     workspace_root = _resolve_path(config_path, str(experiment["workspace_root"]))
     model = model_override or str(experiment.get("model", "default-model"))
     max_iterations = int(experiment.get("max_iterations", 3))
+    repeats = int(experiment.get("repeats", DEFAULT_REPEATS))
+    gate = str(experiment.get("gate", DEFAULT_GATE))
 
     better_agent = raw.get("better_agent", {})
     better_agent_model = str(better_agent.get("model", model))
@@ -645,6 +672,8 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         runner_config=runner_config,
         surfaces=surfaces,
         cases=cases,
+        repeats=repeats,
+        gate=gate,
     )
     validate_experiment(loaded)
     return loaded
@@ -663,6 +692,12 @@ def validate_experiment(experiment: Experiment) -> None:
         raise ValueError(msg)
     if experiment.better_agent_max_turns < 1:
         msg = "better_agent.max_turns must be at least 1"
+        raise ValueError(msg)
+    if experiment.repeats < 1:
+        msg = "repeats must be at least 1"
+        raise ValueError(msg)
+    if experiment.gate not in VALID_GATES:
+        msg = f"invalid gate {experiment.gate!r}; expected one of {VALID_GATES}"
         raise ValueError(msg)
 
     for surface in experiment.surfaces.values():
@@ -871,6 +906,7 @@ def run_experiment(
     """Run the better-harness optimization loop."""
     from better_harness.agent import propose_variant
     from better_harness.patching import build_baseline_variant
+    from better_harness.repeats import run_split_repeated
     from better_harness.runners import build_runner
 
     runner = build_runner(experiment)
@@ -880,14 +916,16 @@ def run_experiment(
     iteration_limit = experiment.max_iterations if max_iterations is None else max_iterations
     baseline = build_baseline_variant(experiment)
     current = baseline
-    baseline_train = runner.run_split(
+    baseline_train = run_split_repeated(
+        runner,
         experiment=experiment,
         variant=baseline,
         split="train",
         layout=layout,
         reuse_existing=reuse_existing,
     )
-    baseline_holdout = runner.run_split(
+    baseline_holdout = run_split_repeated(
+        runner,
         experiment=experiment,
         variant=baseline,
         split="holdout",
@@ -918,35 +956,38 @@ def run_experiment(
             )
             break
 
-        train = runner.run_split(
+        train = run_split_repeated(
+            runner,
             experiment=experiment,
             variant=candidate_variant,
             split="train",
             layout=layout,
             reuse_existing=reuse_existing,
         )
-        holdout = runner.run_split(
+        holdout = run_split_repeated(
+            runner,
             experiment=experiment,
             variant=candidate_variant,
             split="holdout",
             layout=layout,
             reuse_existing=reuse_existing,
         )
-        current_combined = current_train.passed + current_holdout.passed
-        candidate_combined = train.passed + holdout.passed
-        accepted = candidate_combined > current_combined
-        reason = (
-            "improved combined train + holdout pass count"
-            if accepted
-            else "did not improve combined train + holdout pass count"
+        gate_decision = decide(
+            gate=experiment.gate,
+            current_train=current_train,
+            current_holdout=current_holdout,
+            candidate_train=train,
+            candidate_holdout=holdout,
         )
+        accepted = gate_decision.accepted
         candidate = CandidateEvaluation(
             variant=candidate_variant.key,
             proposal=proposal,
             train=train,
             holdout=holdout,
             accepted=accepted,
-            reason=reason,
+            reason=gate_decision.reason,
+            gate_decision=gate_decision,
         )
         layout.write_iteration_decision(
             iteration=index,
@@ -995,6 +1036,8 @@ def run_experiment(
         baseline_scorecard=baseline_scorecard,
         final_scorecard=final_scorecard,
         iterations=tuple(iterations),
+        repeats=experiment.repeats,
+        gate=experiment.gate,
     )
     layout.write_report(report)
     return report
@@ -1008,9 +1051,12 @@ def _run_optional_scorecard(
     layout: RunLayout,
     reuse_existing: bool,
 ) -> SplitResult | None:
+    from better_harness.repeats import run_split_repeated
+
     if not experiment.has_split("scorecard"):
         return None
-    return runner.run_split(
+    return run_split_repeated(
+        runner,
         experiment=experiment,
         variant=variant,
         split="scorecard",
@@ -1058,6 +1104,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--max-iterations", type=int)
     run_parser.add_argument("--reuse-existing", action="store_true")
     run_parser.add_argument("--output-dir", type=Path)
+    run_parser.add_argument(
+        "--repeats",
+        type=int,
+        help=f"rollouts per split per candidate (config default: {DEFAULT_REPEATS})",
+    )
+    run_parser.add_argument(
+        "--gate",
+        choices=VALID_GATES,
+        help=f"promotion gate (config default: {DEFAULT_GATE})",
+    )
 
     inspect_parser = subparsers.add_parser("inspect", help="Summarize one run directory")
     inspect_parser.add_argument("run_dir", type=Path)
@@ -1085,6 +1141,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     experiment = load_experiment(args.config, model_override=getattr(args, "model", None))
+    overrides = {
+        field: value
+        for field, value in (("repeats", getattr(args, "repeats", None)), ("gate", getattr(args, "gate", None)))
+        if value is not None
+    }
+    if overrides:
+        experiment = replace(experiment, **overrides)
+        validate_experiment(experiment)
 
     if args.command == "validate":
         print(f"Config valid: {experiment.path}")
@@ -1092,6 +1156,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Workspace: {experiment.workspace_root}")
         print(f"Model: {experiment.model}")
         print(f"Better-agent model: {experiment.better_agent_model}")
+        print(f"Repeats per split: {experiment.repeats}")
+        print(f"Promotion gate: {experiment.gate}")
         print(f"Surfaces: {', '.join(experiment.surfaces)}")
         print(f"Train: {len(experiment.cases_for_split('train'))} cases")
         print(f"Holdout: {len(experiment.cases_for_split('holdout'))} cases")

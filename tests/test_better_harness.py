@@ -588,10 +588,13 @@ def test_run_end_to_end_pytest_demo(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         output_dir=output_dir,
         max_iterations=4,
     )
-    assert report.final_train.passed == 4
-    assert report.final_holdout.passed == 4
+    # Counts are attempts, not cases: passed/total scale with report.repeats (P0-1).
+    assert report.final_train.passed == 4 * report.repeats
+    assert report.final_holdout.passed == 4 * report.repeats
+    assert report.final_train.correctness == 1.0
+    assert report.final_holdout.correctness == 1.0
     assert report.final_scorecard is not None
-    assert report.final_scorecard.passed == 2
+    assert report.final_scorecard.passed == 2 * report.repeats
     assert (output_dir / "history" / "visible" / "train").exists()
     assert (output_dir / "history" / "private" / "holdout").exists()
     assert (output_dir / "history" / "visible" / "iterations" / "001" / "decision.json").exists()
@@ -735,10 +738,11 @@ stratum = "combined"
 
     output_dir = tmp_path / "harbor-run"
     report = run_experiment(load_experiment(config), output_dir=output_dir, max_iterations=2)
-    assert report.final_train.passed == 2
-    assert report.final_holdout.passed == 2
+    assert report.final_train.passed == 2 * report.repeats
+    assert report.final_holdout.passed == 2 * report.repeats
+    assert report.final_train.correctness == 1.0
     assert report.final_scorecard is not None
-    assert report.final_scorecard.passed == 1
+    assert report.final_scorecard.passed == 1 * report.repeats
     assert (output_dir / "history" / "private" / "scorecard").exists()
 
 

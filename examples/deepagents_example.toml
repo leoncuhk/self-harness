@@ -22,6 +22,16 @@ workspace_root = "${DEEPAGENTS_ROOT}"
 model = "claude-sonnet-4-6"
 max_iterations = 3
 
+# P0-1: rollouts per split per candidate. Below 3 a promotion decision cannot be
+# separated from run-to-run noise. Raise it on noisy benchmarks; lower it only to
+# reproduce upstream behaviour.
+repeats = 3
+
+# P0-2: promotion gate.
+#   conservative -> Δ_in >= 0 and Δ_ho >= 0 and max(Δ_in, Δ_ho) > 0
+#   combined     -> (Δ_in + Δ_ho) > 0   (upstream; lets holdout regress)
+gate = "conservative"
+
 [better_agent]
 model = "claude-sonnet-4-6"
 max_turns = 11000
