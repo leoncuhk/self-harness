@@ -18,11 +18,11 @@ until you compare it against a baseline.
 | Level | Question it answers | Status |
 | --- | --- | --- |
 | L0 | Does the code do what it says? | ✅ 74 tests, lint clean |
-| L1 | Does the loop run with a **real** outer agent? | ❌ never executed |
-| L2 | What is the real baseline, and how noisy is it? | ❌ not measured |
-| L3 | Does the proposer understand what it is doing? | ❌ no data |
-| L4 | Does evolution beat spending the same budget on retries? | ❌ not run |
-| L5 | Does the gain survive a locked test and transfer? | ❌ not run |
+| L1 | Does the loop run with a **real** outer agent? | ✅ M1 2026-08-11, all 6 criteria ([results](results.md)) |
+| L2 | What is the real baseline, and how noisy is it? | ✅ measured — MVP-1 saturated (0.917, 0 flaky) and the stop rule fired |
+| L3 | Does the proposer understand what it is doing? | ⏳ MVP-2 ([mvp.md](mvp.md)) |
+| L4 | Does evolution beat spending the same budget on retries? | ⏳ MVP-2 — the decisive test |
+| L5 | Does the gain survive a locked test and transfer? | ❌ post-MVP |
 
 ---
 

@@ -1,3 +1,14 @@
+# Pre-registration registry
+
+Chronological, append-only. Each entry is frozen before its data is collected;
+outcomes are recorded against entries, never by rewriting them.
+
+- **MVP-1** (below) — terminated at M2 by its stop rule; see [results](results.md).
+- **[MVP-2](#mvp-2-pre-registration)** (end of file) — completes L3/L4/L5.1 on the
+  same suite with a calibrated weaker inner model.
+
+---
+
 # MVP plan — pre-registered
 
 > **Outcome (2026-08-11): the MVP terminated at M2 under the frozen headroom rule** —
@@ -347,3 +358,66 @@ the M4 comparison with the pre-registered rule applied, and the single scorecard
 number. Positive → proceed to L4 multi-seed / L5. Negative → the writeup *is* the
 result, and the next question is which box of the loop failed (③ proposals weak? ②
 clusters uninformative? ④ gate starved?) — answerable from the same artifacts.
+
+---
+
+# MVP-2 pre-registration
+
+**Registered 2026-08-11, before any calibration rollout.** Purpose: run the
+L3 (prediction accuracy), L4 (equal-budget comparison), and L5.1 (locked test)
+stages that MVP-1's stop rule correctly cancelled, on the same 16-task suite,
+with an inner model that has headroom.
+
+## Roles
+
+- **Proposer (updater):** `openai:deepseek-v4-flash` — unchanged from MVP-1.
+- **Inner agent (beneficiary):** selected by the calibration rule below.
+- **Disclosure:** proposer and inner agent are no longer the same model. The claim
+  under test is *system-level* self-improvement (the agent system edits its own
+  harness from its own execution evidence), in the updater≠beneficiary
+  configuration that matches AHE practice. Same-model "self" purity was an MVP-1
+  property; MVP-2 trades it for a testbed that can detect anything at all.
+
+## Calibration rule (model selection)
+
+1. Candidate models come from the endpoint's inventory, ordered ascending by
+   expected capability (list fixed and committed after inventory, before any task
+   rollout; every probed candidate is reported).
+2. A candidate must first pass a non-task tool-calling smoke (one function call).
+3. Calibration baseline: train+holdout at `repeats=3`. First candidate whose
+   combined pass@1 lands in **[0.20, 0.85]** is selected. Selection uses baseline
+   numbers only — never evolution results — so it cannot favour either M4 arm.
+4. The winner's baseline is then re-measured at `repeats=5` (the M4 reference).
+5. If the list is exhausted with no candidate in window, MVP-2 stops and reports.
+
+## Frozen experiment parameters
+
+5 iterations · K=1 · `repeats=3` · conservative gate · guards and budget enabled ·
+proposer `max_turns=100` · `temperature=0` for the inner agent · suite, split, and
+verifiers bit-identical to MVP-1 rev1 (commit `206b916` lineage).
+
+## Decision rules (frozen)
+
+- **L3 read first:** prediction precision vs base rate from `ledger.md`;
+  `unpredicted_regressions`; signature `unknown` rate; guard log. Read before any
+  pass-rate judgement.
+- **M4 (decisive):** B1 = winner-model seed harness, best-of-N, N chosen to match
+  the evolution run's **total** spend (inner + proposer tokens; rollout-matched
+  reported alongside). Rule: evolution final harness beats B1 on the **holdout
+  paired margin by more than the winner's baseline holdout CI half-width**.
+  Power disclosure: with 4 holdout cases the margin quantum is 0.25 and the rule
+  is hard to satisfy; the pooled train+holdout margin is reported as secondary
+  evidence but is not decisive.
+- **Scorecard:** unsealed exactly once, after the M4 verdict. Nothing before that
+  reads any scorecard output.
+- **Fingerprint discipline:** per-rollout `system_fingerprint` is now captured in
+  eval summaries; a fingerprint change mid-stage invalidates that stage.
+- **No further task revisions of any kind.** The difficulty budget died with MVP-1.
+
+## What MVP-2 can conclude
+
+Positive: on this suite, for this updater→beneficiary pair, one evolution run beat
+equal-budget oracle retries — existence, not generality (single seed, authored
+tasks, no transfer). Negative: the loop failed to beat retries here — consistent
+with published priors, and reported as such. Either way: first L3 prediction-
+accuracy data on a non-toy setup.
