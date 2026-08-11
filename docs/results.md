@@ -115,7 +115,7 @@ No scorecard output was ever read; `runs/*-rev0` and rev1 run dirs are preserved
 
 ## Protocol-execution gaps, disclosed
 
-- **Per-rollout `system_fingerprint` logging was promised in MVP.md but not
+- **Per-rollout `system_fingerprint` logging was promised in the MVP-1 pre-registration ([mvp.md](mvp.md)) but not
   implemented during the four baseline campaigns** — provider drift was unmonitored
   while they ran. Closed after the fact (`agent_harness.run_task` and the eval
   summary now record fingerprints), so it holds for future runs, not

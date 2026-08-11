@@ -1,12 +1,13 @@
 # better-harness (self-harness fork)
 
 > **Fork index.** This is a fork of upstream `examples/better-harness` with an
-> experimental-rigor layer and a completed, pre-registered MVP experiment:
+> experimental-rigor layer and pre-registered MVP experiments. Docs live in `docs/`:
 >
-> - [`FORK.md`](FORK.md) — every divergence from upstream and why (P0–P2 patches)
-> - [`VERIFY.md`](VERIFY.md) — the L0–L5 verification ladder and falsification criteria
-> - [`MVP.md`](MVP.md) — the frozen pre-registration (amendments recorded in place)
-> - [`RESULTS.md`](RESULTS.md) — the outcome: terminated at M2 by the stop rule; testbed saturated
+> - [`docs/overview.md`](docs/overview.md) — self-harness 认知: concept, loop, landscape, evidence priors
+> - [`docs/design.md`](docs/design.md) — the fork's rigor layer (P0–P2), eval methodology, suite, risks
+> - [`docs/verification.md`](docs/verification.md) — the L0–L5 ladder and falsification criteria
+> - [`docs/mvp.md`](docs/mvp.md) — pre-registration registry (MVP-1, MVP-2), append-only
+> - [`docs/results.md`](docs/results.md) — outcomes, gaps disclosed
 > - `benchmarks/agentic/` — 16-task suite, real inner agent, deterministic verifiers
 > - `scripts/` — task generator, M1 verifier, analysis (baseline CI / pass@N / tokens / M4 compare)
 >
