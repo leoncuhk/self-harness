@@ -18,6 +18,42 @@ The MVP answers one question: *on this task set, does one full evolution run bea
 spending the same budget on retries of the seed harness?* It does not claim
 generality, transfer, or reproducibility — those are L5 and multi-seed work.
 
+## Model plan — every role on one OpenAI-compatible endpoint
+
+All model calls run on `deepseek-v4-flash` via an OpenAI-compatible proxy
+(aihubmix), reached through LangChain's `init_chat_model` with
+`model = "openai:deepseek-v4-flash"` and `OPENAI_BASE_URL` pointing at the proxy.
+Connectivity, token usage reporting (`prompt_tokens` / `completion_tokens` /
+`reasoning_tokens`), and `system_fingerprint` were verified live on 2026-08-11
+(fingerprint `fp_a18b46594c_prod0820_fp8_kvcache_20260402`).
+
+| Role | Model | Why |
+| --- | --- | --- |
+| Outer proposer | deepseek-v4-flash | reasoning model; harness-*updating* ability is roughly flat across model tiers (2605.30621), so a flash-tier proposer is adequate |
+| Inner agent | deepseek-v4-flash | harness-*benefit* is non-monotonic across tiers — mid-tier models gain most. A frontier inner agent has little headroom for a harness to add; a mid-tier one is the more sensitive instrument for detecting the effect at all |
+| Evaluator | none (deterministic TB2.1 verifiers) | the frozen-evaluator premise stays intact — no LLM judge anywhere in the loop |
+
+What this buys:
+
+- **True "self"-harness.** Proposer and inner agent are the same model: the claim
+  being tested is literally self-improvement, not strong-model-tunes-weak-model.
+  Cross-model updater→beneficiary cells stay available for L5 (Claude Code as an
+  alternate proposer is one function swap away).
+- **One accounting stream.** Every token in the experiment flows through one API with
+  full usage reporting, so M4's equal-budget comparison is token-matched by
+  construction. `reasoning_tokens` are inside `completion_tokens` and are counted —
+  a proposer that thinks longer pays for it.
+- **Cheap rollouts.** Flash-tier pricing means variance control (repeats, larger N in
+  B1) costs little; the budget table below is conservative.
+
+What it costs (each is a registered threat below):
+
+- The provider is a third-party proxy: the model behind the name can drift. Every run
+  logs `system_fingerprint`; a fingerprint change **mid-stage** invalidates that stage
+  (rerun it), a change **between** stages is recorded in the writeup.
+- Temperature and model string are pinned in the config; sampling nondeterminism
+  remains and is what `repeats` exists for.
+
 ## Stages
 
 ### M1 — real-loop smoke (= VERIFY L1)
@@ -25,10 +61,17 @@ generality, transfer, or reproducibility — those are L5 and multi-seed work.
 Toy fixture, live proposer. One to three model calls.
 
 ```bash
-export DEEPAGENTS_ROOT=... ANTHROPIC_API_KEY=...
+export DEEPAGENTS_ROOT=...
+export OPENAI_API_KEY=<aihubmix key>
+export OPENAI_BASE_URL=https://aihubmix.com/v1
+# config: model = "openai:deepseek-v4-flash" for both [experiment] and [better_agent]
 uv run better-harness run examples/deepagents_example.toml \
   --output-dir runs/m1-smoke --max-iterations 1 --repeats 1
 ```
+
+M1 additionally confirms the LangChain `openai:` provider path actually honours
+`OPENAI_BASE_URL` inside the deepagents proposer — that wiring has been verified only
+with raw curl so far.
 
 Pass criteria (none are pass-rate): surfaces actually rewritten (diff vs baseline);
 `prediction_made: true` in ledger; `decision.json` has a real gate block; no
@@ -102,6 +145,11 @@ the writeup says so).
 **Not** grounds for continuing to tune: "it almost cleared the bar", "one task was
 unfair", "the proposer had a bad day". One evolution run, one B1 run, one comparison.
 
+One pre-registered exception (see threat 12): if the result is negative, M3+M4 may be
+rerun **once** with a frontier proposer (Claude) before the conclusion is written, to
+separate "the method fails" from "this proposer fails". Both runs are reported either
+way; the exception cannot be invoked twice.
+
 ### Scorecard access budget (frozen)
 
 The `scorecard` split is unsealed **exactly once** in the entire MVP: after the M4
@@ -158,14 +206,31 @@ Threats, in decreasing order of how much they could corrupt the conclusion:
 6. **Task selection bias.** Handled by pre-registered stratified random sampling.
 7. **Static guard is not a sandbox.** A tool surface could still misbehave at runtime.
    Handled at MVP scale by human audit of every promoted diff.
-8. **Proposer and inner agent share a model family.** The result claims
-   self-improvement *for this configuration*; cross-model updater→beneficiary transfer
-   is L5.
+8. **Proposer and inner agent are the same model.** Deliberate: it makes the claim
+   *self*-improvement rather than distillation. The cost is that the result says
+   nothing about cross-model transfer (L5), and a shared blind spot (the model cannot
+   see its own systematic failure mode) depresses the result — which biases the MVP
+   *against* a false positive, the acceptable direction.
 9. **Signature vocabulary untested on TB.** High `unknown` rate expected on first
    contact; it is a measured limitation, not silently absorbed.
 10. **Experimenter degrees of freedom.** The main defense is this document's ordering:
     criteria frozen before data, one decision point (M4), one scorecard unseal, and
     negative results are a deliverable, not a bug.
+11. **The model behind the proxy is not frozen.** The weights-frozen premise is only
+    as good as the provider's routing: aihubmix could silently swap the model behind
+    `deepseek-v4-flash`. Mitigation: `system_fingerprint` logged on every call;
+    mid-stage change → rerun the stage; between-stage change → reported. Residual
+    risk accepted and disclosed — this is the price of the single-API design, and it
+    applies equally to both arms of M4, so it threatens absolute numbers more than
+    the comparison itself.
+12. **Proposer capability floor.** A flash-tier proposer might write weaker harness
+    edits than a frontier one. Two reasons this is acceptable at MVP scale: published
+    evidence (2605.30621) finds harness-updating ability roughly flat across tiers;
+    and if the MVP is positive *despite* a flash proposer, the result is stronger,
+    while a negative result triggers one pre-authorized follow-up — rerun M3+M4 with
+    a frontier proposer (Claude) before writing the final conclusion, since "the
+    method fails" and "this proposer fails" must not be conflated. That follow-up is
+    part of the MVP's negative-result protocol, not post-hoc tuning.
 
 ## What the MVP deliverable looks like
 
