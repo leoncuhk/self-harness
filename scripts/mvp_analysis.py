@@ -147,16 +147,62 @@ def cmd_tokens(run_dir: Path, include_scorecard: bool) -> None:
     print(f"[total] {grand:,} tokens" + ("" if include_scorecard else " (scorecard excluded)"))
 
 
+def _final_variant(run_dir: Path, split: str) -> str:
+    """Final promoted variant key for a split (falls back to baseline)."""
+    report = json.loads((run_dir / "report.json").read_text())
+    key = report.get("final", {}).get("key") or "baseline"
+    return key if _split_dir(run_dir, split, key).exists() else "baseline"
+
+
+def cmd_compare(evo_run: Path, b1_run: Path, m2_halfwidth: float) -> None:
+    """M4 frozen decision rule: evolution final pass@1 vs B1 oracle pass@N, holdout.
+
+    Paired per case; margin must exceed the M2 baseline CI half-width.
+    """
+    split = "holdout"
+    evo_variant = _final_variant(evo_run, split)
+    evo = _case_fractions(evo_run, split, evo_variant)
+    b1_repeats = _load_repeats(b1_run, split, "baseline")
+    if b1_repeats is None:
+        print("B1 run has no repeats.json on holdout; cannot score pass@N")
+        return
+    b1 = {
+        case["case_id"]: 1.0 if float(case["pass_fraction"]) > 0 else 0.0
+        for case in b1_repeats["cases"]
+    }
+    cases = sorted(set(evo) & set(b1))
+    if set(evo) != set(b1):
+        print(f"warning: case sets differ; comparing intersection of {len(cases)}")
+    diffs = [evo[case] - b1[case] for case in cases]
+    margin, lo, hi = bootstrap_ci(diffs)
+    evo_mean = sum(evo[case] for case in cases) / len(cases)
+    b1_mean = sum(b1[case] for case in cases) / len(cases)
+    print(f"evolution final variant: {evo_variant}")
+    print(f"[{split}] evolution pass@1 = {evo_mean:.3f}   B1 oracle pass@{b1_repeats['repeats']} = {b1_mean:.3f}")
+    print(f"[{split}] paired margin = {margin:+.3f}  CI95 = [{lo:+.3f}, {hi:+.3f}]")
+    for case in cases:
+        print(f"    evo={evo[case]:>5.2f}  b1={b1[case]:.0f}  {case}")
+    verdict = margin > m2_halfwidth
+    print(f"frozen rule: margin {margin:+.3f} > M2 half-width {m2_halfwidth:.3f} ? "
+          f"{'YES -> MVP POSITIVE' if verdict else 'NO -> MVP NEGATIVE'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["baseline-stats", "pass-at-n", "tokens"])
+    parser.add_argument("command", choices=["baseline-stats", "pass-at-n", "tokens", "compare"])
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--include-scorecard", action="store_true")
+    parser.add_argument("--b1-run", type=Path, default=None)
+    parser.add_argument("--m2-halfwidth", type=float, default=None)
     args = parser.parse_args()
     if args.command == "baseline-stats":
         cmd_baseline_stats(args.run_dir, args.include_scorecard)
     elif args.command == "pass-at-n":
         cmd_pass_at_n(args.run_dir)
+    elif args.command == "compare":
+        if args.b1_run is None or args.m2_halfwidth is None:
+            parser.error("compare needs --b1-run and --m2-halfwidth")
+        cmd_compare(args.run_dir, args.b1_run, args.m2_halfwidth)
     else:
         cmd_tokens(args.run_dir, args.include_scorecard)
 
