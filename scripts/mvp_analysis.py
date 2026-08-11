@@ -148,7 +148,7 @@ def cmd_tokens(run_dir: Path, include_scorecard: bool) -> None:
 
 
 def _final_variant(run_dir: Path, split: str) -> str:
-    """Final promoted variant key for a split (falls back to baseline)."""
+    """Return the final promoted variant key for a split (baseline fallback)."""
     report = json.loads((run_dir / "report.json").read_text())
     key = report.get("final", {}).get("key") or "baseline"
     return key if _split_dir(run_dir, split, key).exists() else "baseline"
