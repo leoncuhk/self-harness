@@ -487,7 +487,9 @@ def test_default_candidates_is_one(tmp_path: Path):
 
 def test_transient_error_classifier_covers_transport_failures():
     """A dropped connection must be retried, not crash the iteration (MVP-2 incident)."""
-    from better_harness.agent import _is_transient_model_error  # noqa: PLC0415 - local to avoid import cost in unrelated tests
+    from better_harness.agent import (
+        _is_transient_model_error,
+    )
 
     assert _is_transient_model_error(
         "httpx.RemoteProtocolError: Server disconnected without sending a response."
