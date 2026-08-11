@@ -20,9 +20,32 @@ one thing all the negative results share is honest budget matching; the one thin
 all the positive results share is trace-grounded diagnosis. Nobody has published
 both together. That is the opening.
 
+## Phase 0 — shipped 2026-08-11
+
+Before any of the gaps below could be worked on, an audit found the instrument
+itself unsound. All of the following are now in `main`, with 112 tests:
+
+| Item | Status |
+| --- | --- |
+| Inner-agent retry + timeout; content-addressed `--resume`; markers on crash | ✅ `f4e3186` |
+| Sealed-split rows withheld from stdout by default | ✅ `f4e3186` |
+| Apparatus partition; unmeasured evaluations cannot promote | ✅ `7933965` |
+| φ(r) reads the error, not pytest's echo; `step_budget_exhausted` / `harness_did_not_load` named | ✅ `7933965` |
+| Answer-key leak closed (shared case sources withheld from the proposer) | ✅ `7933965` |
+| Fingerprint discipline enforced in code | ✅ `7933965` |
+| Static surface smoke gate | ✅ `7933965` |
+| `scripts/verify_artifacts.py` — [L0.5](verification.md#l05--artifact-fidelity) | ✅ `7933965` |
+| JUnit case-id resolution; sealed split evaluated once | ✅ `2369fc7` |
+
+What it found is in [results.md](results.md#correction--instrument-defects-found-2026-08-11-and-what-they-change).
+The short version: every sealed-split number in the repo was 0/20 against a true
+17–18/20, train and holdout were clean, and 47% of measured failures pointed at
+a step budget the proposer cannot reach.
+
 ## The gaps
 
-Ordered by leverage, not by effort.
+Ordered by leverage, not by effort. Gaps 5 (crash surface) and the instrument
+items above are closed; the rest stand.
 
 | # | Gap | Evidence it matters | Status in code |
 | --- | --- | --- | --- |

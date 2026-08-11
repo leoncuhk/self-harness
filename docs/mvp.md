@@ -508,3 +508,52 @@ Made before M3 and after the baseline, so they need stating:
 
 Both are reliability-only: they change which runs *finish*, not what the
 proposer sees, what the verifier accepts, or how any decision is made.
+
+---
+
+## Amendment 3 (2026-08-11, recorded after M3 was stopped and voided, before any M3 data is used)
+
+**Trigger: an audit of the instrument, not of the results.** Every recorded
+outcome in every run was re-derived from the raw `junit.xml`. Five defects were
+found, all reproduced from artifacts before anything was changed; the full
+account with numbers is in [results.md](results.md#correction--instrument-defects-found-2026-08-11-and-what-they-change).
+
+**The stopped M3 run is void.** Two independent reasons, either sufficient:
+the proposer was receiving all 16 verifier reference implementations — including
+all four sealed scorecard cases — on every iteration, so any prediction-accuracy
+number would measure the leak rather than the reasoning; and the stage spans two
+provider fingerprints, which this pre-registration already says invalidates a
+stage. Its artifacts are preserved as evidence, not as results.
+
+### Instrument changes, all recorded before the re-run
+
+| Change | Why it is not a protocol change |
+| --- | --- |
+| Case-source files shared with a private split are withheld from the proposer | Removes information the proposer was never entitled to. Strictly reduces its inputs |
+| Apparatus failures leave numerator and denominator; a mostly-unmeasured evaluation cannot promote | Restores the intended meaning of pass@1. Does not alter the promotion rule for measured evaluations |
+| JUnit outcomes resolve by matching configured ids instead of guessing nodeids; the sealed split is evaluated once | Fixes reading the verifier's output. The verifier itself is untouched |
+| φ(r) reads the error rather than pytest's echo of the test source; `step_budget_exhausted` and `harness_did_not_load` are named causes | Improves diagnosis quality. Clustering is not part of any decision rule |
+| Fingerprint discipline enforced in code | Implements a rule this document already froze |
+| Surfaces that do not parse are rejected statically | Extends the existing guard to a defect class that previously cost a full evaluation |
+
+**Unchanged:** suite, splits, verifiers, inner model, proposer, 5 iterations,
+K=1, repeats=3, conservative gate, budget, `temperature=0`. MVP-2 remains an
+**L3 experiment** with M4 descriptive, per Amendment 2.
+
+### Disclosed asymmetry
+
+The re-run's baseline must be re-measured on the corrected instrument rather
+than compared against `runs/mvp2-baseline`. The audit found train and holdout
+clean there, so the numbers are expected to reproduce — but "expected to" is not
+"verified as", and a baseline measured by a different instrument than the
+treatment is exactly the confound this project exists to refuse.
+
+### Registered limitation, not fixed for MVP-2
+
+47% of the measured train+holdout failures are `GraphRecursionError` — the agent
+exhausting `RECURSION_LIMIT = 60`, a constant in the frozen inner-agent builder
+that **no editable surface can reach**. The proposer can therefore see nearly
+half of its failure mass and do nothing about it. Making runtime control policy
+an editable surface is the right fix and is a *task-set and surface* change, so
+it belongs to MVP-3's pre-registration, not to an amendment of this one. MVP-2's
+L3 result must be read with this ceiling stated.

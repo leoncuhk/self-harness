@@ -17,7 +17,8 @@ until you compare it against a baseline.
 
 | Level | Question it answers | Status |
 | --- | --- | --- |
-| L0 | Does the code do what it says? | ✅ 74 tests, lint clean |
+| L0 | Does the code do what it says? | ✅ 112 tests, lint clean |
+| **L0.5** | **Do the recorded numbers match what was measured?** | ✅ after Phase 0 — **it did not before** ([artifact fidelity](#l05--artifact-fidelity)) |
 | L1 | Does the loop run with a **real** outer agent? | ✅ M1 2026-08-11, all 6 criteria ([results](results.md)) |
 | L2 | What is the real baseline, and how noisy is it? | ✅ measured — MVP-1 saturated (0.917, 0 flaky) and the stop rule fired |
 | L3 | Does the proposer understand what it is doing? | ⏳ MVP-2 ([mvp.md](mvp.md)) |
@@ -50,8 +51,65 @@ What the tests actually pin down, beyond "it runs":
 | Environment failures are not mined as harness weaknesses | `test_classify_environment_failure_is_not_blamed_on_the_agent` |
 | Predictions are parsed, stored, and graded | `test_prediction_survives_into_the_ledger_and_is_graded` |
 | K>1 yields K records, at most one promotion | `test_k_candidates_each_get_their_own_record` |
+| A resumed run never reuses a result measured on a different harness | `test_resume_refuses_a_result_measured_on_a_different_harness` |
+| Apparatus failures leave the numerator *and* the denominator | `test_apparatus_failures_leave_the_denominator` |
+| A mostly-unmeasured evaluation cannot promote | `test_a_mostly_unmeasured_evaluation_cannot_promote` |
+| Signatures read the error, not pytest's echo of the test source | `test_signature_reads_the_error_not_the_test_source` |
+| One stage spanning two provider fingerprints fails | `test_one_stage_two_fingerprints_fails_the_stage` |
+| A source file shared with a private split is never copied to the proposer | `test_a_source_file_shared_with_a_private_split_is_never_copied` |
+| A surface that does not parse is rejected before any eval is spent | `test_a_surface_that_does_not_parse_is_rejected_before_any_eval` |
+| The sealed split is evaluated once, not twice into one directory | `test_an_unpromoted_run_does_not_evaluate_the_sealed_split_twice` |
+| A JUnit file with no `file` attribute still resolves to its case | `test_junit_without_a_file_attribute_still_resolves_to_its_case` |
 
-### The hole in L0
+### The bigger hole in L0, found the hard way
+
+Every test above passed continuously while the repo's most protocol-loaded
+number was wrong by ~90 percentage points. That is not a gap in the test suite;
+it is a limit of what a test suite can do. **Unit tests verify that the code does
+what the code says. They cannot verify that what the code says is what you meant
+to measure.** `parse_pytest_outcomes` correctly recorded `missing → score 0` for
+every case whose nodeid it failed to reconstruct — exactly as written, and
+exactly wrong.
+
+Nothing in L0–L5 as originally written would ever have caught it, because every
+rung consumes `result.json` and asks questions *about* the numbers rather than
+*of* them. Hence a new rung, below all of them.
+
+---
+
+## L0.5 — artifact fidelity
+
+**Question:** does every recorded outcome match the raw evidence the runner
+wrote?
+
+```bash
+uv run python scripts/verify_artifacts.py runs/*
+```
+
+The auditor re-derives every pass/fail straight from `junit.xml` and compares it
+with `result.json`. It deliberately shares no code and no assumptions with the
+parser under audit: each case directory holds the XML for exactly one case, so
+the outcome is unambiguous without reconstructing any identifier — which is
+precisely the step that was broken.
+
+**What it found on first contact** (before the Phase 0 fixes):
+
+| Run | recorded `final_scorecard` | true, from XML |
+| --- | --- | --- |
+| m2-baseline | 0/20 | **18/20** |
+| b5-baseline | 0/20 | **17/20** |
+| m2-baseline-rev0 | 0/20 | **18/20** |
+| b5-baseline-rev0 | 0/20 | **18/20** |
+| mvp2-baseline | 0/20 | **1/20** |
+
+Train and holdout were clean in all five runs — every discrepancy sat in the
+sealed split, so no experiment decision ever rested on a corrupted number. Had
+MVP-1 reached its one permitted unseal, it would have published ~0/20.
+
+**Rule:** no number from a run is admissible until this passes for that run.
+Cost: seconds, zero rollouts.
+
+### The original hole in L0
 
 `invoke_deepagents_proposer` — and everything under it (`_invoke_via_uv_project_once`,
 `_deepagents_import_context`, `_resolve_deepagents_root`, `_is_transient_model_error`) —

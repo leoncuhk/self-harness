@@ -83,3 +83,28 @@ by costing something. Append-only.
   harness-evolution result feeds execution traces to its proposer; we spent the
   whole build on selection rigor while box ② read pytest assertion text. Rigor
   around a blind diagnosis stage measures the blindness precisely.
+- **A passing test suite cannot tell you the instrument is right.** 88 tests and
+  a 213-line verification ladder were green throughout the entire period in which
+  every sealed-split number in the repo read 0/20 against a true 17–18/20. Unit
+  tests check that the code does what the code says; they cannot check that what
+  the code says is what you meant to measure. Only an independent re-derivation
+  from the raw evidence can, and it has to share no code with the thing it audits.
+- **Never let "we failed to measure" score as "the agent failed".** A parse miss
+  scored 0 exactly like a wrong answer, so an infrastructure defect was
+  indistinguishable from a capability result — and biased every estimate
+  downward by precisely the defect rate.
+- **Grep the failure corpus before trusting a classifier.** φ(r) labelled real
+  assertion failures `unbounded_retry_loop` because pytest echoes the test source
+  and this suite's `@pytest.mark.timeout(420)` decorator matched a `timeout`
+  rule. Text heuristics over free-form output need their inputs *looked at*, not
+  imagined; the classifier was wrong in a fixed direction, which is worse than
+  being silent.
+- **Every ratio-plus-floor threshold has a hole between the two.** The bloat
+  guard rejected the one substantive proposal at 9.92× and admitted the broken
+  one at 4.76× — because the second was under the absolute floor. Pairing a ratio
+  with a floor fixes the small-seed problem and creates a band where the ratio
+  does not apply. Check what falls in the band.
+- **Audit the artifacts of a run you are about to trust, not after.** The M3 run
+  was stopped four iterations in because an audit ran *while it was going*, not
+  because it crashed. Everything it had produced was inadmissible for reasons
+  visible from artifacts alone, at zero rollout cost.

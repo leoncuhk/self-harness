@@ -188,3 +188,98 @@ Two mitigations shipped and neither closed it: proposer-path retries
 Registered as gap 5 in the [roadmap](roadmap.md); items A1/A2 are the fix, and
 they are infrastructure only — no information reaching the proposer changes, so
 they do not touch the frozen MVP-2 protocol.
+
+**Run stopped 2026-08-11 22:5x, deliberately, four iterations in.** Not because
+of a crash — because an audit of the instrument found the run inadmissible while
+it was still going. See the correction below.
+
+---
+
+# Correction — instrument defects found 2026-08-11, and what they change
+
+An audit re-derived every recorded outcome from the raw `junit.xml`
+([L0.5](verification.md#l05--artifact-fidelity)). Five findings, all reproduced
+from artifacts in `runs/` before anything was changed.
+
+## 1. Every sealed-split number in the repo was wrong
+
+`final_scorecard` reads **0/20 in all five baseline runs**. The true values,
+recovered from the XML:
+
+| Run | recorded | true | per-case |
+| --- | --- | --- | --- |
+| m2-baseline | 0/20 | **18/20** | 5/5, 5/5, 4/5, 4/5 |
+| b5-baseline | 0/20 | **17/20** | 5/5, 5/5, 2/5, 5/5 |
+| m2-baseline-rev0 | 0/20 | **18/20** | 5/5, 5/5, 3/5, 5/5 |
+| b5-baseline-rev0 | 0/20 | **18/20** | 5/5, 5/5, 3/5, 5/5 |
+| mvp2-baseline | 0/20 | **1/20** | 1/5, 0/5, 0/5, 0/5 |
+
+Two compounding causes, both now fixed: the JUnit nodeid reconstruction could
+not map this suite's XML back to a configured case, so every case was recorded
+`missing → 0`; and when nothing is promoted the scorecard was evaluated twice
+into one variant-keyed directory, the second write overwriting the first.
+
+**What this does and does not change.** No experiment decision ever rested on a
+scorecard number — MVP-1 stopped on train/holdout, and Amendment 2's arithmetic
+rests on holdout. But had MVP-1 reached its one permitted unseal, it would have
+published ~0/20 as its locked-test headline against a true 18/20.
+
+## 2. Train and holdout are clean
+
+Zero discrepancies outside the scorecard split in all five runs. **The MVP-1 and
+MVP-2 baselines stand as measured**, and Amendment 2's conclusion is unaffected.
+
+## 3. Nearly half the measured failures were not task failures
+
+`runs/mvp2-baseline`, per-repeat, 80 rollouts / 17 passed / 63 failed:
+
+| | count | what it is |
+| --- | --- | --- |
+| assertion | 23 | real task failure |
+| `GraphRecursionError` | 20 | step budget exhausted — **`RECURSION_LIMIT = 60`, a frozen constant no editable surface can reach** |
+| junit unreadable | 20 | never measured (all 20 scorecard rollouts) |
+
+So of the 43 train+holdout failures, **20 (47%) point at a lever the proposer is
+forbidden to pull**. That is a testbed design fault, not a model result: the
+literature treats runtime control policy (error caps, tool-message caps) as an
+*editable* component, and here it is welded shut.
+
+## 4. The failure classifier was confidently wrong, in a fixed direction
+
+Measured on the real messages, before the fix:
+
+| input | φ(r) |
+| --- | --- |
+| `GraphRecursionError` | `unknown / undetermined / unknown` |
+| junit unreadable | `unknown / undetermined / unknown` |
+| broken middleware | `unknown / undetermined / unknown` |
+| **a real assertion failure** | **`timeout / agent_caused / unbounded_retry_loop`** |
+
+The three instrument failures landed in `unknown`; the one genuine task failure
+got a confident, wrong mechanism — because pytest echoes the test source into
+the failure message and this suite's `@pytest.mark.timeout(420)` decorator
+matched the `timeout` rule. Box ② was telling the proposer the agent looped on
+retries when it had mis-padded a column.
+
+## 5. The frozen fingerprint rule had already fired, unenforced
+
+`runs/mvp2-evolve` spans `fp_e010545658` (74 rollouts) and `fp_65c6c2730f` (66)
+against a single-fingerprint baseline. MVP-2's frozen rule voids a stage whose
+provider model changed mid-run. No code enforced it; there is now.
+
+## Also observed in the four completed M3 iterations
+
+- **iteration 1** — the only substantive proposal — was rejected by the bloat
+  guard at 7770B from a 783B seed (9.92×).
+- **iteration 2** was admitted at 3725B (4.76×, *58% over the same ratio*)
+  because it fell under the 4096B absolute floor, then failed to load in all 24
+  train attempts: `TypeError: break_retry_loops() missing 1 required positional
+  argument: 'config'`. The gate recorded it as a harness regression
+  (Δ_in=-1, Δ_ho=-3). A 60-second import check would have caught it; there is
+  now a static one, and `harness_did_not_load` is a named signature.
+
+## Status
+
+MVP-2's M3 is void and will be re-run on the corrected instrument. The
+pre-registration is unchanged in every respect that governs a decision; the
+instrument changes are recorded in [mvp.md](mvp.md) Amendment 3.
