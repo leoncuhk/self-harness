@@ -85,3 +85,95 @@ Bounded edits under fixed benchmarks (not open-ended self-improvement); accepted
 edits may reflect benchmark-specific failure patterns; dependent on verifier and
 trace quality; higher-stakes edits would need stronger acceptance gates than
 pass-rate non-regression.
+
+---
+
+## Evo-Bench (arXiv 2608.09096, RUC-AIBox) — a benchmark for harness-evolving capability
+
+*Studied 2026-08-11 from the authors' Chinese write-up. Code: RUCAIBox/Evo-Bench;
+data: HF RUC-AIBOX/Evo-Bench; site: evobench.org.*
+
+### What it is
+
+The first unified benchmark measuring a model's **Harness-Evolving Capability**:
+long-horizon, code-centric iterative improvement of an executable harness, judged
+by generalization to sealed evaluation tasks. Three requirements it enforces that
+ad-hoc evaluations miss:
+
+1. **Harness Sensitivity** — tasks must actually respond to harness quality, or
+   score changes prove nothing about evolution.
+2. **Cross-split Generalization** — validation and evaluation must have *matched
+   harness-response distributions*, not just disjoint samples, or gains are
+   validation overfitting.
+3. **Long-horizon Evolution** — up to 48h / 20 validation iterations / 1,000
+   evolver steps of analyze→hypothesize→edit→verify.
+
+### Construction — the principled fix for our MVP-1 failure
+
+**Harness-guided task selection**: 4 frontier models first evolve harnesses on 320
+auxiliary tasks (→73 versions →12 representative harnesses); those probe 2,329
+candidate tasks to build a Task-Harness Response Map; tasks are kept by
+**Sensitivity** (score varies with harness quality) and **Performance** (headroom),
+then stratified into 160 validation / 448 sealed evaluation with aligned response
+distributions. Final: 608 harness-sensitive tasks across Search (BrowseComp, HLE),
+Office (GDPval, APEX-Agents), General (Claw-Eval).
+
+This is the rigorous version of our headroom window: **select tasks by measured
+harness-response, not by authored difficulty.** MVP-1 died because our authored
+suite had zero measured harness sensitivity (B5 == seed was the tell).
+
+### Protocol — external validation of our MVP-2 shape
+
+Fixed **Policy Model** (main runs: **DeepSeek-V4-Flash** — the same model that
+saturated our authored suite scores 29.7 on their seed, confirming our diagnosis
+that the task family, not the model, was our problem) + the **Evolver Model**
+under test, running in its own fixed evolve-harness. Seed = minimal CodeAct
+(shell + final answer only). Evolver sees validation scores/traces only;
+evaluation stays sealed until the harness is frozen. **Evolver≠Policy is their
+standard configuration** — the updater≠beneficiary split MVP-2 uses.
+
+Two metrics: **Overall Score** (sealed eval, outcome) and **Anytime Validation
+Score** (research-process efficiency) — the process/outcome split our ledger
+implements at small scale.
+
+### Results
+
+- All 9 evolvers positive from seed 29.7: GPT-5.6-Sol 46.3, Claude Opus 4.8 45.8 —
+  still below the human-engineered composite **47.5**.
+- Domain-uneven: Search +34.8 (build missing web tools); Office ≈flat or negative
+  (specialised file/format workflows resist generic fixes); General 59.4 **beats
+  human 56.3** — sometimes by *removing* over-constraints, not adding rules.
+- **Early saturation is the norm**: best validated version ≠ final frozen version;
+  models misattribute real regressions to noise, skip paired experiments, never
+  roll back to historical best. (Exactly the failure classes our conservative
+  gate + ledger + at-most-one-promotion are built against.)
+- **Budget scaling works** (24h→48h keeps improving both scores) even though most
+  models underuse budget — stopping early on stalled reasoning loops.
+- **Cross-policy transfer is positive**: harnesses evolved with one policy model
+  lift Qwen3.6-35B (13.9→~29) and GLM-5.2 (38.0→48.4) over their own CodeAct
+  baselines. Nuances 2606.09498's model-specificity claim: evolved *tooling and
+  control structure* transfers; what stays model-specific is thinner than the
+  divergence figures suggest.
+
+### Critical read
+
+- Comparison is seed-vs-evolved and human-vs-evolved; **still no equal-budget
+  test-time-scaling arm** — the 2607.12227 objection applies here too, though the
+  sealed-eval + sensitivity-matched splits close the overfitting half of it.
+- Human 47.5 is a composite of three domain-specialised harnesses; the evolvers
+  build one general harness — the comparison slightly favours humans.
+- Sensitivity selection uses harnesses evolved by frontier models — task selection
+  is entangled with what *current* models know how to improve.
+
+### What this project takes
+
+1. **Confirmatory-step upgrade**: Evo-Bench (or its method) is a better external
+   testbed than raw TB2.1 for our L4/L5 — purpose-built sensitivity, matched
+   splits, sealed eval, public code/data.
+2. **Adopt harness-guided task selection** if we ever author tasks again: probe
+   with diverse harnesses, keep tasks with measured Sens>0, match split response
+   distributions. B5==seed is a cheap one-probe version of this test.
+3. Our gate/ledger/rollback design targets exactly the early-saturation failure
+   classes they document at scale — independent evidence those mechanisms matter.
+4. An **Anytime Validation Score** is worth adding to our reports (best-so-far
+   curve over iterations, already derivable from decision.json history).
