@@ -64,14 +64,43 @@ MECH_FORMAT_VIOLATION = "output_format_violation"
 MECH_TRUNCATION = "truncated_read"
 MECH_FLAKY = "nondeterministic_behaviour"
 
+CAUSE_STEP_BUDGET = "step_budget_exhausted"
+CAUSE_HARNESS_INVALID = "harness_did_not_load"
+
 # Ordered rules: first match wins, so put the specific patterns first.
+#
+# Exception classes are matched *before* free-text words. The earlier ordering
+# put a bare `timeout` first, and pytest echoes the test's own source into every
+# failure message — so this suite's `@pytest.mark.timeout(420)` decorator made
+# every real assertion failure classify as (timeout, agent_caused,
+# unbounded_retry_loop). The proposer was told the agent was looping on retries
+# when it had mis-padded a column. A classifier that reads the scaffolding
+# instead of the error is worse than no classifier: it is confidently wrong in a
+# fixed direction.
 CAUSE_RULES: tuple[tuple[str, str], ...] = (
-    (r"\btimed?\s*out\b|\btimeout\b|deadline exceeded", CAUSE_TIMEOUT),
+    (r"graphrecursionerror|recursion limit of \d+ reached", CAUSE_STEP_BUDGET),
+    (r"(typeerror|importerror|modulenotfounderror|syntaxerror|nameerror)\b.*"
+     r"(middleware|tools\.py|make_tools|surface)", CAUSE_HARNESS_INVALID),
+    (r"^e\s+assertionerror|assertionerror:", CAUSE_ASSERTION),
+    (r"^e\s+(\w*error|\w*exception):", CAUSE_EXCEPTION),
     (r"no such file|file not found|filenotfounderror|does not exist", CAUSE_MISSING_FILE),
     (r"assertionerror|\bassert\b|expected .* but got|did not match", CAUSE_ASSERTION),
+    (r"\btimed?\s*out\b|\btimeout\b|deadline exceeded", CAUSE_TIMEOUT),
     (r"non-?zero exit|exit code [1-9]|command failed|returned [1-9]\d* ", CAUSE_COMMAND_ERROR),
     (r"traceback \(most recent call last\)|unhandled exception|raised .*error", CAUSE_EXCEPTION),
     (r"no result|not collected|collection error|missing outcome", CAUSE_NO_RESULT),
+)
+
+MECH_STEP_BUDGET = "step_budget_exhausted"
+MECH_HARNESS_INVALID = "harness_did_not_load"
+
+# Lines pytest echoes from the test source rather than from the failure itself.
+# They describe the measuring apparatus, never the agent, and must not reach the
+# rule matcher.
+SCAFFOLD_LINE_PATTERN = re.compile(
+    r"^\s*(@pytest\.|def test_|task_id =|model =|tmp_path =|record_usage =|"
+    r"[a-z_]+ = <function|_ _ _ _|- - - -|=+ (FAILURES|short test summary))",
+    re.IGNORECASE,
 )
 
 ENVIRONMENT_RULES: tuple[str, ...] = (
@@ -153,6 +182,22 @@ def _match(rules: Iterable[tuple[str, str]], text: str) -> str | None:
     return None
 
 
+def strip_scaffolding(failure_message: str | None) -> str:
+    """Return the failure text with pytest's source echo removed, lower-cased.
+
+    Prefers the ``E   `` error lines when pytest emitted any: those are the
+    failure, everything else in the block is the test's own source.
+    """
+    if not failure_message:
+        return ""
+    lines = failure_message.splitlines()
+    error_lines = [line for line in lines if line.lstrip().startswith("E ")]
+    if error_lines:
+        return "\n".join(error_lines).lower()
+    kept = [line for line in lines if not SCAFFOLD_LINE_PATTERN.match(line)]
+    return "\n".join(kept).lower()
+
+
 def classify(outcome: CaseOutcome) -> FailureSignature:
     """Classify one failing outcome into ``φ(r) = (c, q, m)``."""
     if outcome.status == "flaky":
@@ -160,8 +205,24 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
         # not whatever the first failing repeat happened to print.
         return FailureSignature(CAUSE_NONDETERMINISTIC, UNDETERMINED, MECH_FLAKY)
 
-    text = (outcome.failure_message or "").lower()
+    text = strip_scaffolding(outcome.failure_message)
+    # Surface-load failures are recognised from the whole message: the frame that
+    # names middleware.py or tools.py is not on pytest's `E ` lines.
+    raw = (outcome.failure_message or "").lower()
+    if re.search(r"middleware\.py|tools\.py|make_tools|surface", raw) and re.search(
+        r"(typeerror|importerror|modulenotfounderror|syntaxerror|nameerror|attributeerror)", text
+    ):
+        return FailureSignature(CAUSE_HARNESS_INVALID, AGENT_CAUSED, MECH_HARNESS_INVALID)
     cause = _match(CAUSE_RULES, text) or (UNKNOWN if text else CAUSE_NO_RESULT)
+    if cause == CAUSE_STEP_BUDGET:
+        # The agent ran and spent its whole step budget. That is a real task
+        # failure, and the mechanism is specific enough to act on — provided the
+        # step budget is reachable from an editable surface.
+        return FailureSignature(CAUSE_STEP_BUDGET, AGENT_CAUSED, MECH_STEP_BUDGET)
+    if cause == CAUSE_HARNESS_INVALID:
+        # The candidate's own surfaces failed to load. Not the agent's conduct
+        # and not the environment's: the edit is broken.
+        return FailureSignature(CAUSE_HARNESS_INVALID, AGENT_CAUSED, MECH_HARNESS_INVALID)
 
     environment = any(re.search(pattern, text) for pattern in ENVIRONMENT_RULES)
     if environment:

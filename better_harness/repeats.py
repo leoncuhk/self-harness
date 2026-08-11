@@ -11,14 +11,20 @@ This module runs each split ``repeats`` times and aggregates the runs into one
 resulting ``correctness`` is therefore a pass@1 estimate over ``n_cases * repeats``
 attempts.
 
-Per-case aggregation uses three statuses:
+Per-case aggregation uses four statuses:
 
 ``passed``
-    every repeat passed (stable pass)
+    every measured repeat passed (stable pass)
 ``failed``
-    every repeat failed (stable fail)
+    every measured repeat failed (stable fail)
 ``flaky``
     mixed
+``apparatus``
+    every repeat failed to measure anything (see :mod:`better_harness.apparatus`)
+
+Apparatus repeats are dropped before aggregation, so they neither score nor
+dilute: ``total`` counts *measured* attempts only, and the apparatus attempts are
+reported separately on ``SplitResult.apparatus``.
 
 ``CaseOutcome.passed`` is ``status == "passed"``, so ``passing_case_ids()`` keeps
 its "stably passing" meaning and flaky cases never look like wins.
@@ -33,6 +39,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
+from better_harness.apparatus import STATUS_APPARATUS
 from better_harness.core import CaseOutcome, Experiment, RunLayout, SplitResult, Variant
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -94,8 +101,9 @@ def aggregate_split_results(
     """Aggregate repeated runs of one split into a single ``SplitResult``.
 
     ``passed`` becomes the number of successful *attempts* across every repeat and
-    ``total`` becomes ``n_cases * repeats``, so ``correctness`` is a pass@1
-    estimate. Raises ``ValueError`` on an empty sequence.
+    ``total`` the number of *measured* attempts (``n_cases * repeats`` minus the
+    apparatus failures), so ``correctness`` is a pass@1 estimate over what was
+    actually observed. Raises ``ValueError`` on an empty sequence.
     """
     if not results:
         msg = "aggregate_split_results requires at least one result"
@@ -112,9 +120,10 @@ def aggregate_split_results(
             returncode=first.returncode,
             run_dir=str(run_dir),
             outcomes=first.outcomes,
+            apparatus=first.apparatus,
+            fingerprints=first.fingerprints,
         )
 
-    repeats = len(results)
     order: list[str] = []
     by_case: dict[str, list[CaseOutcome]] = {}
     for result in results:
@@ -127,12 +136,34 @@ def aggregate_split_results(
     aggregated: list[CaseOutcome] = []
     attempts = 0
     successes = 0
+    apparatus_attempts = 0
     for case_id in order:
         outcomes = by_case[case_id]
-        hits = sum(1 for outcome in outcomes if outcome.passed)
-        attempts += len(outcomes)
+        # Apparatus repeats measured nothing, so they neither score nor dilute.
+        # A case whose every repeat was apparatus is reported as apparatus rather
+        # than as a failure: no evidence about the harness was collected for it.
+        measured = [outcome for outcome in outcomes if not outcome.is_apparatus]
+        apparatus_attempts += len(outcomes) - len(measured)
+        if not measured:
+            evidence = outcomes[0]
+            aggregated.append(
+                CaseOutcome(
+                    case_id=case_id,
+                    split=evidence.split,
+                    stratum=evidence.stratum,
+                    status=STATUS_APPARATUS,
+                    score=0.0,
+                    duration_s=sum(outcome.duration_s for outcome in outcomes) / len(outcomes),
+                    failure_message=_first([outcome.failure_message for outcome in outcomes]),
+                    artifacts_dir=evidence.artifacts_dir,
+                    trace_ref=_first([outcome.trace_ref for outcome in outcomes]),
+                )
+            )
+            continue
+        hits = sum(1 for outcome in measured if outcome.passed)
+        attempts += len(measured)
         successes += hits
-        if hits == len(outcomes):
+        if hits == len(measured):
             status = STATUS_STABLE
         elif hits == 0:
             status = STATUS_BROKEN
@@ -141,8 +172,8 @@ def aggregate_split_results(
         # Point the outer agent at a real failing repeat when one exists, so it
         # still reads a genuine failure trace rather than a passing one.
         evidence = next(
-            (outcome for outcome in outcomes if not outcome.passed),
-            outcomes[0],
+            (outcome for outcome in measured if not outcome.passed),
+            measured[0],
         )
         aggregated.append(
             CaseOutcome(
@@ -150,11 +181,11 @@ def aggregate_split_results(
                 split=evidence.split,
                 stratum=evidence.stratum,
                 status=status,
-                score=hits / len(outcomes),
-                duration_s=sum(outcome.duration_s for outcome in outcomes) / len(outcomes),
-                failure_message=_first([outcome.failure_message for outcome in outcomes]),
+                score=hits / len(measured),
+                duration_s=sum(outcome.duration_s for outcome in measured) / len(measured),
+                failure_message=_first([outcome.failure_message for outcome in measured]),
                 artifacts_dir=evidence.artifacts_dir,
-                trace_ref=_first([outcome.trace_ref for outcome in outcomes]),
+                trace_ref=_first([outcome.trace_ref for outcome in measured]),
             )
         )
 
@@ -163,11 +194,13 @@ def aggregate_split_results(
         variant=results[0].variant,
         model=results[0].model,
         passed=successes,
-        total=attempts or repeats * len(order),
+        total=attempts,
         score=float(successes),
         returncode=max(result.returncode for result in results),
         run_dir=str(run_dir),
         outcomes=tuple(aggregated),
+        apparatus=apparatus_attempts,
+        fingerprints=tuple(sorted({fp for result in results for fp in result.fingerprints})),
     )
 
 
@@ -185,6 +218,9 @@ def write_repeat_detail(
             "passed": aggregated.passed,
             "total": aggregated.total,
             "correctness": aggregated.correctness,
+            "apparatus": aggregated.apparatus,
+            "apparatus_rate": aggregated.apparatus_rate,
+            "measurable": aggregated.measurable,
         },
         "per_repeat": [
             {

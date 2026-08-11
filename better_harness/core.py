@@ -15,8 +15,16 @@ from dataclasses import asdict, dataclass, replace
 from dataclasses import field as dc_field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+from better_harness.apparatus import (
+    STATUS_APPARATUS,
+    apparatus_rate,
+    is_measurable,
+)
 from better_harness.cost import (
     DEFAULT_MAX_COST_GROWTH,
     DEFAULT_MAX_LATENCY_GROWTH,
@@ -54,6 +62,10 @@ DEFAULT_GATE = "conservative"
 # train+holdout evaluation, so the default stays at 1 and raising it is a
 # deliberate spend on proposal diversity.
 DEFAULT_CANDIDATES = 1
+# A stage that spans two provider fingerprints was not run against one frozen
+# model. "strict" fails the stage; "report" records the drift and continues.
+DEFAULT_FINGERPRINT_DISCIPLINE = "strict"
+VALID_FINGERPRINT_DISCIPLINES = ("strict", "report")
 ENV_PATTERN = re.compile(r"\$\{([^}]+)\}")
 URL_PATTERN = re.compile(r"https?://[^\s\"'>]+")
 UUID_PATTERN = re.compile(
@@ -107,6 +119,7 @@ class Experiment:
     candidates: int = DEFAULT_CANDIDATES
     guards: dict[str, Any] = dc_field(default_factory=dict)
     budget: dict[str, Any] = dc_field(default_factory=dict)
+    fingerprint_discipline: str = DEFAULT_FINGERPRINT_DISCIPLINE
 
     @property
     def guards_enabled(self) -> bool:
@@ -235,10 +248,20 @@ class CaseOutcome:
         """Return whether the outcome counts as passed."""
         return self.status == "passed"
 
+    @property
+    def is_apparatus(self) -> bool:
+        """Return whether this outcome measured nothing about the harness."""
+        return self.status == STATUS_APPARATUS
+
 
 @dataclass(frozen=True)
 class SplitResult:
-    """One split result."""
+    """One split result.
+
+    ``passed``/``total`` count only *measured* attempts: apparatus failures are
+    excluded from both, and counted separately in ``apparatus``. See
+    :mod:`better_harness.apparatus` for why the third class exists.
+    """
 
     split: str
     variant: str
@@ -249,11 +272,23 @@ class SplitResult:
     returncode: int
     run_dir: str
     outcomes: tuple[CaseOutcome, ...]
+    apparatus: int = 0
+    fingerprints: tuple[str, ...] = ()
 
     @property
     def correctness(self) -> float:
-        """Return pass rate for the split."""
+        """Return pass rate over measured attempts."""
         return 0.0 if self.total == 0 else self.passed / self.total
+
+    @property
+    def apparatus_rate(self) -> float:
+        """Return apparatus failures as a fraction of attempted evaluations."""
+        return apparatus_rate(apparatus=self.apparatus, measured=self.total)
+
+    @property
+    def measurable(self) -> bool:
+        """Return whether enough of this split ran to support a decision."""
+        return is_measurable(apparatus=self.apparatus, measured=self.total)
 
     def passing_case_ids(self) -> set[str]:
         """Return the set of passed case ids."""
@@ -264,11 +299,15 @@ class SplitResult:
         }
 
     def failing_outcomes(self) -> list[CaseOutcome]:
-        """Return failed or missing outcomes."""
+        """Return outcomes that carry evidence about the harness.
+
+        Apparatus failures are excluded: nothing was measured, so mining them for
+        harness weaknesses turns infrastructure noise into proposal targets.
+        """
         return [
             outcome
             for outcome in self.outcomes
-            if outcome.status != "passed"
+            if outcome.status != "passed" and not outcome.is_apparatus
         ]
 
     def to_dict(self) -> dict[str, Any]:
@@ -281,6 +320,10 @@ class SplitResult:
             "total": self.total,
             "score": self.score,
             "correctness": self.correctness,
+            "apparatus": self.apparatus,
+            "apparatus_rate": self.apparatus_rate,
+            "measurable": self.measurable,
+            "fingerprints": list(self.fingerprints),
             "returncode": self.returncode,
             "run_dir": self.run_dir,
             "outcomes": [asdict(outcome) for outcome in self.outcomes],
@@ -305,6 +348,9 @@ class SplitResult:
             returncode=int(payload["returncode"]),
             run_dir=str(payload["run_dir"]),
             outcomes=tuple(CaseOutcome(**item) for item in payload["outcomes"]),
+            # Absent in results written before the apparatus partition existed.
+            apparatus=int(payload.get("apparatus", 0)),
+            fingerprints=tuple(str(item) for item in payload.get("fingerprints", ())),
         )
 
 
@@ -433,25 +479,28 @@ class RunReport:
             f"- Baseline changed surfaces: `{', '.join(self.baseline.changed_surfaces) or 'none'}`",
             f"- Final changed surfaces: `{', '.join(self.final.changed_surfaces) or 'none'}`",
             "",
-            "| Split | Baseline | Final |",
-            "| --- | --- | --- |",
+            "| Split | Baseline | Final | Apparatus (baseline / final) |",
+            "| --- | --- | --- | --- |",
             (
                 f"| Train | `{self.baseline_train.passed}/{self.baseline_train.total}` | "
-                f"`{self.final_train.passed}/{self.final_train.total}` |"
+                f"`{self.final_train.passed}/{self.final_train.total}` | "
+                f"{_apparatus_cell(self.baseline_train, self.final_train)} |"
             ),
             (
                 f"| Holdout | `{self.baseline_holdout.passed}/{self.baseline_holdout.total}` | "
-                f"`{self.final_holdout.passed}/{self.final_holdout.total}` |"
+                f"`{self.final_holdout.passed}/{self.final_holdout.total}` | "
+                f"{_apparatus_cell(self.baseline_holdout, self.final_holdout)} |"
             ),
         ]
         if self.baseline_scorecard is not None and self.final_scorecard is not None:
             lines.append(
                 (
                     f"| Scorecard | `{self.baseline_scorecard.passed}/{self.baseline_scorecard.total}` | "
-                    f"`{self.final_scorecard.passed}/{self.final_scorecard.total}` |"
+                    f"`{self.final_scorecard.passed}/{self.final_scorecard.total}` | "
+                    f"{_apparatus_cell(self.baseline_scorecard, self.final_scorecard)} |"
                 )
                 if include_scorecard
-                else "| Scorecard | *sealed* | *sealed* |"
+                else "| Scorecard | *sealed* | *sealed* | *sealed* |"
             )
         lines.extend(["", "## Iterations", ""])
         for iteration in self.iterations:
@@ -597,6 +646,55 @@ class RunLayout:
         report.write(self.root)
 
 
+class FingerprintDriftError(RuntimeError):
+    """Raised when one stage spans more than one provider model fingerprint."""
+
+
+def check_fingerprint_discipline(
+    results: Sequence[SplitResult],
+    *,
+    discipline: str,
+) -> tuple[str, ...]:
+    """Enforce the pre-registered fingerprint rule and return what was seen.
+
+    The frozen MVP-2 rule reads: *a fingerprint change mid-stage invalidates that
+    stage*. It lived in the pre-registration with no code behind it, and it fired
+    unnoticed — ``runs/mvp2-evolve`` spans ``fp_e010545658`` (74 rollouts) and
+    ``fp_65c6c2730f`` (66) against a single-fingerprint baseline, which under the
+    protocol voids the whole evolution stage.
+
+    The weights-frozen premise of self-harness is only as good as the provider's
+    routing, so this is not bookkeeping: two fingerprints in one stage means the
+    thing being held fixed was not held fixed.
+    """
+    seen = tuple(sorted({fp for result in results for fp in result.fingerprints}))
+    if discipline == "strict" and len(seen) > 1:
+        msg = (
+            f"fingerprint drift within one stage: {', '.join(seen)}. "
+            "The pre-registered rule invalidates a stage whose provider model changed "
+            'mid-run; rerun the stage, or set fingerprint_discipline = "report" to '
+            "record the drift instead of failing."
+        )
+        raise FingerprintDriftError(msg)
+    return seen
+
+
+def _apparatus_cell(baseline: SplitResult, final: SplitResult) -> str:
+    """Render the apparatus-failure rates for one report row.
+
+    Surfaced next to every score because a split that mostly failed to run and a
+    split the agent mostly failed now produce different numbers, and the reader
+    has to be able to tell which one they are looking at.
+    """
+    def one(result: SplitResult) -> str:
+        if result.apparatus == 0:
+            return "0"
+        mark = "" if result.measurable else " ⚠️ **unmeasured**"
+        return f"{result.apparatus} ({result.apparatus_rate:.0%}){mark}"
+
+    return f"{one(baseline)} / {one(final)}"
+
+
 def reusable_result(
     *,
     result_path: Path,
@@ -709,6 +807,9 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     repeats = int(experiment.get("repeats", DEFAULT_REPEATS))
     gate = str(experiment.get("gate", DEFAULT_GATE))
     candidates = int(experiment.get("candidates", DEFAULT_CANDIDATES))
+    fingerprint_discipline = str(
+        experiment.get("fingerprint_discipline", DEFAULT_FINGERPRINT_DISCIPLINE)
+    )
     guards = dict(raw.get("guards", {}))
     budget = dict(raw.get("budget", {}))
 
@@ -786,6 +887,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         candidates=candidates,
         guards=guards,
         budget=budget,
+        fingerprint_discipline=fingerprint_discipline,
     )
     validate_experiment(loaded)
     return loaded
@@ -813,6 +915,12 @@ def validate_experiment(experiment: Experiment) -> None:
         raise ValueError(msg)
     if experiment.candidates < 1:
         msg = "candidates must be at least 1"
+        raise ValueError(msg)
+    if experiment.fingerprint_discipline not in VALID_FINGERPRINT_DISCIPLINES:
+        msg = (
+            f"invalid fingerprint_discipline {experiment.fingerprint_discipline!r}; "
+            f"expected one of {VALID_FINGERPRINT_DISCIPLINES}"
+        )
         raise ValueError(msg)
 
     for surface in experiment.surfaces.values():
@@ -1049,6 +1157,11 @@ def run_experiment(
     )
     current_train = baseline_train
     current_holdout = baseline_holdout
+    # Fail fast rather than at the end: a stage that has already drifted cannot
+    # be salvaged by finishing it, and every further rollout is spend on a stage
+    # the protocol will void.
+    stage_results: list[SplitResult] = [baseline_train, baseline_holdout]
+    check_fingerprint_discipline(stage_results, discipline=experiment.fingerprint_discipline)
 
     iterations: list[IterationRecord] = []
     ledger: list[LedgerEntry] = []
@@ -1122,6 +1235,8 @@ def run_experiment(
                 layout=layout,
                 reuse_existing=reuse_existing,
             )
+            stage_results.extend([train, holdout])
+            check_fingerprint_discipline(stage_results, discipline=experiment.fingerprint_discipline)
             gate_decision = decide(
                 gate=experiment.gate,
                 current_train=current_train,

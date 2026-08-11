@@ -34,6 +34,7 @@ VIOLATION_CASE_LEAK = "case_id_leak"
 VIOLATION_FORBIDDEN = "forbidden_pattern"
 VIOLATION_BLOAT = "surface_bloat"
 VIOLATION_UNDECLARED = "undeclared_surface"
+VIOLATION_UNPARSEABLE = "surface_does_not_parse"
 
 # Knobs that decide how much compute the run is allowed to spend, plus anything
 # that touches the evaluator. Optimising these is not harness engineering; it is
@@ -146,6 +147,25 @@ def _scan_forbidden(text: str, patterns: Sequence[str]) -> list[tuple[str, str]]
     return hits
 
 
+def _python_syntax_error(experiment: Experiment, name: str, value: str) -> str | None:
+    """Return a syntax error for a Python surface, or None.
+
+    Only surfaces whose target is a ``.py`` file are checked: prose surfaces are
+    not code and must not be compiled. This catches the cheap half of
+    harness-invalid candidates statically. The other half — code that parses but
+    whose signature does not match the library it plugs into — is only reachable
+    at runtime, and is caught by the ``harness_did_not_load`` failure signature.
+    """
+    surface = experiment.surfaces.get(name)
+    if surface is None or not str(surface.target).endswith(".py"):
+        return None
+    try:
+        compile(value, f"<surface:{name}>", "exec")
+    except SyntaxError as exc:
+        return f"{exc.msg} (line {exc.lineno})"
+    return None
+
+
 def check_variant(  # noqa: PLR0913 - every threshold is meant to be overridable per experiment
     *,
     experiment: Experiment,
@@ -176,6 +196,21 @@ def check_variant(  # noqa: PLR0913 - every threshold is meant to be overridable
         if value == baseline.values.get(name):
             # Unchanged surfaces inherit whatever the baseline already had; the
             # guard judges the proposer's edits, not the seed it was handed.
+            continue
+
+        if (syntax_error := _python_syntax_error(experiment, name, value)) is not None:
+            # A surface that does not even parse cannot teach anything, and
+            # evaluating it spends a full split to rediscover that. MVP-2's
+            # iteration 2 shipped middleware whose signature did not match the
+            # installed langchain; all 24 train attempts died in ~1.2s and the
+            # gate recorded it as a harness regression.
+            violations.append(
+                Violation(
+                    kind=VIOLATION_UNPARSEABLE,
+                    surface=name,
+                    detail=f"surface is not valid Python: {syntax_error}",
+                )
+            )
             continue
 
         for literal in sorted(literals):

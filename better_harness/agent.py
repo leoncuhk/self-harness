@@ -331,6 +331,32 @@ def invoke_deepagents_proposer(
     return final_message
 
 
+def _private_case_sources(experiment: Experiment) -> set[str]:
+    """Return case source paths that also back a private split.
+
+    Copying train case sources into the proposer workspace is meant to show the
+    proposer what the visible tasks ask for. When several cases share one source
+    file — the common shape for a parametrised suite, where every task's
+    reference implementation sits in one test module — that copy hands over the
+    holdout and scorecard verifiers as well. Measured on this repo before the
+    fix: ``proposer_workspace/train_cases/tests/test_agentic.py`` contained all
+    16 ``verify_*`` implementations, including all four sealed scorecard cases,
+    on every iteration.
+
+    A shared source is therefore withheld outright rather than redacted: a
+    redaction rule that has to understand the file's structure is a rule that
+    can be wrong silently, and being wrong here voids the sealed split.
+    """
+    private: set[str] = set()
+    for split in ("holdout", "scorecard"):
+        for case in experiment.cases_for_split(split):
+            rendered = case.render(model=experiment.model)
+            source = rendered.partition("::")[0] if experiment.runner == "pytest" else rendered
+            if source:
+                private.add(source)
+    return private
+
+
 def _write_train_artifacts(
     *,
     experiment: Experiment,
@@ -351,6 +377,8 @@ def _write_train_artifacts(
 
     train_cases_dir = root / "train_cases"
     train_cases_dir.mkdir(parents=True, exist_ok=True)
+    withheld: list[str] = []
+    private_sources = _private_case_sources(experiment)
     if experiment.runner == "pytest":
         project_root = Path(str(experiment.runner_config["project_root"]))
         copied: set[str] = set()
@@ -360,6 +388,9 @@ def _write_train_artifacts(
             if not file_part or file_part in copied:
                 continue
             copied.add(file_part)
+            if file_part in private_sources:
+                withheld.append(file_part)
+                continue
             source = project_root / file_part
             if source.exists():
                 target = train_cases_dir / file_part
@@ -369,9 +400,19 @@ def _write_train_artifacts(
         tasks_root = Path(str(experiment.runner_config["tasks_root"]))
         for case in experiment.cases_for_split("train"):
             rendered = case.render(model=experiment.model)
+            if rendered in private_sources:
+                withheld.append(rendered)
+                continue
             task_dir = tasks_root / rendered
             if task_dir.exists():
                 shutil.copytree(task_dir, train_cases_dir / rendered, dirs_exist_ok=True)
+    if withheld:
+        (train_cases_dir / "WITHHELD.md").write_text(
+            "# Withheld case sources\n\n"
+            "These train case sources also back holdout or scorecard cases, so copying\n"
+            "them here would hand the proposer the private splits' verifiers. Withheld:\n\n"
+            + "".join(f"- `{item}`\n" for item in sorted(withheld))
+        )
 
 
 def _write_visible_history(*, layout: RunLayout, root: Path) -> None:

@@ -7,9 +7,11 @@ import os
 import shlex
 import subprocess
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from better_harness.apparatus import STATUS_APPARATUS, apparatus_kind
 from better_harness.core import (
     CaseOutcome,
     EvalCase,
@@ -99,6 +101,7 @@ class PytestRunner:
         returncodes: list[int] = []
         split_stdout: list[str] = []
         split_stderr: list[str] = []
+        fingerprints: set[str] = set()
 
         with workspace_override_context(experiment.workspace_root, variant.file_overrides()):
             for case in experiment.cases_for_split(split):
@@ -164,6 +167,11 @@ class PytestRunner:
                     }
                     summary_path.write_text(json.dumps(summary_payload, indent=2) + "\n")
 
+                if isinstance(summary_payload, dict):
+                    fingerprints.update(
+                        str(item) for item in summary_payload.get("system_fingerprints", []) or []
+                    )
+
                 trace_refs = extract_trace_refs(
                     payload=summary_payload,
                     stdout=completed.stdout,
@@ -185,14 +193,18 @@ class PytestRunner:
 
         (split_dir / "stdout.log").write_text("\n\n".join(split_stdout))
         (split_dir / "stderr.log").write_text("\n\n".join(split_stderr))
+        outcomes = mark_apparatus_outcomes(outcomes)
+        apparatus = sum(1 for outcome in outcomes if outcome.is_apparatus)
         passed = sum(1 for outcome in outcomes if outcome.passed)
-        total = len(outcomes)
+        total = len(outcomes) - apparatus
         summary_payload = {
             "passed": passed,
             "failed": sum(1 for outcome in outcomes if outcome.status == "failed"),
             "skipped": sum(1 for outcome in outcomes if outcome.status == "skipped"),
+            "apparatus": apparatus,
             "total": total,
             "correctness": 0.0 if total == 0 else passed / total,
+            "system_fingerprints": sorted(fingerprints),
         }
         (split_dir / "summary.json").write_text(json.dumps(summary_payload, indent=2) + "\n")
 
@@ -206,6 +218,8 @@ class PytestRunner:
             returncode=max(returncodes) if returncodes else 0,
             run_dir=str(split_dir),
             outcomes=tuple(outcomes),
+            apparatus=apparatus,
+            fingerprints=tuple(sorted(fingerprints)),
         )
         result.save(result_path)
         return result
@@ -350,17 +364,20 @@ class HarborRunner:
                 )
             )
 
+        outcomes = list(mark_apparatus_outcomes(outcomes))
+        apparatus = sum(1 for outcome in outcomes if outcome.is_apparatus)
         passed = sum(1 for outcome in outcomes if outcome.passed)
         result = SplitResult(
             split=split,
             variant=variant.key,
             model=experiment.model,
             passed=passed,
-            total=len(outcomes),
+            total=len(outcomes) - apparatus,
             score=float(sum(outcome.score for outcome in outcomes)),
             returncode=max(returncodes, default=0),
             run_dir=str(split_dir),
             outcomes=tuple(outcomes),
+            apparatus=apparatus,
         )
         result.save(result_path)
         summary_payload = {
@@ -410,6 +427,33 @@ def build_runner(experiment: Experiment):
         return HarborRunner()
     msg = f"unknown runner {experiment.runner!r}"
     raise ValueError(msg)
+
+
+def mark_apparatus_outcomes(outcomes: list[CaseOutcome]) -> list[CaseOutcome]:
+    """Re-label outcomes whose failure was the measurement, not the agent.
+
+    Applied once, at the boundary where raw runner output becomes a
+    ``SplitResult``, so every consumer downstream — gate, cost veto, signature
+    clustering, ledger, analysis scripts — sees the same partition.
+    """
+    marked: list[CaseOutcome] = []
+    for outcome in outcomes:
+        if outcome.passed or outcome.is_apparatus:
+            marked.append(outcome)
+            continue
+        kind = apparatus_kind(outcome.failure_message)
+        if kind is None:
+            marked.append(outcome)
+            continue
+        marked.append(
+            replace(
+                outcome,
+                status=STATUS_APPARATUS,
+                score=0.0,
+                failure_message=f"[apparatus:{kind}] {outcome.failure_message or ''}".strip(),
+            )
+        )
+    return marked
 
 
 def parse_pytest_outcomes(

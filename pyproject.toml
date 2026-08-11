@@ -74,3 +74,5 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# scripts/ holds the artifact auditor, which is itself under test.
+pythonpath = [".", "scripts"]

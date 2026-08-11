@@ -507,7 +507,12 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
     )
     assert (proposer_workspace.root / "task.md").exists()
     assert (proposer_workspace.root / "train_failures.json").exists()
-    assert (proposer_workspace.root / "train_cases" / "tests" / "test_demo.py").exists()
+    # tests/test_demo.py backs a holdout case as well as the train case, so
+    # copying it would hand the proposer the private split's verifier. Withheld,
+    # and the omission is recorded where an auditor will see it.
+    assert not (proposer_workspace.root / "train_cases" / "tests" / "test_demo.py").exists()
+    withheld = (proposer_workspace.root / "train_cases" / "WITHHELD.md").read_text()
+    assert "tests/test_demo.py" in withheld
     assert (proposer_workspace.root / "history" / "prior_visible" / "iterations" / "000" / "decision.json").exists()
     assert (proposer_workspace.root / "history" / "prior_visible" / "iterations" / "000" / "proposer_workspace" / "outer_agent_result.json").exists()
     assert (proposer_workspace.root / "history" / "prior_visible" / "train" / "baseline" / "result.json").exists()

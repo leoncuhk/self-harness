@@ -69,6 +69,27 @@ def decide(
     delta_in, delta_in_rate = _deltas(current_train, candidate_train)
     delta_ho, delta_ho_rate = _deltas(current_holdout, candidate_holdout)
 
+    # An evaluation that mostly failed to run cannot promote anything. Apparatus
+    # failures are excluded from the denominator, which is right for the estimate
+    # and dangerous for the comparison: a candidate whose evaluation collapsed
+    # would be scored on whichever handful of cases happened to complete, and a
+    # small favourable sample clears a gate that a full evaluation would not.
+    unmeasured = [
+        f"{name} apparatus {result.apparatus}/{result.apparatus + result.total}"
+        for name, result in (("train", candidate_train), ("holdout", candidate_holdout))
+        if not result.measurable
+    ]
+    if unmeasured:
+        return GateDecision(
+            gate=gate,
+            accepted=False,
+            reason=f"unmeasured evaluation, no promotion: {'; '.join(unmeasured)}",
+            delta_in=delta_in,
+            delta_ho=delta_ho,
+            delta_in_rate=delta_in_rate,
+            delta_ho_rate=delta_ho_rate,
+        )
+
     if gate == "combined":
         accepted = (delta_in + delta_ho) > 0
         reason = (
