@@ -4,8 +4,10 @@ Chronological, append-only. Each entry is frozen before its data is collected;
 outcomes are recorded against entries, never by rewriting them.
 
 - **MVP-1** (below) — terminated at M2 by its stop rule; see [results](results.md).
-- **[MVP-2](#mvp-2-pre-registration)** (end of file) — completes L3/L4/L5.1 on the
-  same suite with a calibrated weaker inner model.
+- **[MVP-2](#mvp-2-pre-registration)** (end of file) — L3 on the same suite with a
+  calibrated weaker inner model. **Amended twice**: Amendment 2 rescopes it to L3
+  only, because the frozen M4 rule is unsatisfiable at holdout n=4 (arithmetic in
+  the amendment). L4/L5.1 move to MVP-3.
 
 ---
 
@@ -428,3 +430,81 @@ Ascending expected capability: `qwen3-4b` → `qwen3-8b` → `gpt-4.1-nano` →
 `gpt-4o-mini` → `gpt-4.1-mini`. Each must pass a one-call tool smoke first; first
 candidate whose repeats=3 train+holdout baseline lands in [0.20, 0.85] is the
 MVP-2 inner model. All probes are reported regardless of outcome.
+
+---
+
+## Amendment 2 (2026-08-11, recorded before any M3 or M4 data exists)
+
+**Trigger: the frozen M4 rule is unsatisfiable, and this follows from the M2
+baseline alone — no evolution outcome was seen, or exists.**
+
+The reference baseline (`runs/mvp2-baseline`, repeats=5) gives holdout per-case
+pass fractions **0.00 / 1.00 / 0.00 / 1.00**, pass@1 0.500, bootstrap CI95
+half-width **0.500**. The frozen rule requires the evolution-minus-B1 holdout
+paired margin to exceed that half-width, i.e. **margin > 0.500**. The maximum
+attainable margin is:
+
+- two of the four holdout cases already pass at 1.00 → no headroom on them;
+- the other two fail on all 5 repeats → **B1 oracle pass@N scores them 0 for any
+  N**, so B1 = 0.500 exactly, and raising N can only raise B1, never lower it;
+- a perfect evolved harness reaches 1.000.
+
+→ **margin ≤ 0.500 for every possible outcome, and the rule demands > 0.500.**
+A flawless evolution run fails the test by a strict inequality. The
+pre-registration called this "hard to satisfy"; the arithmetic says impossible.
+That is a defect in the rule, discovered from data the protocol explicitly
+directs M2 to read, and it is recorded here before any M3 rollout.
+
+**Root cause: two goals with an order-of-magnitude difference in power were
+bundled into one pre-registration.** L3 (prediction accuracy) is powered by the
+number of prediction events — 5 iterations against 7–8 failing train cases. L4
+(equal-budget decision) is powered by holdout case count, and needs n ≳ 40 for a
+CI half-width near 0.14. n=4 cannot host L4 at any effect size. No 16-task suite
+can, for any model.
+
+### What changes
+
+1. **MVP-2 becomes an L3 experiment.** Primary deliverable: prediction precision
+   vs base rate, unpredicted regressions, signature `unknown` rate, guard log —
+   read from `ledger.md` before any pass rate, as already frozen.
+2. **M4 is demoted to descriptive.** B1 still runs and is still reported in full;
+   the frozen decision rule is **void** and yields no positive/negative verdict.
+   The reason above is the reason, and it may not be replaced by a rule chosen
+   after the fact.
+3. **L4 and L5.1 move to MVP-3**, which requires its own pre-registration and a
+   testbed sized for them (holdout n ≳ 40, tasks selected by measured harness
+   sensitivity). See [roadmap](roadmap.md).
+4. **Scorecard:** the single unseal still happens once, after M3 and B1 complete,
+   and is reported descriptively. The locked-test *claim* is void — both because
+   the M4 verdict it was tied to no longer exists and because an aggregate was
+   already exposed accidentally ([results](results.md)).
+
+### What does not change
+
+Suite, splits, verifiers, inner model (`gpt-4.1-nano`), proposer
+(`deepseek-v4-flash`), 5 iterations, K=1, repeats=3, conservative gate, guards,
+budget, `temperature=0`, `max_turns=100`. **No information reaching the proposer
+changes.** No task revisions — that budget died with MVP-1.
+
+### Infrastructure changes, disclosed
+
+Made before M3 and after the baseline, so they need stating:
+
+- **Inner-agent retry and per-request timeout.** ~180 rollouts per M3 stage ran
+  with no retry at all while only the single proposer call per iteration was
+  covered; three M3 attempts died on transport errors. Transport failures now
+  retry (5 attempts, 5/10/15/20 s), task failures never do.
+  *Comparability:* the baseline campaign recorded **zero** transient transport
+  failures (every `result.json` scanned; the only "timeout" strings are the
+  `@pytest.mark.timeout(420)` source line echoed in assertion output), so no
+  baseline number would have changed under this code. Rollouts now also report
+  `attempts`, making any future retry visible rather than silent.
+- **Resume (`--resume`).** Reuse is now content-addressed: a stored split result
+  is reused only when the variant JSON saved beside it fingerprints identically,
+  and a resumed iteration reloads its prior proposal instead of re-asking the
+  model. This *fixes* the pre-existing `--reuse-existing` flag, which keyed on
+  positional labels (`iter-003`) and would have attributed old numbers to a new
+  candidate. Neither behaviour was exercised in any recorded run.
+
+Both are reliability-only: they change which runs *finish*, not what the
+proposer sees, what the verifier accepts, or how any decision is made.

@@ -177,3 +177,164 @@ implements at small scale.
    classes they document at scale — independent evidence those mechanisms matter.
 4. An **Anytime Validation Score** is worth adding to our reports (best-so-far
    curve over iterations, already derivable from decision.json history).
+
+---
+
+## Rethinking the Evaluation of Harness Evolution (arXiv 2607.12227) — the falsifier
+
+*Studied 2026-08-11. Cited across this repo as the decisive prior; recorded here in full.*
+
+### The framework
+
+Four methods compared under one budget protocol, on **Terminal-Bench 2.1** (89
+tasks) with Claude Opus 4.6 / GPT-5.4 / GPT-5.4-mini, averaged over two runs:
+
+| Method | What it spends budget on |
+| --- | --- |
+| Parallel sampling | K independent trajectories, pick by verifier or self-judgment |
+| Sequential refinement | iterative depth — refine the prior attempt |
+| Harness evolution | meta-agent optimises the harness across task batches |
+| Harness scaling | per-instance harness adaptation from task feedback |
+
+Two budget axes held equal: **feedback budget** (what correctness signal each
+method may read — unit tests vs self-judgment) and **inference budget** (K=5).
+Separating these two is the contribution; most prior work matches neither.
+
+### Results
+
+| Condition | Best test-time scaling | Harness evolution |
+| --- | --- | --- |
+| No unit tests | parallel sampling **72.3** (from 68.2 baseline) | **67.4** — *below baseline* |
+| With unit tests | sequential refinement **91.8** (pass@5) | **86.2** |
+| Held-out tasks | — | **+0.6pp** average gain |
+
+### What this project takes
+
+1. **B1 alone is not enough.** Our decisive arm is parallel/oracle best-of-N. On
+   a suite with deterministic verifiers — which is exactly our situation — their
+   strongest arm is **sequential refinement**, and it beats evolution by 5.6pp.
+   An evolution run that clears B1 but was never tested against refinement has
+   not cleared the bar this paper sets. Registered as a gap ([roadmap](roadmap.md) F1).
+2. **The +0.6pp held-out figure is the number to beat**, and it is the reason our
+   scorecard is sealed rather than merely held out.
+3. Their two-axis budget definition is sharper than ours: our M4 rule matches
+   total tokens (inference) but never states the **feedback** budget explicitly.
+   B1 retries read pass/fail per attempt; evolution reads per-case failure
+   messages. Those are not the same feedback, and the writeup must say so.
+
+---
+
+## Agentic Harness Engineering (arXiv 2604.25850) — the strongest positive result
+
+*Studied 2026-08-11 from the abstract page.*
+
+### Method
+
+Three observability pillars, and the vocabulary is worth adopting wholesale:
+
+| Pillar | What it means | Our status |
+| --- | --- | --- |
+| **Component** observability | file-level representations of every editable harness part | ✅ `surface_manifest.json` |
+| **Experience** observability | trajectory data distilled into evidence the proposer can consume | ❌ **missing** — we pass pytest assertion text only |
+| **Decision** observability | every edit paired with a prediction, verified against outcomes | ✅ `ledger.json` (built independently, same shape) |
+
+"Every edit becomes a falsifiable contract" — the same premise as our P2-6 ledger.
+
+### Results
+
+TB2 pass@1 **69.7 → 77.0** over ten iterations, above the human-engineered
+Codex-CLI (71.9) and above self-evolving baselines ACE and TF-GRPO. Transfer to
+SWE-bench-verified: same aggregate success at **12% fewer tokens**. Cross-family:
+**+5.1 to +10.1pp** across three model families.
+
+### The ablation that should redirect our surface design
+
+Gains localise to **tools, middleware, and long-term memory — not the system
+prompt.** Structural harness elements transfer; prose-level strategy does not.
+
+Our four surfaces are prompt / tools / skills / middleware: two of the three
+productive categories are present, **long-term memory is absent entirely**, and
+the least productive surface (prompt) carries the most weight in our seed. See
+[roadmap](roadmap.md) C.
+
+### Critical read
+
+Seed-vs-evolved and vs-human comparisons; no equal-budget test-time-scaling arm
+here either. The transfer results are the load-bearing evidence, not the 77.0.
+
+---
+
+## TTHE — Test-Time Harness Evolution (arXiv 2607.08124)
+
+*Studied 2026-08-11.*
+
+Evolves the harness **during evaluation** from unlabelled traces. Per batch:
+observe (full traces — prompts, tool calls, errors, outputs) → multiple proposer
+agents each rewrite the harness toward a **different improvement objective** →
+an agentic judge commits one version for the next batch. Solver, proposers, and
+judge are all the same frozen LLM under different harnesses.
+
+Results: BIRD text-to-SQL 12→50, competitive programming 30→38.3, SWE 20→35.
+Evolved harnesses discovered grounding, verification, and repair strategies **as
+executable code**, not prompt prose — consistent with AHE's ablation.
+
+**Critical read (their own):** scoring is **transductive** — a harness adapts on
+a batch and is scored on that same batch. Forward generalisation is unproven;
+they name **prequential** evaluation (score batch *t*'s harness on batch *t+1*
+before it adapts) as the missing test.
+
+What this project takes: (1) **multi-objective proposers** are a better K>1
+design than our cluster round-robin — diversity by objective, not by cluster
+index; (2) prequential scoring is a structurally cheap addition for us and an
+open gap in the literature ([roadmap](roadmap.md) E3, F2).
+
+---
+
+## EvoHarness-RL (arXiv 2608.05446) — the boundary case
+
+*Studied 2026-08-11.*
+
+Trains the model to use runtime scaffolding, via SFT then cost-aware GRPO.
+Harness abstracted to a **BPE** interface — Belief (environment state), Progress
+(subgoal status), Experience (cross-episode skills) — reachable through four
+meta-actions: `track`, `commit`, `recall`, `note`. ALFWorld, Qwen3-8B: 96.9%
+seen / 86.6% unseen, matching Claude Opus 4.5; each BPE component worth 6–8pp.
+
+Two dynamics worth naming: **harness annealing** (training internalises the
+scaffold — ~5 calls/episode → ~1, keeping only high-value external access) and
+**experience consolidation** (the store compacts by forgetting, rather than
+growing append-only).
+
+Relevance is as a **boundary marker, not a method to adopt**: it breaks our
+frozen-weights premise (this is L5 joint weights+harness). It also states the
+comparison we should expect to face — prompt-level scaffolding scored 56.4% vs
+96.9% for a learned access policy, i.e. *when* to use the harness may matter more
+than *what* the harness says. Our runtime-policy surface gap ([roadmap](roadmap.md) C2)
+is the frozen-weights version of that lever.
+
+---
+
+## Shorter entries
+
+**SEAGym (arXiv 2606.17546)** — evaluation environment for self-evolving agents
+across SWE / web / tool-use domains, measuring learning trajectories rather than
+static scores, with a train/test protocol against benchmark overfitting. Reports
+**catastrophic forgetting** as the persistent failure. A candidate external
+testbed, below Evo-Bench in priority (less harness-specific).
+
+**Lil'Log, "Harness Engineering for Self-Improvement" (2026-07-04)** — the survey
+that names the optimisation ladder: prompt → structured context → workflow →
+harness code → **optimizer code** (our L0–L4 under other names). Four
+requirements for a credible setup: observability, read-only evaluator access,
+evidence-grounded edits with predicted at-risk regressions, and **logging
+rejected candidates and negative results instead of discarding them**. We satisfy
+the middle two; observability is partial (component+decision, no experience) and
+**negative-result reuse is absent** — rejected candidates are written to
+`decision.json` but never fed back into the proposer's context ([roadmap](roadmap.md) B4).
+Seven named bottlenecks, of which diversity collapse and reward hacking are the
+two our K-candidate and guard designs touch.
+
+**RUCAIBox, "Agent Systems with Harness Engineering"** (survey + `awesome-agent-harness`)
+— field map: harness evolution, design (workflow / memory / skills / multi-agent),
+model adaptation, benchmarks by domain, future directions. Use as the index when
+looking for a domain-specific benchmark; not a source of claims.

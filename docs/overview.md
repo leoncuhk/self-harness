@@ -31,8 +31,10 @@ Every self-harness method is an instance of one loop:
 | SICA | benchmark scores | agent edits own codebase | greedy best |
 | ACE | execution feedback | context/playbook delta | incremental merge |
 | Self-Harness (2606.09498) | failure signatures φ(r)=(c,q,m) | targeted harness edit | conservative monotone: Δ_in≥0 ∧ Δ_ho≥0 ∧ max>0 |
-| AHE | error attribution | 7 components + 4 commitment fields | outcome + flip attribution |
+| AHE (2604.25850) | trajectory-level error attribution | edit + falsifiable prediction | outcome vs prediction |
+| TTHE (2607.08124) | unlabelled batch traces | N proposers, one objective each | agentic judge picks one |
 | Meta-Harness | multi-objective scores | harness program search | Pareto front |
+| **this repo** | φ(r) over assertion text | 1–K candidates + prediction | conservative gate + cost veto |
 
 Capability levels: **L0** prompt → **L1** context/memory → **L2** workflow/graph →
 **L3** harness self-edit → **L4** self-referential (edits its own editor) → **L5**
@@ -47,18 +49,34 @@ joint weights+harness. This project operates at L3.
   non-monotonic** (2605.30621) — frontier models have little headroom, weak models
   can't execute the harness, mid-tier gains most. Corollary learned the hard way in
   MVP-1: *tier labels track price, not capability on your task distribution*.
-- **Automatic harness evolution does not consistently beat equal-budget test-time
-  scaling, and generalizes poorly to held-out tasks** (2607.12227). The decisive
-  comparison is always evolution vs. best-of-N retries at equal spend, and the
-  expected outcome is a loss.
+- **Against equal-budget test-time scaling, evolution loses** (2607.12227, TB2.1,
+  two budget axes held equal — feedback *and* inference): without unit tests,
+  parallel sampling 72.3 vs evolution **67.4**, itself below the 68.2 baseline;
+  with unit tests, sequential refinement 91.8 vs evolution **86.2**. Held-out
+  transfer: **+0.6pp**. On a suite with deterministic verifiers — ours —
+  *sequential refinement*, not best-of-N, is the arm to beat.
+- **What does produce gains is structural, not prose** (2604.25850): TB2 69.7→77.0,
+  above human-engineered Codex-CLI, with the ablation localising the gain to
+  **tools, middleware, and long-term memory — not the system prompt**; transfer
+  holds cross-family (+5.1–10.1pp) and to SWE-bench-verified at 12% fewer tokens.
+  Every positive result of this kind feeds the proposer **execution traces**.
 - **Benchmark hygiene is load-bearing**: Terminal-Bench 2.1 repairs 28 of 89 tasks
   from 2.0 (dependency drift, budget mismatches, instruction/test misalignment).
   Evolving against a broken benchmark teaches routing around broken tasks.
+  Stronger form (Evo-Bench, 2608.09096): select tasks by **measured harness
+  sensitivity**, and match the response distribution across splits.
+
+**Synthesis of the 2026 literature:** the positive results all come from
+trace-grounded diagnosis over structural surfaces; the negative results all come
+from honest budget matching. No published work has both at once. That gap is
+this project's position — see the [roadmap](roadmap.md).
 
 ## What would make self-harness "proven"
 
-1. An evolution run beats equal-budget best-of-N on validation, margin above
-   baseline noise, reproduced across seeds (L4 of the [verification ladder](verification.md)).
+1. An evolution run beats the **strongest** equal-budget test-time-scaling arm on
+   validation — best-of-N, and sequential refinement wherever a deterministic
+   verifier makes it available — by a margin above baseline noise, reproduced
+   across seeds (L4 of the [verification ladder](verification.md)).
 2. The gain survives a locked test set read once, is not concentrated in 2–3
    tasks, and transfers across models/benchmarks (L5).
 3. The proposer's predictions beat the base rate — evidence it is engineering,
@@ -68,6 +86,18 @@ Any of these failing is a reportable result, not a reason to keep tuning.
 
 ## References
 
-- Self-Harness: arXiv 2606.09498 · Meta-Harness: arXiv 2603.28052 (code: stanford-iris-lab/meta-harness)
-- Tier study: arXiv 2605.30621 · Evolution vs test-time scaling: arXiv 2607.12227
-- LangChain harness engineering blog · deepagents (langchain-ai) · Terminal-Bench 2.1 / harbor
+Full critical reads in [paper-study.md](paper-study.md); this is the index.
+
+| | Paper | Why it matters here |
+| --- | --- | --- |
+| Method | Self-Harness **2606.09498** | the namesake: φ(r), conservative gate, bounded context |
+| Method | AHE **2604.25850** | strongest positive result; 3 observability pillars; prompt-is-not-the-lever ablation |
+| Method | TTHE **2607.08124** | test-time evolution, multi-objective proposers, transductive-scoring caveat |
+| Method | Meta-Harness **2603.28052** (code: stanford-iris-lab/meta-harness) | harness program search, Pareto selection |
+| Evidence | Tier study **2605.30621** | updating ability flat, benefit non-monotonic |
+| Evidence | Evaluation critique **2607.12227** | the falsifier: evolution loses at equal budget |
+| Bench | Evo-Bench **2608.09096** | harness-sensitivity task selection, sealed eval, matched splits |
+| Bench | SEAGym **2606.17546** · Terminal-Bench 2.1 / harbor | alternate testbeds |
+| Boundary | EvoHarness-RL **2608.05446** | learned runtime access policy — breaks frozen weights (L5) |
+| Survey | Lil'Log 2026-07-04 · RUCAIBox `awesome-agent-harness` | field map; the four requirements for a credible setup |
+| Practice | LangChain harness engineering blog · deepagents (langchain-ai) | the human-in-the-loop reference point |

@@ -165,3 +165,26 @@ no experiment decision was or will be taken from it. The M4 verdict is
 holdout-based; the one permitted unseal still applies to the evolved harness.
 Lesson filed: filter run logs (`grep DONE`) instead of tailing them when a run
 touches scorecard.
+
+## M3 (evolution) — not completed as of 2026-08-11 22:23
+
+Four launches, no stage marker written by any of them; `runs/mvp2-evolve` holds
+only the baseline train rollouts. Failure mode each time: `APIConnectionError` /
+`RemoteProtocolError: Server disconnected` inside a langgraph `model`/`tools`
+node, mid-stage.
+
+Two mitigations shipped and neither closed it: proposer-path retries
+(5 attempts, 5–20 s backoff, `e589350`) and `caffeinate -is` against idle sleep
+(`0d16736`). What both miss:
+
+- **The inner agent has no retry and no per-request timeout** — `run_task` calls
+  `agent.invoke` bare, so a proxy blip during any of the ~180 M3 rollouts is
+  unhandled. Retry coverage is proposer-only.
+- **A run has no checkpoint.** A crash in iteration 3 discards the rollouts of
+  iterations 1–2 entirely; expected cost to finish therefore grows with run
+  length instead of staying flat, which is why every attempt has died before the
+  end.
+
+Registered as gap 5 in the [roadmap](roadmap.md); items A1/A2 are the fix, and
+they are infrastructure only — no information reaching the proposer changes, so
+they do not touch the frozen MVP-2 protocol.

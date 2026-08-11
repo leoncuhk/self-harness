@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -148,6 +149,21 @@ class Variant:
     def key(self) -> str:
         """Return a stable filesystem key."""
         return self.label
+
+    @property
+    def fingerprint(self) -> str:
+        """Return a content hash over the surface values and model.
+
+        The filesystem key is the *label* (``iter-003``), which is assigned by
+        position in the loop and says nothing about content: re-running an
+        iteration produces a different harness under the same label. Resume
+        therefore has to compare content, not names.
+        """
+        payload = json.dumps(
+            {"model": self.model, "values": self.values},
+            sort_keys=True,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
 
     def attr_overrides(self) -> dict[str, str]:
         """Return module-attr overrides keyed by target."""
@@ -396,8 +412,15 @@ class RunReport:
             ],
         }
 
-    def to_markdown(self) -> str:
-        """Render a concise Markdown report."""
+    def to_markdown(self, *, include_scorecard: bool = True) -> str:
+        """Render a concise Markdown report.
+
+        ``include_scorecard=False`` withholds the sealed-split row. The file
+        written into the run directory always carries it — reading that file is a
+        deliberate act — but anything echoed to a terminal or a stage log is not,
+        and a scorecard aggregate glimpsed while checking progress spends an
+        unseal that a pre-registration only permits once.
+        """
         lines = [
             "# better-harness report",
             "",
@@ -423,8 +446,12 @@ class RunReport:
         ]
         if self.baseline_scorecard is not None and self.final_scorecard is not None:
             lines.append(
-                f"| Scorecard | `{self.baseline_scorecard.passed}/{self.baseline_scorecard.total}` | "
-                f"`{self.final_scorecard.passed}/{self.final_scorecard.total}` |"
+                (
+                    f"| Scorecard | `{self.baseline_scorecard.passed}/{self.baseline_scorecard.total}` | "
+                    f"`{self.final_scorecard.passed}/{self.final_scorecard.total}` |"
+                )
+                if include_scorecard
+                else "| Scorecard | *sealed* | *sealed* |"
             )
         lines.extend(["", "## Iterations", ""])
         for iteration in self.iterations:
@@ -568,6 +595,35 @@ class RunLayout:
     def write_report(self, report: RunReport) -> None:
         """Write the final report."""
         report.write(self.root)
+
+
+def reusable_result(
+    *,
+    result_path: Path,
+    variant: Variant,
+    variant_path: Path,
+) -> SplitResult | None:
+    """Return a stored split result, but only if it measured *this* harness.
+
+    Candidate labels are positional (``iter-003``), so a resumed run reaches the
+    same directory with different surface values. Reusing on the strength of the
+    path alone attributes old numbers to a new candidate — silently, and in the
+    direction that looks like a working experiment. Reuse is therefore allowed
+    only when the variant JSON stored beside the result still fingerprints
+    identically. Anything unreadable or mismatched means re-run.
+    """
+    if not result_path.exists() or not variant_path.exists():
+        return None
+    try:
+        saved = Variant.load(variant_path)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if saved.fingerprint != variant.fingerprint:
+        return None
+    try:
+        return SplitResult.load(result_path)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def expand_env(value: str) -> str:
@@ -1014,6 +1070,7 @@ def run_experiment(
                 candidate_index=candidate_index,
                 clusters=clusters,
                 total_candidates=experiment.candidates,
+                resume=reuse_existing,
             )
             if not proposal.changed_surfaces:
                 continue
@@ -1309,8 +1366,25 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("config", type=Path)
     run_parser.add_argument("--model")
     run_parser.add_argument("--max-iterations", type=int)
-    run_parser.add_argument("--reuse-existing", action="store_true")
+    run_parser.add_argument(
+        "--reuse-existing",
+        "--resume",
+        dest="reuse_existing",
+        action="store_true",
+        help=(
+            "reuse prior proposals and split results from --output-dir when they "
+            "provably measured the same harness (variant fingerprint match)"
+        ),
+    )
     run_parser.add_argument("--output-dir", type=Path)
+    run_parser.add_argument(
+        "--show-scorecard",
+        action="store_true",
+        help=(
+            "print the sealed scorecard row to stdout. Off by default so stage "
+            "logs cannot spend a pre-registered unseal by accident"
+        ),
+    )
     run_parser.add_argument(
         "--repeats",
         type=int,
@@ -1396,7 +1470,9 @@ def main(argv: list[str] | None = None) -> int:
         max_iterations=args.max_iterations,
         reuse_existing=args.reuse_existing,
     )
-    print(report.to_markdown())
+    print(report.to_markdown(include_scorecard=args.show_scorecard))
+    if not args.show_scorecard and report.final_scorecard is not None:
+        print("\n> Scorecard withheld from stdout. Unseal deliberately: `--show-scorecard`, or read report.md.")
     return 0
 
 

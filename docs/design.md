@@ -37,6 +37,13 @@ are text heuristics (watch the `unknown` rate); the gate is Δ≥0 over attempts
 paired significance test (analysis scripts add bootstrap CIs on top); scorecard
 access discipline is protocol, not code.
 
+One further limit, larger than any of the above and identified against the 2026
+literature: **the proposer never sees an execution trace.** Inner-agent
+trajectories are discarded after each rollout, so φ(r) is computed from pytest
+assertion text rather than from behaviour, and box ② is pattern-matching error
+strings. Every published positive result in this area feeds traces to its
+proposer. Full gap list and build order: [roadmap.md](roadmap.md).
+
 ## Evaluation methodology
 
 **Three-way split.** `train` visible to the proposer; `holdout` scored but never

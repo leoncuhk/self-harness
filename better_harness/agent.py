@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from better_harness.core import Experiment, Proposal, RunLayout, SplitResult, Variant
-from better_harness.ledger import parse_prediction
+from better_harness.ledger import Prediction, parse_prediction
 from better_harness.patching import build_variant, prepend_pythonpath
 from better_harness.signatures import FailureCluster
 
@@ -150,6 +150,45 @@ def read_proposal_summary(workspace: ProposerWorkspace) -> str:
     return workspace.proposal_file.read_text().strip()
 
 
+def load_proposal_record(path: Path) -> tuple[Proposal, Variant] | None:
+    """Reload a proposal and its candidate variant from a prior run, or None.
+
+    Written by :func:`propose_variant` after every model call. Reloading it on
+    resume keeps a restarted iteration byte-identical to the one that crashed —
+    without this, a resumed run pays for a fresh proposer call and produces
+    different surface values, so no downstream evaluation can be reused either.
+    """
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text())
+        proposal_payload = dict(payload["proposal"])
+        prediction = Prediction(
+            root_cause=str(proposal_payload.get("prediction", {}).get("root_cause", "")),
+            evidence=tuple(proposal_payload.get("prediction", {}).get("evidence", ())),
+            flip_to_pass=tuple(proposal_payload.get("prediction", {}).get("flip_to_pass", ())),
+            at_risk=tuple(proposal_payload.get("prediction", {}).get("at_risk", ())),
+        )
+        proposal = Proposal(
+            changed_surfaces=tuple(proposal_payload["changed_surfaces"]),
+            workspace_dir=str(proposal_payload["workspace_dir"]),
+            summary=str(proposal_payload["summary"]),
+            final_message=proposal_payload.get("final_message"),
+            prediction=prediction,
+            target_cluster=proposal_payload.get("target_cluster"),
+        )
+        variant_payload = payload["candidate_variant"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    variant_path = path.parent / "candidate_variant.json"
+    variant_path.write_text(json.dumps(variant_payload, indent=2, sort_keys=True) + "\n")
+    try:
+        candidate = Variant.load(variant_path)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return proposal, candidate
+
+
 def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration context
     *,
     experiment: Experiment,
@@ -160,9 +199,17 @@ def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration c
     candidate_index: int = 0,
     clusters: Sequence[FailureCluster] = (),
     total_candidates: int = 1,
+    resume: bool = False,
 ) -> tuple[Proposal, Variant]:
     """Run the outer Deep Agent once and return its candidate variant."""
     scoped_index = candidate_index if total_candidates > 1 else None
+    if resume:
+        # Check before building the workspace: building it wipes the directory.
+        prior = load_proposal_record(
+            layout.proposer_workspace_dir(iteration, scoped_index) / "result.json"
+        )
+        if prior is not None:
+            return prior
     workspace = build_proposer_workspace(
         experiment=experiment,
         current=current,

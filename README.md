@@ -8,6 +8,7 @@
 > - [`docs/verification.md`](docs/verification.md) — the L0–L5 ladder and falsification criteria
 > - [`docs/mvp.md`](docs/mvp.md) — pre-registration registry (MVP-1, MVP-2), append-only
 > - [`docs/results.md`](docs/results.md) — outcomes, gaps disclosed
+> - [`docs/roadmap.md`](docs/roadmap.md) — standing vs the 2026 literature, gap list, build order
 > - [`docs/agent-stack.md`](docs/agent-stack.md) — reference: Deep Agents / LangChain / LangGraph layers
 > - [`docs/paper-study.md`](docs/paper-study.md) — running study notes on relevant papers (starts with 2606.09498)
 > - [`docs/lessons.md`](docs/lessons.md) — practice lessons from MVP-1/MVP-2, append-only

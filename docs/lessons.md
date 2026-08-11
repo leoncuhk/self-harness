@@ -70,3 +70,16 @@ by costing something. Append-only.
   multi-hour stages in `caffeinate -is`. (Cost: three dead M3 runs before the
   pattern — crash always ~2-4 iterations in, i.e. exactly when the operator
   stopped watching — gave it away.)
+- **Harden the whole crash surface, not the path you were looking at.** Retries
+  went onto the proposer call because that is where the first traceback pointed;
+  the inner agent makes ~180 calls per M3 stage with no retry and no timeout at
+  all, so the run kept dying. Count the API calls per stage per path before
+  deciding where reliability work goes.
+- **Any run longer than its mean time between failures needs a checkpoint.**
+  Without `--resume`, a crash in iteration 3 throws away iterations 1–2, so the
+  expected cost of *finishing* grows with run length — a stage can become
+  unfinishable while every individual attempt looks like bad luck.
+- **Read the field before hardening the method.** Every published positive
+  harness-evolution result feeds execution traces to its proposer; we spent the
+  whole build on selection rigor while box ② read pytest assertion text. Rigor
+  around a blind diagnosis stage measures the blindness precisely.

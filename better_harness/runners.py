@@ -18,6 +18,7 @@ from better_harness.core import (
     SplitResult,
     Variant,
     extract_trace_refs,
+    reusable_result,
     write_trace_refs,
 )
 from better_harness.patching import (
@@ -75,11 +76,17 @@ class PytestRunner:
         """Run one split and capture artifacts."""
         split_dir = layout.split_dir(variant_key=variant.key, split=split)
         result_path = split_dir / "result.json"
-        if reuse_existing and result_path.exists():
-            return SplitResult.load(result_path)
+        variant_path = layout.variant_path(variant.key)
+        if reuse_existing:
+            reused = reusable_result(
+                result_path=result_path,
+                variant=variant,
+                variant_path=variant_path,
+            )
+            if reused is not None:
+                return reused
 
         split_dir.mkdir(parents=True, exist_ok=True)
-        variant_path = layout.variant_path(variant.key)
         variant.save(variant_path)
         project_root = Path(str(experiment.runner_config["project_root"]))
         env = self._build_env(
@@ -252,11 +259,17 @@ class HarborRunner:
         """Run one Harbor split."""
         split_dir = layout.split_dir(variant_key=variant.key, split=split)
         result_path = split_dir / "result.json"
-        if reuse_existing and result_path.exists():
-            return SplitResult.load(result_path)
+        variant_path = layout.variant_path(variant.key)
+        if reuse_existing:
+            reused = reusable_result(
+                result_path=result_path,
+                variant=variant,
+                variant_path=variant_path,
+            )
+            if reused is not None:
+                return reused
 
         split_dir.mkdir(parents=True, exist_ok=True)
-        variant_path = layout.variant_path(variant.key)
         variant.save(variant_path)
         cases = experiment.cases_for_split(split)
         outcomes: list[CaseOutcome] = []

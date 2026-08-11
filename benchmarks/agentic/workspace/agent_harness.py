@@ -9,11 +9,44 @@ usage.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent
 RECURSION_LIMIT = 60
+# One M3 stage makes ~180 inner-agent rollouts, each many API calls, against a
+# third-party proxy. Retry coverage previously existed only on the single
+# proposer call per iteration, which is why a transient disconnect kept killing
+# whole stages. Backoff is 5/10/15/20s; task-level failures are never retried.
+MAX_ATTEMPTS = 5
+BACKOFF_S = 5
+REQUEST_TIMEOUT_S = 120
+MODEL_MAX_RETRIES = 3
+
+TRANSIENT_MARKERS = (
+    "connection error",
+    "server disconnected",
+    "remoteprotocolerror",
+    "apiconnectionerror",
+    "connection reset",
+    "connection aborted",
+    "temporarily unavailable",
+    "timed out",
+    "timeout",
+    "bad gateway",
+    "service unavailable",
+    "gateway timeout",
+    " 502",
+    " 503",
+    " 504",
+)
+
+
+def is_transient(error: BaseException) -> bool:
+    """Return whether an error is transport noise rather than a task outcome."""
+    text = f"{type(error).__name__}: {error}".lower()
+    return any(marker in text for marker in TRANSIENT_MARKERS)
 
 
 def _read_surface(name: str) -> str:
@@ -52,13 +85,24 @@ def _compose_system_prompt() -> str | None:
 
 
 def run_task(*, task_root: str, model: str) -> dict[str, Any]:
-    """Run the inner agent once against one task sandbox. Returns usage info."""
+    """Run the inner agent once against one task sandbox. Returns usage info.
+
+    Transport failures are retried with the sandbox left untouched between
+    attempts, so a retry re-runs the task from its original inputs. Anything
+    that is not transport noise propagates on the first attempt and is graded as
+    a task failure, which is what keeps a broken harness from looking flaky.
+    """
     from deepagents.backends import FilesystemBackend
     from deepagents.graph import create_deep_agent
     from langchain.chat_models import init_chat_model
     from langchain_core.messages import HumanMessage
 
-    model_obj = init_chat_model(model, temperature=0)
+    model_obj = init_chat_model(
+        model,
+        temperature=0,
+        timeout=REQUEST_TIMEOUT_S,
+        max_retries=MODEL_MAX_RETRIES,
+    )
     agent = create_deep_agent(
         model=model_obj,
         system_prompt=_compose_system_prompt(),
@@ -66,20 +110,31 @@ def run_task(*, task_root: str, model: str) -> dict[str, Any]:
         middleware=_load_middleware(),
         backend=FilesystemBackend(root_dir=task_root, virtual_mode=True),
     )
-    result = agent.invoke(
-        {
-            "messages": [
-                HumanMessage(
-                    content=(
-                        "Complete the task described in /instructions.txt. All task files "
-                        "are under the filesystem root '/'. Read /instructions.txt first, "
-                        "then do the work, writing output files exactly where it specifies."
-                    )
+    payload = {
+        "messages": [
+            HumanMessage(
+                content=(
+                    "Complete the task described in /instructions.txt. All task files "
+                    "are under the filesystem root '/'. Read /instructions.txt first, "
+                    "then do the work, writing output files exactly where it specifies."
                 )
-            ]
-        },
-        config={"recursion_limit": RECURSION_LIMIT},
-    )
+            )
+        ]
+    }
+    attempts_used = 0
+    result = None
+    for attempt in range(MAX_ATTEMPTS):
+        attempts_used = attempt + 1
+        try:
+            result = agent.invoke(payload, config={"recursion_limit": RECURSION_LIMIT})
+            break
+        except BaseException as exc:  # noqa: BLE001 - langgraph wraps transport errors in many types
+            if attempt == MAX_ATTEMPTS - 1 or not is_transient(exc):
+                raise
+            time.sleep(BACKOFF_S * (attempt + 1))
+    if result is None:  # pragma: no cover - unreachable: the loop returns or raises
+        msg = "inner agent produced no result"
+        raise RuntimeError(msg)
     total_tokens = 0
     fingerprints: set[str] = set()
     for message in result.get("messages", []):
@@ -93,4 +148,5 @@ def run_task(*, task_root: str, model: str) -> dict[str, Any]:
         "total_tokens": total_tokens,
         "n_messages": len(result.get("messages", [])),
         "system_fingerprints": sorted(fingerprints),
+        "attempts": attempts_used,
     }
