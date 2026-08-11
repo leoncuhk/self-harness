@@ -7,3 +7,4 @@
 runs/
 .runtime/
 **/_runtime/
+.env
