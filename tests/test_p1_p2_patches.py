@@ -483,3 +483,16 @@ def test_config_rejects_zero_candidates(tmp_path: Path):
 def test_default_candidates_is_one(tmp_path: Path):
     """K>1 multiplies eval spend, so raising it must be deliberate."""
     assert load_experiment(write_config(tmp_path)).candidates == 1
+
+
+def test_transient_error_classifier_covers_transport_failures():
+    """A dropped connection must be retried, not crash the iteration (MVP-2 incident)."""
+    from better_harness.agent import _is_transient_model_error  # noqa: PLC0415 - local to avoid import cost in unrelated tests
+
+    assert _is_transient_model_error(
+        "httpx.RemoteProtocolError: Server disconnected without sending a response."
+    )
+    assert _is_transient_model_error("openai.APIConnectionError: Connection error.")
+    assert _is_transient_model_error("Error code: 502 - upstream hiccup")
+    assert not _is_transient_model_error("Error code: 401 - invalid api key")
+    assert not _is_transient_model_error("ValueError: bad config")

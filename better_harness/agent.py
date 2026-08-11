@@ -630,6 +630,16 @@ def _is_transient_model_error(message: str) -> bool:
             "529 -",
             "rate limit",
             "timeout",
+            # Transient transport failures: the request never got a response, so
+            # retrying is safe and almost always what the caller wants.
+            "server disconnected",
+            "connection error",
+            "connection reset",
+            "connection aborted",
+            "remoteprotocolerror",
+            "error code: 502",
+            "error code: 503",
+            "error code: 504",
         )
     )
 
