@@ -59,3 +59,7 @@ by costing something. Append-only.
   method value.
 - **Read the ledger before the pass rate** — prediction accuracy is readable
   after one iteration; pass-rate curves on small task sets are noise for many.
+- **Run logs leak the scorecard.** `report.md` content (including scorecard
+  aggregates) is echoed into stage logs; checking progress with `tail` can breach
+  a read-nothing rule. Grep for stage markers only, and keep scorecard rows out
+  of anything a human eyeballs mid-experiment.

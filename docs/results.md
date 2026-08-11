@@ -150,3 +150,18 @@ headroom (0.50) with a wide CI (±0.50 at n=4), as the power disclosure anticipa
 
 Inner agent: `openai:gpt-4.1-nano`. Proposer: `openai:deepseek-v4-flash`
 (updater≠beneficiary configuration, disclosed in the pre-registration).
+
+## MVP-2 reference baseline (repeats=5, `runs/mvp2-baseline`)
+
+Train 7/40 = **0.175**, holdout 10/20 = **0.500**, combined 0.283 — in window,
+consistent with calibration. Flakiness is real for this model (calibration showed
+0.33 pass fractions), so the repeats machinery is load-bearing for the first time.
+
+**Disclosure — accidental scorecard exposure.** The stage log prints the run
+report, which includes the baseline scorecard aggregate (≈1/20). This was seen
+while checking progress, violating the letter of the read-nothing rule. Scope of
+exposure: aggregate count only, baseline harness only, no task-level detail, and
+no experiment decision was or will be taken from it. The M4 verdict is
+holdout-based; the one permitted unseal still applies to the evolved harness.
+Lesson filed: filter run logs (`grep DONE`) instead of tailing them when a run
+touches scorecard.
