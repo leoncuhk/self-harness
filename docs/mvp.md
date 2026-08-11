@@ -421,3 +421,10 @@ equal-budget oracle retries — existence, not generality (single seed, authored
 tasks, no transfer). Negative: the loop failed to beat retries here — consistent
 with published priors, and reported as such. Either way: first L3 prediction-
 accuracy data on a non-toy setup.
+
+## MVP-2 calibration list (fixed 2026-08-11, after inventory, before any task rollout)
+
+Ascending expected capability: `qwen3-4b` → `qwen3-8b` → `gpt-4.1-nano` →
+`gpt-4o-mini` → `gpt-4.1-mini`. Each must pass a one-call tool smoke first; first
+candidate whose repeats=3 train+holdout baseline lands in [0.20, 0.85] is the
+MVP-2 inner model. All probes are reported regardless of outcome.
