@@ -81,8 +81,16 @@ def run_task(*, task_root: str, model: str) -> dict[str, Any]:
         config={"recursion_limit": RECURSION_LIMIT},
     )
     total_tokens = 0
+    fingerprints: set[str] = set()
     for message in result.get("messages", []):
         usage = getattr(message, "usage_metadata", None)
         if usage and usage.get("total_tokens"):
             total_tokens += int(usage["total_tokens"])
-    return {"total_tokens": total_tokens, "n_messages": len(result.get("messages", []))}
+        metadata = getattr(message, "response_metadata", None)
+        if isinstance(metadata, dict) and metadata.get("system_fingerprint"):
+            fingerprints.add(str(metadata["system_fingerprint"]))
+    return {
+        "total_tokens": total_tokens,
+        "n_messages": len(result.get("messages", [])),
+        "system_fingerprints": sorted(fingerprints),
+    }

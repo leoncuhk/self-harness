@@ -112,3 +112,13 @@ Option 2 is the cheapest next experiment and the only one runnable in hours; opt
 ~322 real inner-agent rollouts + 1 proposer invocation ≈ **6M tokens** on
 deepseek-v4-flash across M1, smoke, and four baseline campaigns (M2/B5 × rev0/rev1).
 No scorecard output was ever read; `runs/*-rev0` and rev1 run dirs are preserved.
+
+## Protocol-execution gaps, disclosed
+
+- **Per-rollout `system_fingerprint` logging was promised in MVP.md but not
+  implemented during the four baseline campaigns** — provider drift was unmonitored
+  while they ran. Closed after the fact (`agent_harness.run_task` and the eval
+  summary now record fingerprints), so it holds for future runs, not
+  retroactively for these.
+- The cost-veto path on this suite was never exercised under evolution (M3
+  cancelled); it remains verified only at the unit-test level.

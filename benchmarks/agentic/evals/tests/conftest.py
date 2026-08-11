@@ -7,6 +7,7 @@ import pytest
 
 COUNTS = {"passed": 0, "failed": 0, "skipped": 0}
 TOKENS = {"total": 0}
+FINGERPRINTS: set[str] = set()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -20,9 +21,10 @@ def model(pytestconfig: pytest.Config) -> str:
 
 
 @pytest.fixture
-def record_tokens():
-    def _record(count: int) -> None:
-        TOKENS["total"] += int(count)
+def record_usage():
+    def _record(usage: dict) -> None:
+        TOKENS["total"] += int(usage.get("total_tokens", 0))
+        FINGERPRINTS.update(usage.get("system_fingerprints", []))
 
     return _record
 
@@ -32,6 +34,7 @@ def pytest_configure(config: pytest.Config) -> None:
     for key in COUNTS:
         COUNTS[key] = 0
     TOKENS["total"] = 0
+    FINGERPRINTS.clear()
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
@@ -61,6 +64,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         "total": total,
         "correctness": 0.0 if total == 0 else COUNTS["passed"] / total,
         "total_tokens": TOKENS["total"],
+        "system_fingerprints": sorted(FINGERPRINTS),
     }
     path = Path(summary_file)
     path.parent.mkdir(parents=True, exist_ok=True)

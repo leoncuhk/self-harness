@@ -258,13 +258,13 @@ VERIFIERS = {
 
 @pytest.mark.timeout(420)
 @pytest.mark.parametrize("task_id", sorted(VERIFIERS))
-def test_task(task_id: str, model: str, tmp_path: Path, record_tokens) -> None:
+def test_task(task_id: str, model: str, tmp_path: Path, record_usage) -> None:
     task = TASKS_ROOT / task_id
     assert task.exists(), f"task fixture missing: {task}"
     sandbox = tmp_path / task_id
     shutil.copytree(task, sandbox)
 
     usage = agent_harness.run_task(task_root=str(sandbox), model=model)
-    record_tokens(usage.get("total_tokens", 0))
+    record_usage(usage)
 
     VERIFIERS[task_id](task, sandbox)

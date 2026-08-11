@@ -1,4 +1,16 @@
-# better-harness
+# better-harness (self-harness fork)
+
+> **Fork index.** This is a fork of upstream `examples/better-harness` with an
+> experimental-rigor layer and a completed, pre-registered MVP experiment:
+>
+> - [`FORK.md`](FORK.md) — every divergence from upstream and why (P0–P2 patches)
+> - [`VERIFY.md`](VERIFY.md) — the L0–L5 verification ladder and falsification criteria
+> - [`MVP.md`](MVP.md) — the frozen pre-registration (amendments recorded in place)
+> - [`RESULTS.md`](RESULTS.md) — the outcome: terminated at M2 by the stop rule; testbed saturated
+> - `benchmarks/agentic/` — 16-task suite, real inner agent, deterministic verifiers
+> - `scripts/` — task generator, M1 verifier, analysis (baseline CI / pass@N / tokens / M4 compare)
+>
+> Upstream README follows unchanged.
 
 System for autonomous harness optimization. Inspired by previous harness engineering work at LangChain in [Improving Deep Agents with Harness Engineering](https://blog.langchain.com/improving-deep-agents-with-harness-engineering/), [karpathy/autoresearch](https://github.com/karpathy/autoresearch), and [Meta-Harness](https://arxiv.org/abs/2603.28052).
 
