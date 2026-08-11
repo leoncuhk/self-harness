@@ -1,4 +1,7 @@
-Every file in /sales has lines of region,amount (amounts are integers).
-Some files may be empty or contain blank lines; skip those. Sum every
-amount across all files and write the total to /answer.txt as a plain
-integer.
+Every file in /sales contains rows of region,amount with integer
+amounts (refunds are negative). Some files start with the header line
+'region,amount' and some do not; skip the header where present. Skip
+blank lines, whitespace-only lines, and empty files.
+
+Sum every amount across all files and write the total to /answer.txt
+as a plain integer.

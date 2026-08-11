@@ -1,5 +1,8 @@
-/numbers.txt has one integer per line. Write /report.json containing a JSON
-object with exactly these three keys and no others:
-  "count" - how many numbers (integer)
-  "sum"   - their sum (integer)
-  "mean"  - their arithmetic mean rounded to 2 decimals (number)
+/numbers.txt has one integer per line. Write /report.json containing a
+JSON object with exactly these five keys and no others:
+  "count"  - how many numbers (integer)
+  "sum"    - their sum (integer)
+  "mean"   - arithmetic mean rounded to 2 decimals (number)
+  "median" - median rounded to 2 decimals (number; for an even count,
+             the average of the two middle values)
+  "range"  - max minus min (integer)

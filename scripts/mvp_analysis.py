@@ -46,7 +46,7 @@ def _case_fractions(run_dir: Path, split: str, variant: str) -> dict[str, float]
     """Per-case pass fraction over repeats; falls back to result.json at repeats=1."""
     repeats = _load_repeats(run_dir, split, variant)
     if repeats is not None:
-        return {case["case_id"]: float(case["pass_fraction"]) for case in repeats["cases"]}
+        return {case["case_id"]: float(case["pass_fraction"]) for case in repeats["per_case"]}
     result = json.loads((_split_dir(run_dir, split, variant) / "result.json").read_text())
     return {
         outcome["case_id"]: 1.0 if outcome["status"] == "passed" else 0.0
@@ -89,7 +89,7 @@ def cmd_pass_at_n(run_dir: Path) -> None:
             print(f"[{split}] no repeats.json — pass@N needs repeats > 1")
             continue
         n = repeats["repeats"]
-        cases = repeats["cases"]
+        cases = repeats["per_case"]
         hits = sum(1 for case in cases if float(case["pass_fraction"]) > 0.0)
         print(f"[{split}] pass@{n} = {hits}/{len(cases)} = {hits / len(cases):.3f}")
         for case in sorted(cases, key=lambda c: c["case_id"]):
@@ -168,7 +168,7 @@ def cmd_compare(evo_run: Path, b1_run: Path, m2_halfwidth: float) -> None:
         return
     b1 = {
         case["case_id"]: 1.0 if float(case["pass_fraction"]) > 0 else 0.0
-        for case in b1_repeats["cases"]
+        for case in b1_repeats["per_case"]
     }
     cases = sorted(set(evo) & set(b1))
     if set(evo) != set(b1):

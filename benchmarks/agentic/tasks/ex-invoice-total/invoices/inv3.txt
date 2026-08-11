@@ -1,1 +1,3 @@
-gizmo,4,101.10
+"bolt, large",4,3.75
+gizmo,2,101.10
+DISCOUNT,5

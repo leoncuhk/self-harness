@@ -1,3 +1,8 @@
-/fruits.txt has lines of: name quantity. Write /sorted.csv with a header
-line 'name,qty' followed by one row per fruit as name,qty, sorted by
-quantity descending; ties broken by name ascending.
+/fruits.txt has lines of: name quantity. Quantities may be zero-padded
+(e.g. 007) but must be written as plain integers in the output.
+
+Write /sorted.csv as:
+  header line: name,qty
+  one row per fruit as name,qty, sorted by quantity descending, ties
+  broken by name ascending
+  final row: TOTAL,<sum of all quantities>

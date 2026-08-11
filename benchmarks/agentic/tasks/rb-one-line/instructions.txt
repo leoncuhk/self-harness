@@ -1,4 +1,8 @@
-Count the words in /story.txt (words are whitespace-separated tokens).
+Count the words in /story.txt. A word is a whitespace-separated token
+that contains at least one letter or digit (tokens that are pure
+punctuation, like '-' or '...', do not count). A hyphenated token like
+'well-known' counts as one word.
+
 Write /answer.txt containing exactly one line: the count as a plain
-integer. The file must contain nothing else - no labels, no explanation,
-no extra lines.
+integer. The file must contain nothing else - no labels, no
+explanation, no extra lines.

@@ -169,6 +169,21 @@ record which one the MVP claims **before** M4 runs.
 format, multistep, robustness), 8 train / 4 holdout / 4 scorecard, deterministic
 verifiers, run by the pytest runner.
 
+> **Difficulty revision 1 (2026-08-11) — the single permitted revision, now spent.**
+> Trigger, from the first baseline (runs archived as `runs/*-rev0`): train pass@1
+> 0.875, holdout pass@1 **1.000**, zero flaky cases over 5 repeats, B5 identical to
+> the seed. Combined 11/12 = 0.917 is above the frozen window ceiling of 0.85, and a
+> holdout at 1.0 leaves M4 no margin to detect by construction.
+> Revision: all 16 tasks hardened by **compounding exactness requirements**
+> (quoted-CSV parsing with discounts, ordinal/two-digit-year dates incl. a leap-year
+> trap, multi-key sort orders, conditional checksums, a hint file whose shortcut
+> matches the wrong column, NBSP/whitespace normalisation, multi-file edge cases).
+> Task ids, strata, and split assignment are unchanged; instructions remain fully
+> explicit — difficulty comes from execution discipline, not ambiguity, which is
+> precisely the dimension a harness can improve. Per the pre-registration, the
+> window is now final: if the revised baseline still lands outside [0.20, 0.85],
+> the MVP stops and reports that as its result.
+
 **Original (pre-amendment) task-set text kept for the record:** Terminal-Bench 2.1
 subset, 16 tasks (8 train / 4 holdout / 4 scorecard, stratified by task category),
 via the harbor runner.

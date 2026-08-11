@@ -1,6 +1,11 @@
-The directory /invoices contains invoice files. Each line is CSV:
-item,quantity,unit_price
+The directory /invoices contains invoice files. Each line is CSV with
+three fields: item,quantity,unit_price. Item names may be quoted with
+double quotes and may contain commas inside the quotes, e.g.:
+"bolt, large",2,3.50
+A file may additionally contain at most one line of the form
+DISCOUNT,<percent> (always the last line when present). That discount
+applies to that file's subtotal only.
 
-Compute the grand total (sum of quantity * unit_price over every line of
-every file) and write it to /answer.txt as a number rounded to exactly two
-decimals (for example: 123.40). Write nothing else to the file.
+Compute: grand_total = sum over files of subtotal * (1 - percent/100),
+rounding only the final grand total to 2 decimals. Write it to
+/answer.txt as a plain number with exactly two decimals, nothing else.

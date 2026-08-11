@@ -1,3 +1,4 @@
-bolt 42
-washer 7
-nut 1300
+bolt 42 0.35
+washer 7 0.1
+nut 1300 0.02
+anchor 9 12.5

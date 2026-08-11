@@ -1,4 +1,5 @@
-apple 12
+apple 012
 banana 3
 cherry 12
-date 25
+date 025
+elder 007

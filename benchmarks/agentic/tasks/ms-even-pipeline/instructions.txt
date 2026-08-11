@@ -1,4 +1,9 @@
-Three steps, in order:
+Four steps, in order:
 1. Read the integers in /raw.txt (one per line).
 2. Write the even ones, sorted ascending, one per line, to /evens.txt.
-3. Write the sum of those even numbers to /answer.txt as a plain integer.
+3. Write the square of each of those even numbers, in the same order,
+   one per line, to /squares.txt.
+4. Write the running cumulative sums of those squares, in order, one
+   per line, to /cumsum.txt (so the last line of /cumsum.txt is the
+   total). Also write that final total to /answer.txt as a plain
+   integer.

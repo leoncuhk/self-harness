@@ -1,5 +1,9 @@
-/items.txt has lines of: name quantity. Write /table.txt with one line per
-item, keeping the original order, where each line is the name left-justified
-in a field of width 12 followed by the quantity right-justified in a field of
-width 5. Example: the item 'screw 137' becomes this exact 17-character line:
-'screw         137'
+/items.txt has lines of: name quantity price. Write /table.txt with one
+line per item, keeping the original order, where each line is exactly:
+  the name left-justified in a field of width 12,
+  the quantity right-justified in a field of width 5,
+  the price right-justified in a field of width 9, formatted with
+  exactly two decimals.
+Every line is therefore exactly 26 characters. Example: the item
+'screw 137 3.5' becomes this exact line:
+'screw         137     3.50'

@@ -1,20 +1,20 @@
-INFO boot sequence started
-INFO config loaded
-ERROR db connection refused
-WARN cache miss rate high
-ERROR db connection refused, retry scheduled
-INFO worker 1 online
-ERROR malformed payload in queue
-INFO worker 2 online
-WARN slow query 1.9s
-ERROR timeout talking to billing service
-ERROR timeout talking to billing service, retry scheduled
-INFO heartbeat ok
-ERROR user 4411 invalid token
-WARN disk 81% full
-INFO heartbeat ok
-ERROR malformed payload in queue
-ERROR upstream 502, retry scheduled
-INFO heartbeat ok
-ERROR user 9020 invalid token
-INFO shutdown requested
+2026-08-11T09:00:01 INFO boot sequence started
+2026-08-11T09:00:02 INFO config loaded
+2026-08-11T09:00:05 ERROR db connection refused
+2026-08-11T09:00:06 WARN cache miss rate high
+2026-08-11T09:00:08 ERROR db connection refused, retry scheduled
+2026-08-11T09:00:09 INFO worker 1 online
+2026-08-11T09:00:11 ERROR malformed payload in queue
+2026-08-11T09:00:12 INFO client sent the string ERROR in its payload
+2026-08-11T09:00:14 WARN disk 81% full on /var
+2026-08-11T09:00:15 ERROR timeout talking to billing service
+2026-08-11T09:00:17 ERROR timeout talking to billing, retry scheduled
+2026-08-11T09:00:18 INFO heartbeat ok
+2026-08-11T09:00:20 ERROR user 4411 invalid token
+2026-08-11T09:00:21 WARN disk latency rising
+2026-08-11T09:00:23 INFO WARN-level noise in message body only
+2026-08-11T09:00:24 ERROR malformed payload in queue
+2026-08-11T09:00:26 ERROR upstream 502, retry scheduled
+2026-08-11T09:00:27 WARN slow query 1.9s
+2026-08-11T09:00:29 ERROR user 9020 invalid token
+2026-08-11T09:00:30 INFO shutdown requested

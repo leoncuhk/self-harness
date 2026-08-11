@@ -1,4 +1,4 @@
-The harness woke before the model did. It checked the failing cases
-twice, filed its prediction, and only then allowed the edit. By the time
-the model started reasoning, the loop had already decided what evidence
-would count.
+The harness woke before the model did - twice, in fact. It checked
+the failing cases ... filed a well-known prediction, and - only then -
+allowed the edit. By the time the model started reasoning, the loop
+had already decided what evidence would count.

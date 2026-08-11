@@ -1,0 +1,2 @@
+"nut, hex",50,0.30
+"washer, flat",25,0.12

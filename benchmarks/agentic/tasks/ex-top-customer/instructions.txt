@@ -1,4 +1,11 @@
-/orders.csv has a header row and rows of customer,amount. Find the customer
-with the highest total spend across all their rows. If several customers tie
-for the highest total, pick the alphabetically first name. Write just that
-customer's name to /answer.txt.
+/orders.csv has a header row, then rows of customer,amount.
+Amounts are dollar strings like $120.50; an amount in parentheses like
+($30.00) is a refund and counts as negative. Customer names vary in
+case ('Alice' and 'ALICE' are the same customer - compare
+case-insensitively).
+
+Find the customer with the highest net total. Write /answer.txt with
+exactly one line in exactly this format (name in lowercase, total with
+two decimals):
+name:total
+(for example: alice:190.50)

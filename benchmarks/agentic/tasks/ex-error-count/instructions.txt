@@ -1,3 +1,14 @@
-Count the lines in /logs/app.log whose log level is ERROR, excluding any
-ERROR line that contains the text 'retry scheduled'. Write the count to
-/answer.txt as a plain integer, nothing else.
+Each line of /logs/app.log has the format:
+<timestamp> <LEVEL> <message>
+The LEVEL field is the second whitespace-separated token. The message
+text may itself contain level words like ERROR or WARN - only the LEVEL
+field counts.
+
+Compute two numbers:
+  E = lines whose LEVEL is ERROR, excluding lines whose message contains
+      'retry scheduled'
+  W = lines whose LEVEL is WARN and whose message contains 'disk'
+
+Write /answer.txt containing exactly one line in exactly this format:
+errors=E;warnings=W
+(for example: errors=7;warnings=2)

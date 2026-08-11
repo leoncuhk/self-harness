@@ -1,3 +1,7 @@
-/contacts.txt lists one contact per line as: Name <email>.
-Count the number of unique email domains, comparing domains
-case-insensitively. Write the count to /answer.txt as a plain integer.
+/contacts.txt lists one contact per line as: Name <email>. Some lines
+are malformed (no email or no @) and must be ignored. To extract a
+domain: take the part after @, lowercase it, and strip one leading
+'www.' prefix if present.
+
+Count the unique domains and write the count to /answer.txt as a plain
+integer.
