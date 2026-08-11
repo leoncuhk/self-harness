@@ -130,8 +130,48 @@ record which one the MVP claims **before** M4 runs.
 
 ### M2 — task set and baseline variance (= VERIFY L2)
 
-**Task set: Terminal-Bench 2.1 subset, 16 tasks** (8 train / 4 holdout / 4 scorecard,
-stratified by task category), via the harbor runner.
+> **Amendment 1 (2026-08-11, recorded before any M2 data was collected).**
+> TB2.1-via-harbor is deferred to the post-MVP confirmatory step and M2–M4 run
+> instead on a bespoke local agentic suite (`benchmarks/agentic/`). Reasons, decided
+> after probing the execution environment: (a) harbor + TB2.1 requires a custom
+> harbor agent for editable surfaces to reach the container — upstream only ever
+> exercised its harbor runner against a mock, so this is new integration with
+> container-level debugging at minutes per rollout; (b) that risk is large enough to
+> consume the entire execution budget before producing any M2–M4 evidence.
+>
+> The amended suite preserves every property the validity audit depends on:
+> **real inner agent** (deepagents `create_deep_agent` + live deepseek-v4-flash with
+> `temperature=0`, filesystem backend rooted at a per-task sandbox), **deterministic
+> frozen verifier** (pytest assertions, no LLM judge), **surfaces genuinely loaded at
+> runtime** (prompt/tools/skills/middleware read from workspace files the variant
+> overrides), **token accounting** on every rollout.
+>
+> What it costs, disclosed: (1) **task-designer = experiment-runner** — the 16 tasks
+> were authored by the same party running the experiment, with knowledge of the
+> harness levers; this is the strongest new bias and is why TB2.1 remains the
+> confirmatory step; the tasks were authored and committed **before** the first
+> baseline rollout, and may be revised at most once (difficulty only) if the
+> baseline lands outside the headroom window below. (2) External comparability is
+> zero — no published numbers exist for this suite. (3) Train failure messages
+> contain expected values, so a memorising proposer can hard-code visible train
+> answers; bounded because M4 judges on the **holdout** margin, which memorisation
+> cannot lift, and by the bloat guard. (4) The replaced random-sampling clause is
+> void (nothing to sample); stratified split assignment is deterministic
+> (alphabetical within stratum: 2 train / 1 holdout / 1 scorecard).
+>
+> **Headroom window (frozen):** proceed to M3 only if baseline train+holdout pass@1
+> is within [0.20, 0.85]. Outside it, one documented difficulty revision is allowed,
+> then the window is final. Scorecard files are written by every run as an upstream
+> side effect; the unseal-once discipline below is about **reading** them, and
+> nothing before the M4 decision may read any scorecard output.
+
+**Task set (amended): 16 authored agentic tasks** — 4 strata × 4 tasks (extraction,
+format, multistep, robustness), 8 train / 4 holdout / 4 scorecard, deterministic
+verifiers, run by the pytest runner.
+
+**Original (pre-amendment) task-set text kept for the record:** Terminal-Bench 2.1
+subset, 16 tasks (8 train / 4 holdout / 4 scorecard, stratified by task category),
+via the harbor runner.
 
 Why not deepagents' own `libs/evals`: several of those evals are LLM-judged, which
 breaks the frozen-evaluator premise (evaluator noise becomes indistinguishable from
