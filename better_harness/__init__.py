@@ -1,14 +1,17 @@
 """Public exports for better-harness."""
 
+from better_harness.apparatus import STATUS_APPARATUS, apparatus_kind, is_measurable
 from better_harness.core import (
     CaseOutcome,
     EvalCase,
     Experiment,
+    FingerprintDriftError,
     Proposal,
     RunReport,
     SplitResult,
     Surface,
     Variant,
+    check_fingerprint_discipline,
     load_experiment,
     main,
     run_experiment,
@@ -34,7 +37,12 @@ from better_harness.patching import (
     workspace_override_context,
 )
 from better_harness.repeats import aggregate_split_results, run_split_repeated
-from better_harness.runners import parse_harbor_case, parse_pytest_outcomes
+from better_harness.runners import (
+    UnresolvedCaseError,
+    parse_harbor_case,
+    parse_pytest_outcomes,
+    resolve_case_id,
+)
 from better_harness.signatures import (
     FailureCluster,
     FailureSignature,
@@ -45,6 +53,7 @@ from better_harness.signatures import (
 )
 
 __all__ = [
+    "STATUS_APPARATUS",
     "BudgetDecision",
     "CaseOutcome",
     "CostProfile",
@@ -52,6 +61,7 @@ __all__ = [
     "Experiment",
     "FailureCluster",
     "FailureSignature",
+    "FingerprintDriftError",
     "FlipReport",
     "GateDecision",
     "GuardReport",
@@ -61,17 +71,21 @@ __all__ = [
     "RunReport",
     "SplitResult",
     "Surface",
+    "UnresolvedCaseError",
     "Variant",
     "aggregate_split_results",
+    "apparatus_kind",
     "build_baseline_variant",
     "build_variant",
     "check_budget",
+    "check_fingerprint_discipline",
     "check_variant",
     "classify",
     "cluster_failures",
     "cluster_split",
     "compute_flips",
     "decide",
+    "is_measurable",
     "load_experiment",
     "main",
     "parse_harbor_case",
@@ -80,6 +94,7 @@ __all__ = [
     "patch_from_env",
     "patch_module_attrs",
     "profile_split",
+    "resolve_case_id",
     "run_experiment",
     "run_split_repeated",
     "score_prediction",
