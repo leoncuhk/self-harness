@@ -18,6 +18,26 @@ The MVP answers one question: *on this task set, does one full evolution run bea
 spending the same budget on retries of the seed harness?* It does not claim
 generality, transfer, or reproducibility — those are L5 and multi-seed work.
 
+## What "adapts to any model" means — and does not mean
+
+The claim that self-harness "self-adapts to any model" is true of the **mechanism** and
+unproven for the **outcome**, and the two must not be conflated:
+
+- **The loop is model-agnostic.** Nothing in rollout → diagnose → propose → select
+  assumes a model family. Swap the inner model and the loop re-fits the harness to
+  *that* model's failure signatures — the per-model case studies (Qwen → error-triggered
+  middleware, MiniMax → forced early delivery, GLM → env persistence) are exactly this:
+  same loop, different model, different harness out.
+- **The harness produced is model-specific, not universal.** Adaptation *to* any model,
+  not a harness *for* all models. Whether a harness evolved for model A helps model B is
+  an empirical question (the L5 transfer matrix), and the prior from 2605.30621 is that
+  it often will not.
+- **Benefit is not uniform.** Harness-benefit is non-monotonic across capability tiers:
+  frontier models have little headroom, weak models cannot execute the harness, mid-tier
+  gains most. "Adapts to any model" therefore does not imply "helps every model".
+- **Unverified.** All of the above is design intent plus published priors. This MVP is
+  the first evidence either way for this implementation.
+
 ## Model plan — every role on one OpenAI-compatible endpoint
 
 All model calls run on `deepseek-v4-flash` via an OpenAI-compatible proxy
@@ -72,6 +92,32 @@ uv run better-harness run examples/deepagents_example.toml \
 M1 additionally confirms the LangChain `openai:` provider path actually honours
 `OPENAI_BASE_URL` inside the deepagents proposer — that wiring has been verified only
 with raw curl so far.
+
+**M1 status: ✅ executed and verified, 2026-08-11.** deepagents 0.7.5 installed
+in-process (no `DEEPAGENTS_ROOT`); proposer = live `openai:deepseek-v4-flash` via
+aihubmix. One iteration on the toy fixture, `--repeats 1`. All six criteria checked
+mechanically by `scripts/verify_m1.py`:
+
+| Criterion | Result |
+| --- | --- |
+| Surfaces rewritten by the model | ✅ all four (`prompt`, `tools`, `skills`, `middleware`) |
+| Prediction parsed into ledger | ✅ `prediction_made: true` |
+| Gate block with real deltas | ✅ conservative, Δ_in=+4 Δ_ho=+4, accepted |
+| No `undeclared_surface` violations | ✅ none |
+| Proposer token usage recorded | ✅ 201,787 tokens across the proposer transcript |
+| `proposal.md` written | ✅ root cause + per-surface rationale |
+
+Prediction grading (first real data point for the L3 methodology): precision 1.0 —
+the proposer predicted exactly the four visible train flips and hit all four; recall
+0.5 because the four holdout flips are invisible to it, and it correctly listed the
+holdout cases under `at_risk` rather than claiming them. Zero unpredicted
+regressions. Scores 0/4→4/4 train, 0/4→4/4 holdout, 0/2→2/2 scorecard.
+
+Read this as **liveness, not efficacy**: the toy fixture's failure messages contain
+the needed phrases, so a competent proposer should solve it. What M1 establishes is
+that the untested path (`invoke_deepagents_proposer` → deepagents → LangChain →
+aihubmix → deepseek) works end-to-end, the prompt lands (prediction block emitted
+unprompted-by-tests), and token accounting is real. M2 is unblocked.
 
 Pass criteria (none are pass-rate): surfaces actually rewritten (diff vs baseline);
 `prediction_made: true` in ledger; `decision.json` has a real gate block; no
