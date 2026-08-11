@@ -13,19 +13,23 @@ import json
 import pytest
 from verify_artifacts import audit_run, safe_slug
 
+from better_harness import runners as runners_module
 from better_harness.agent import _private_case_sources
 from better_harness.apparatus import apparatus_kind, is_measurable
 from better_harness.core import (
     CaseOutcome,
+    EvalCase,
     FingerprintDriftError,
     SplitResult,
     check_fingerprint_discipline,
     load_experiment,
+    run_experiment,
 )
 from better_harness.gate import decide
 from better_harness.guards import VIOLATION_UNPARSEABLE, check_variant
 from better_harness.patching import build_baseline_variant, build_variant
 from better_harness.repeats import aggregate_split_results
+from better_harness.runners import resolve_case_id
 from better_harness.signatures import classify
 from tests.test_better_harness import _write_minimal_pytest_experiment
 
@@ -307,3 +311,63 @@ def test_verify_artifacts_catches_a_recorded_outcome_the_xml_denies(tmp_path):
     assert len(discrepancies) == 1
     assert discrepancies[0].recorded == "missing"
     assert discrepancies[0].derived == "passed"
+
+
+def test_junit_without_a_file_attribute_still_resolves_to_its_case():
+    """The exact XML shape that zeroed every scorecard evaluation."""
+    case_id = "tests/test_agentic.py::test_task[ex-unique-domains]"
+    configured = {case_id: EvalCase(case_id, "scorecard", "extraction")}
+    resolved = resolve_case_id(
+        file_attr="",
+        classname_attr="benchmarks.agentic.evals.tests.test_agentic",
+        name_attr="test_task[ex-unique-domains]",
+        configured=configured,
+        sole_candidate=True,
+    )
+    assert resolved == case_id
+
+
+def test_an_ambiguous_name_is_not_guessed():
+    configured = {
+        "tests/a.py::test_task[x]": EvalCase("tests/a.py::test_task[x]", "train", "s"),
+        "tests/b.py::test_task[x]": EvalCase("tests/b.py::test_task[x]", "train", "s"),
+    }
+    assert (
+        resolve_case_id(
+            file_attr="",
+            classname_attr="pkg.tests.a",
+            name_attr="test_task[x]",
+            configured=configured,
+            sole_candidate=False,
+        )
+        is None
+    )
+
+
+def test_an_unpromoted_run_does_not_evaluate_the_sealed_split_twice(tmp_path, monkeypatch):
+    """The second write overwrote the first, in the same variant-keyed directory."""
+    # A proposer that changes nothing: no promotion, so final == baseline.
+    def noop_proposer(*, experiment, workspace):
+        del experiment
+        workspace.proposal_file.write_text("# Proposal\n\nNo change.\n")
+
+    monkeypatch.setattr("better_harness.agent.invoke_deepagents_proposer", noop_proposer)
+
+    scorecard_runs: list[str] = []
+    real_run_split = runners_module.PytestRunner.run_split
+
+    def spy(self, **kwargs):
+        if kwargs["split"] == "scorecard":
+            scorecard_runs.append(kwargs["variant"].key)
+        return real_run_split(self, **kwargs)
+
+    monkeypatch.setattr(runners_module.PytestRunner, "run_split", spy)
+
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    report = run_experiment(load_experiment(config), output_dir=tmp_path / "run", max_iterations=1)
+    assert scorecard_runs, "the fixture must define a scorecard split"
+    assert len(set(scorecard_runs)) == 1
+    assert scorecard_runs.count("baseline") == report.repeats  # one pass, not two
+    assert report.baseline_scorecard is not None
+    assert report.final_scorecard is not None
+    assert report.final_scorecard.passed == report.baseline_scorecard.passed

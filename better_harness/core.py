@@ -1339,13 +1339,22 @@ def run_experiment(
         layout=layout,
         reuse_existing=reuse_existing,
     )
-    final_scorecard = _run_optional_scorecard(
-        experiment=experiment,
-        runner=runner,
-        variant=current,
-        layout=layout,
-        reuse_existing=reuse_existing,
-    )
+    if current.fingerprint == baseline.fingerprint:
+        # Nothing was promoted, so the "final" harness *is* the baseline. Running
+        # the sealed split a second time would spend another full evaluation and
+        # — because both runs key on the same variant label — overwrite the first
+        # one's artifacts in place. That is how every recorded final_scorecard in
+        # this repo came to read 0/20 against true scores of 17-18/20: the second
+        # write landed, and it was the one that hit the parse defect.
+        final_scorecard = baseline_scorecard
+    else:
+        final_scorecard = _run_optional_scorecard(
+            experiment=experiment,
+            runner=runner,
+            variant=current,
+            layout=layout,
+            reuse_existing=reuse_existing,
+        )
 
     report = RunReport(
         created_at=datetime.now(tz=UTC).isoformat(timespec="seconds"),

@@ -466,14 +466,17 @@ def parse_pytest_outcomes(
     """Parse JUnit results for configured cases."""
     root = ET.fromstring(junit_path.read_text())
     configured = {case.render(model=model): case for case in cases}
+    testcases = list(root.iter("testcase"))
     outcomes: dict[str, CaseOutcome] = {}
-    for testcase in root.iter("testcase"):
-        case_id = rebuild_case_id(
+    for testcase in testcases:
+        case_id = resolve_case_id(
             file_attr=testcase.attrib.get("file", ""),
             classname_attr=testcase.attrib.get("classname", ""),
             name_attr=testcase.attrib.get("name", ""),
+            configured=configured,
+            sole_candidate=len(configured) == 1 and len(testcases) == 1,
         )
-        case = configured.get(case_id)
+        case = configured.get(case_id) if case_id else None
         if case is None:
             continue
         status = "passed"
@@ -521,6 +524,43 @@ def rebuild_case_id(*, file_attr: str, classname_attr: str, name_attr: str) -> s
     if classname_attr.startswith("tests."):
         return f"{classname_attr.replace('.', '/')}.py::{name_attr}"
     return name_attr
+
+
+def resolve_case_id(
+    *,
+    file_attr: str,
+    classname_attr: str,
+    name_attr: str,
+    configured: dict[str, EvalCase],
+    sole_candidate: bool,
+) -> str | None:
+    """Map one JUnit ``testcase`` back to a configured case id, or None.
+
+    Reconstructing a nodeid from JUnit attributes is guesswork, and the two
+    shapes :func:`rebuild_case_id` handles are not the only ones pytest emits.
+    This suite's XML has no ``file`` attribute and a rootdir-relative dotted
+    classname (``benchmarks.agentic.evals.tests.test_agentic``), so the guess
+    matched no configured case, the real outcome was dropped, and the case was
+    recorded as ``missing`` with score 0 — in every scorecard evaluation across
+    five runs, against true scores of 17-18/20.
+
+    So resolution now falls back from guessing to *matching*: the configured ids
+    are known, and a JUnit ``name`` that uniquely identifies one of them is
+    enough. The last resort uses the strongest fact available in the pytest
+    runner — it invokes pytest once per case, so a single testcase in a file
+    written for a single configured case can only be that case.
+    """
+    guess = rebuild_case_id(file_attr=file_attr, classname_attr=classname_attr, name_attr=name_attr)
+    if guess in configured:
+        return guess
+    if name_attr:
+        suffix = f"::{name_attr}"
+        matches = [case_id for case_id in configured if case_id.endswith(suffix)]
+        if len(matches) == 1:
+            return matches[0]
+    if sole_candidate:
+        return next(iter(configured))
+    return None
 
 
 def parse_harbor_case(*, jobs_dir: Path, pass_threshold: float) -> tuple[float, dict[str, object] | None, str | None]:
