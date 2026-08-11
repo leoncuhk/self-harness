@@ -29,7 +29,11 @@ from better_harness.gate import decide
 from better_harness.guards import VIOLATION_UNPARSEABLE, check_variant
 from better_harness.patching import build_baseline_variant, build_variant
 from better_harness.repeats import aggregate_split_results
-from better_harness.runners import resolve_case_id
+from better_harness.runners import (
+    UnresolvedCaseError,
+    parse_pytest_outcomes,
+    resolve_case_id,
+)
 from better_harness.signatures import classify
 from tests.test_better_harness import _write_minimal_pytest_experiment
 
@@ -327,7 +331,8 @@ def test_junit_without_a_file_attribute_still_resolves_to_its_case():
     assert resolved == case_id
 
 
-def test_an_ambiguous_name_is_not_guessed():
+def test_a_classname_that_carries_the_module_path_still_resolves():
+    """`pkg.tests.a` denotes tests/a.py unambiguously; b.py cannot match it."""
     configured = {
         "tests/a.py::test_task[x]": EvalCase("tests/a.py::test_task[x]", "train", "s"),
         "tests/b.py::test_task[x]": EvalCase("tests/b.py::test_task[x]", "train", "s"),
@@ -337,6 +342,28 @@ def test_an_ambiguous_name_is_not_guessed():
             file_attr="",
             classname_attr="pkg.tests.a",
             name_attr="test_task[x]",
+            configured=configured,
+            sole_candidate=False,
+        )
+        == "tests/a.py::test_task[x]"
+    )
+
+
+def test_a_genuine_tie_is_not_broken_by_guessing():
+    """Two configured ids equally denoted by one candidate: report nothing.
+
+    Picking one would attach a result to the wrong case, which is worse than a
+    parse miss because it looks like a valid outcome.
+    """
+    configured = {
+        "x/tests/a.py::test_task[q]": EvalCase("x/tests/a.py::test_task[q]", "train", "s"),
+        "y/tests/a.py::test_task[q]": EvalCase("y/tests/a.py::test_task[q]", "train", "s"),
+    }
+    assert (
+        resolve_case_id(
+            file_attr="",
+            classname_attr="tests.a",
+            name_attr="test_task[q]",
             configured=configured,
             sole_candidate=False,
         )
@@ -371,3 +398,79 @@ def test_an_unpromoted_run_does_not_evaluate_the_sealed_split_twice(tmp_path, mo
     assert report.baseline_scorecard is not None
     assert report.final_scorecard is not None
     assert report.final_scorecard.passed == report.baseline_scorecard.passed
+
+
+def test_rootdir_lift_classname_resolves_and_keeps_detail(tmp_path):
+    """The long-classname shape a second run into the same directory produces."""
+    case_id = "tests/test_agentic.py::test_task[ex-unique-domains]"
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        '<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="1">'
+        '<testcase classname="benchmarks.agentic.evals.tests.test_agentic" '
+        'name="test_task[ex-unique-domains]" time="14.07">'
+        '<failure message="AssertionError">E   AssertionError: assert 6 == 4</failure>'
+        "</testcase></testsuite></testsuites>"
+    )
+    outcomes = parse_pytest_outcomes(
+        junit_path=junit,
+        cases=[EvalCase(case_id, "scorecard", "extraction")],
+        model="m",
+        artifacts_dir=tmp_path,
+    )
+    assert len(outcomes) == 1
+    assert outcomes[0].case_id == case_id
+    assert outcomes[0].status == "failed"
+    assert outcomes[0].duration_s == pytest.approx(14.07)
+    assert "assert 6 == 4" in (outcomes[0].failure_message or "")
+
+
+def test_class_scoped_nodeid_resolves(tmp_path):
+    case_id = "tests/test_suite.py::TestGroup::test_case"
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        '<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="1">'
+        '<testcase classname="tests.test_suite.TestGroup" name="test_case" time="1.0"/>'
+        "</testsuite></testsuites>"
+    )
+    outcomes = parse_pytest_outcomes(
+        junit_path=junit,
+        cases=[EvalCase(case_id, "train", "s")],
+        model="m",
+        artifacts_dir=tmp_path,
+    )
+    assert outcomes[0].case_id == case_id
+    assert outcomes[0].status == "passed"
+
+
+def test_recorded_but_unresolvable_raises_instead_of_scoring_zero(tmp_path):
+    """A parse miss must never be indistinguishable from a task failure."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        '<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="1">'
+        '<testcase classname="totally.unrelated" name="test_something_else" time="1.0"/>'
+        "</testsuite></testsuites>"
+    )
+    with pytest.raises(UnresolvedCaseError, match="could not resolve"):
+        parse_pytest_outcomes(
+            junit_path=junit,
+            cases=[
+                EvalCase("tests/a.py::test_x", "train", "s"),
+                EvalCase("tests/b.py::test_y", "train", "s"),
+            ],
+            model="m",
+            artifacts_dir=tmp_path,
+        )
+
+
+def test_junit_with_no_testcases_is_apparatus_not_a_failure(tmp_path):
+    """A killed rollout measured nothing; it must not abort a 180-rollout stage."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text('<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="0"/></testsuites>')
+    outcomes = parse_pytest_outcomes(
+        junit_path=junit,
+        cases=[EvalCase("tests/a.py::test_x", "train", "s")],
+        model="m",
+        artifacts_dir=tmp_path,
+    )
+    assert outcomes[0].status == "apparatus"
+    assert outcomes[0].is_apparatus

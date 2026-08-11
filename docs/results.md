@@ -214,10 +214,44 @@ recovered from the XML:
 | b5-baseline-rev0 | 0/20 | **18/20** | 5/5, 5/5, 3/5, 5/5 |
 | mvp2-baseline | 0/20 | **1/20** | 1/5, 0/5, 0/5, 0/5 |
 
-Two compounding causes, both now fixed: the JUnit nodeid reconstruction could
-not map this suite's XML back to a configured case, so every case was recorded
-`missing → 0`; and when nothing is promoted the scorecard was evaluated twice
-into one variant-keyed directory, the second write overwriting the first.
+**One causal chain, not two defects** — an earlier version of this document and
+of commit `2369fc7` described them as independent, which was wrong.
+
+pytest treats every non-option argv token as a possible path and keeps the ones
+that **already exist** when it computes rootdir
+(`_pytest/config/findpaths.py`: `[... for path in possible_paths if safe_exists(path)]`).
+The *values* of `--junitxml` and `--evals-report-file` are such tokens. So:
+
+| | artifact files | rootdir | emitted classname | old parser |
+| --- | --- | --- | --- | --- |
+| 1st run into a case dir | absent → ignored | evals project | `tests.test_agentic` | ✅ resolves |
+| 2nd run into the same dir | present → treated as paths | **repo root** | `benchmarks.agentic.evals.tests.test_agentic` | ❌ no match → `missing → 0` |
+
+The double evaluation of the sealed split did not merely *coincide* with the
+parse defect — it was the **trigger** for it. Confirmed by scanning classname
+shapes across every `junit.xml` in `runs/`:
+
+```
+ 20  b5-baseline      scorecard  LONG      40  b5-baseline    train   short
+ 20  m2-baseline      scorecard  LONG      20  m2-baseline    holdout short
+ 20  mvp2-baseline    scorecard  LONG      …
+ 10  mvp2-evolve      train      LONG   ← not scorecard
+```
+
+That last row is the important one: **resume is the same trigger.** Any stage
+restarted with `--resume` re-runs into existing case directories and lifts
+rootdir exactly the same way. The 10 long-shape train files in `mvp2-evolve`
+match, one for one, the 10 discrepancies the auditor found in that run.
+
+Three fixes, at three levels: the artifact paths are now cleared before pytest
+is invoked (so rootdir no longer depends on how many times a case has run); case
+ids resolve by matching candidate nodeids against the configured ids by path
+suffix rather than by guessing a shape; and a junit that records testcases none
+of which can be mapped now raises `UnresolvedCaseError` instead of scoring zero.
+A junit with *no* testcases — a killed rollout — is apparatus, not an error, so
+one dead rollout cannot abort a 180-rollout stage.
+
+The sealed split is also no longer evaluated twice when nothing was promoted.
 
 **What this does and does not change.** No experiment decision ever rested on a
 scorecard number — MVP-1 stopped on train/holdout, and Amendment 2's arithmetic

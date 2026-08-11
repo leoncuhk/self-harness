@@ -9,7 +9,10 @@ import subprocess
 import xml.etree.ElementTree as ET
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
 
 from better_harness.apparatus import STATUS_APPARATUS, apparatus_kind
 from better_harness.core import (
@@ -111,6 +114,25 @@ class PytestRunner:
                 case_dir.mkdir(parents=True, exist_ok=True)
                 summary_path = case_dir / "summary.json"
                 junit_path = case_dir / "junit.xml"
+                # Clear the artifact paths before invoking pytest. pytest treats
+                # every non-option argv token as a possible path and keeps the
+                # ones that *already exist* when computing rootdir
+                # (_pytest/config/findpaths.py: `if safe_exists(path)`). The
+                # values of --junitxml and --evals-report-file are such tokens,
+                # so the second run into a case directory silently lifts rootdir
+                # to the repo root and every emitted nodeid changes shape.
+                #
+                # That is the whole root cause of the sealed-split corruption:
+                # first run -> files absent -> rootdir = evals project ->
+                # classname "tests.test_agentic"; second run -> files present ->
+                # rootdir = repo root -> classname
+                # "benchmarks.agentic.evals.tests.test_agentic", which the parser
+                # could not map back to a configured case. Measured across runs/:
+                # every scorecard split is the long shape, every train/holdout is
+                # the short one — and mvp2-evolve's train has 10 long ones, from
+                # a resumed stage re-running into existing directories.
+                summary_path.unlink(missing_ok=True)
+                junit_path.unlink(missing_ok=True)
                 command = self._base_command(experiment)
                 if summary_flag := experiment.runner_config.get("summary_flag", "--evals-report-file"):
                     command.extend([str(summary_flag), str(summary_path)])
@@ -499,6 +521,26 @@ def parse_pytest_outcomes(
             failure_message=failure_message,
             artifacts_dir=str(artifacts_dir),
         )
+    unresolved = [case for case in cases if case.render(model=model) not in outcomes]
+    if unresolved and testcases:
+        # pytest recorded results and we could not map them. That is a defect in
+        # this parser, not an outcome of the experiment, and recording a zero
+        # would make the two indistinguishable — which is precisely how every
+        # sealed-split evaluation in this repo came to read 0/20 against a true
+        # 17-18/20, with nothing anywhere reporting a problem.
+        raise UnresolvedCaseError(
+            junit_path=junit_path,
+            case_ids=[case.render(model=model) for case in unresolved],
+            observed=[
+                f"file={tc.attrib.get('file', '')!r} "
+                f"classname={tc.attrib.get('classname', '')!r} "
+                f"name={tc.attrib.get('name', '')!r}"
+                for tc in testcases
+            ],
+        )
+    # No testcases at all: the process died before pytest wrote any result. That
+    # is an apparatus failure — nothing was measured — and it is excluded from
+    # the numerator and the denominator rather than aborting a 180-rollout stage.
     return [
         outcomes.get(
             case.render(model=model),
@@ -506,10 +548,10 @@ def parse_pytest_outcomes(
                 case_id=case.render(model=model),
                 split=case.split,
                 stratum=case.stratum,
-                status="missing",
+                status=STATUS_APPARATUS,
                 score=0.0,
                 duration_s=0.0,
-                failure_message="case missing from junit.xml",
+                failure_message="[apparatus:junit_unreadable] junit.xml recorded no testcase",
                 artifacts_dir=str(artifacts_dir),
             ),
         )
@@ -524,6 +566,55 @@ def rebuild_case_id(*, file_attr: str, classname_attr: str, name_attr: str) -> s
     if classname_attr.startswith("tests."):
         return f"{classname_attr.replace('.', '/')}.py::{name_attr}"
     return name_attr
+
+
+class UnresolvedCaseError(RuntimeError):
+    """A junit.xml recorded testcases but none could be mapped to a configured case.
+
+    Raised instead of recording a zero. A parse miss and a task failure are
+    different events, and the moment they become the same number the whole
+    experiment is measuring its own parser. The message carries every observed
+    ``file``/``classname``/``name`` triple, because that is exactly what is
+    needed to add the missing shape and nothing else is.
+    """
+
+    def __init__(self, *, junit_path: Path, case_ids: Sequence[str], observed: Sequence[str]) -> None:
+        seen = "; ".join(observed) if observed else "<no testcase elements>"
+        super().__init__(
+            f"{junit_path}: could not resolve {', '.join(case_ids)} from junit.xml. "
+            f"Recorded testcases: {seen}"
+        )
+
+
+def _nodeid_candidates(*, file_attr: str, classname_attr: str, name_attr: str) -> list[str]:
+    """Return every plausible pytest nodeid for one JUnit testcase.
+
+    ``classname`` is the module path with ``.`` separators and, when a test lives
+    in a class, the class name appended. Where the module path ends and the class
+    names begin is not recoverable from the string, so every split point is
+    offered as a candidate and the caller picks by matching against ids it knows.
+    """
+    candidates: list[str] = []
+    if file_attr:
+        candidates.append(f"{file_attr}::{name_attr}")
+    if classname_attr:
+        parts = classname_attr.split(".")
+        for cut in range(len(parts), 0, -1):
+            module = "/".join(parts[:cut]) + ".py"
+            suffix = "::".join(parts[cut:])
+            candidates.append(f"{module}::{suffix}::{name_attr}" if suffix else f"{module}::{name_attr}")
+    return candidates
+
+
+def _same_nodeid(candidate: str, case_id: str) -> bool:
+    """Return whether two nodeids denote the same case under a different rootdir.
+
+    Equality, or one being a path-suffix of the other: a rootdir lift only ever
+    prepends directory components, so
+    ``benchmarks/agentic/evals/tests/test_agentic.py::test_task[x]`` and
+    ``tests/test_agentic.py::test_task[x]`` are the same case.
+    """
+    return candidate == case_id or candidate.endswith(f"/{case_id}") or case_id.endswith(f"/{candidate}")
 
 
 def resolve_case_id(
@@ -550,15 +641,40 @@ def resolve_case_id(
     runner — it invokes pytest once per case, so a single testcase in a file
     written for a single configured case can only be that case.
     """
-    guess = rebuild_case_id(file_attr=file_attr, classname_attr=classname_attr, name_attr=name_attr)
-    if guess in configured:
-        return guess
+    candidates = _nodeid_candidates(
+        file_attr=file_attr,
+        classname_attr=classname_attr,
+        name_attr=name_attr,
+    )
+    # Longest match wins: the most specific candidate that still denotes a
+    # configured case is the least likely to be a coincidence. A tie at the same
+    # specificity is a genuine ambiguity and must not be broken arbitrarily —
+    # guessing there would attach one case's result to another, which is worse
+    # than reporting nothing because it looks like a valid outcome.
+    best_len = -1
+    best_ids: set[str] = set()
+    for candidate in candidates:
+        for case_id in configured:
+            if not _same_nodeid(candidate, case_id):
+                continue
+            if len(candidate) > best_len:
+                best_len, best_ids = len(candidate), {case_id}
+            elif len(candidate) == best_len:
+                best_ids.add(case_id)
+    if len(best_ids) == 1:
+        return next(iter(best_ids))
+    if best_ids:
+        return None
     if name_attr:
         suffix = f"::{name_attr}"
         matches = [case_id for case_id in configured if case_id.endswith(suffix)]
         if len(matches) == 1:
             return matches[0]
     if sole_candidate:
+        # Last resort, and it rests on a property of the caller rather than of
+        # the data: the pytest runner invokes pytest once per case. Kept because
+        # it is true here, but reached only when the id matching above found
+        # nothing, which after the candidate expansion should be never.
         return next(iter(configured))
     return None
 

@@ -108,3 +108,21 @@ by costing something. Append-only.
   was stopped four iterations in because an audit ran *while it was going*, not
   because it crashed. Everything it had produced was inadmissible for reasons
   visible from artifacts alone, at zero rollout cost.
+- **Passing a path to pytest that only sometimes exists makes rootdir drift with
+  run count.** pytest keeps non-option argv tokens as rootdir candidates *if the
+  file already exists*, and the values of `--junitxml` / `--evals-report-file`
+  are such tokens. First run into a case directory: absent, ignored. Second run:
+  present, rootdir lifts to the repo root, every nodeid changes shape, and the
+  parser stops recognising its own results. Write artifacts outside the argv, or
+  clear them before invoking. The symptom looked impossible — identical argv,
+  identical cwd, different nodeids — which is why it survived so long.
+- **Two defects that always appear together are usually one defect.** The sealed
+  split was described as hit by "double evaluation" *and* "a parse bug". The
+  double evaluation was the trigger *for* the parse bug, and treating them as
+  independent hid the fact that `--resume` triggers it too. When two causes
+  co-occur perfectly, look for the arrow between them before writing them down
+  as a list.
+- **A second opinion that duplicates your fix is still worth reading.** A
+  parallel session fixed the same bug independently; its patch was redundant, its
+  *root-cause analysis* was not — it found the pytest mechanism and the resume
+  path this side had missed while writing a confident and wrong commit message.

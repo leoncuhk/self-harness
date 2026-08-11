@@ -299,7 +299,7 @@ class SplitResult:
         }
 
     def failing_outcomes(self) -> list[CaseOutcome]:
-        """Return outcomes that carry evidence about the harness.
+        """Return failing outcomes that carry evidence about the harness.
 
         Apparatus failures are excluded: nothing was measured, so mining them for
         harness weaknesses turns infrastructure noise into proposal targets.
