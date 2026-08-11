@@ -63,3 +63,10 @@ by costing something. Append-only.
   aggregates) is echoed into stage logs; checking progress with `tail` can breach
   a read-nothing rule. Grep for stage markers only, and keep scorecard rows out
   of anything a human eyeballs mid-experiment.
+- **Laptop sleep kills unattended runs.** `nohup` survives the shell, not the
+  OS: idle sleep freezes the process and severs every TCP connection, so all
+  in-flight API calls fail together on wake — which reads as a mysterious
+  "Connection error" storm that punches through per-call retries. Wrap
+  multi-hour stages in `caffeinate -is`. (Cost: three dead M3 runs before the
+  pattern — crash always ~2-4 iterations in, i.e. exactly when the operator
+  stopped watching — gave it away.)
