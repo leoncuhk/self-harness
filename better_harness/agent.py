@@ -252,7 +252,7 @@ def invoke_deepagents_proposer(
             backend=backend,
         )
         result = None
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 result = agent.invoke(
                     {
@@ -269,9 +269,9 @@ def invoke_deepagents_proposer(
                 )
                 break
             except Exception as exc:  # pragma: no cover - real env only
-                if attempt == 2 or not _is_transient_model_error(str(exc)):
+                if attempt == 4 or not _is_transient_model_error(str(exc)):
                     raise
-                time.sleep(2 * (attempt + 1))
+                time.sleep(5 * (attempt + 1))
     if result is None:  # pragma: no cover - defensive fallback
         msg = "outer Deep Agent produced no result"
         raise RuntimeError(msg)
@@ -546,7 +546,7 @@ def _invoke_via_uv_project_with_retries(
     deepagents_root: Path,
 ) -> str | None:
     last_error: str | None = None
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             return _invoke_via_uv_project_once(
                 experiment=experiment,
@@ -555,9 +555,9 @@ def _invoke_via_uv_project_with_retries(
             )
         except RuntimeError as exc:
             last_error = str(exc)
-            if attempt == 2 or not _is_transient_model_error(last_error):
+            if attempt == 4 or not _is_transient_model_error(last_error):
                 raise
-            time.sleep(2 * (attempt + 1))
+            time.sleep(5 * (attempt + 1))
     if last_error is None:
         return None
     raise RuntimeError(last_error)
