@@ -1,5 +1,11 @@
 # MVP plan — pre-registered
 
+> **Outcome (2026-08-11): the MVP terminated at M2 under the frozen headroom rule** —
+> baseline 0.917 outside [0.20, 0.85] after the single permitted difficulty revision,
+> holdout at ceiling both times. M3/M4 cancelled per protocol; the scorecard was never
+> read. See `RESULTS.md` for the full account. The criteria below are preserved
+> unmodified as the record of what was frozen.
+
 Written **before** any real run. The decision criteria in this file are frozen: after
 numbers exist, they may be reported against, not renegotiated.
 
