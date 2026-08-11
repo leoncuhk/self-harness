@@ -1,0 +1,5 @@
+/numbers.txt has one integer per line. Write /report.json containing a JSON
+object with exactly these three keys and no others:
+  "count" - how many numbers (integer)
+  "sum"   - their sum (integer)
+  "mean"  - their arithmetic mean rounded to 2 decimals (number)

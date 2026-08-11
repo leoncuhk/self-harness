@@ -1,0 +1,3 @@
+bolt 42
+washer 7
+nut 1300

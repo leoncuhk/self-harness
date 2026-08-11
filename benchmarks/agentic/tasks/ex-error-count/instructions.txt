@@ -1,0 +1,3 @@
+Count the lines in /logs/app.log whose log level is ERROR, excluding any
+ERROR line that contains the text 'retry scheduled'. Write the count to
+/answer.txt as a plain integer, nothing else.

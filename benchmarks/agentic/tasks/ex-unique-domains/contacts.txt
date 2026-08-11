@@ -1,0 +1,6 @@
+Ana Ruiz <ana@Foo.com>
+Ben Ito <ben@foo.COM>
+Cara Wu <cara@bar.org>
+Dev Puri <dev@baz.io>
+Eve Aho <eve@BAR.org>
+Fay Lam <fay@qux.net>

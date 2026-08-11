@@ -1,0 +1,20 @@
+INFO boot sequence started
+INFO config loaded
+ERROR db connection refused
+WARN cache miss rate high
+ERROR db connection refused, retry scheduled
+INFO worker 1 online
+ERROR malformed payload in queue
+INFO worker 2 online
+WARN slow query 1.9s
+ERROR timeout talking to billing service
+ERROR timeout talking to billing service, retry scheduled
+INFO heartbeat ok
+ERROR user 4411 invalid token
+WARN disk 81% full
+INFO heartbeat ok
+ERROR malformed payload in queue
+ERROR upstream 502, retry scheduled
+INFO heartbeat ok
+ERROR user 9020 invalid token
+INFO shutdown requested

@@ -1,0 +1,6 @@
+The directory /data contains files. Plan a renaming (do not actually rename
+anything): order the files by size in bytes ascending, ties broken by name
+ascending, then number them starting at 01. Write the plan to /plan.txt with
+one line per file in that order, formatted exactly as:
+oldname -> NN_oldname
+Example: beta.txt -> 01_beta.txt

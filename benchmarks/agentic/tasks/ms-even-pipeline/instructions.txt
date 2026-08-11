@@ -1,0 +1,4 @@
+Three steps, in order:
+1. Read the integers in /raw.txt (one per line).
+2. Write the even ones, sorted ascending, one per line, to /evens.txt.
+3. Write the sum of those even numbers to /answer.txt as a plain integer.

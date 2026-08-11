@@ -1,0 +1,3 @@
+/dates.txt has one date per line in mixed formats. Dates written with
+slashes are US format (MM/DD/YYYY). Convert every date to ISO format
+(YYYY-MM-DD) and write them to /iso.txt, one per line, in the same order.

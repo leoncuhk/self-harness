@@ -1,0 +1,4 @@
+Every file in /sales has lines of region,amount (amounts are integers).
+Some files may be empty or contain blank lines; skip those. Sum every
+amount across all files and write the total to /answer.txt as a plain
+integer.

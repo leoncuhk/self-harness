@@ -1,0 +1,3 @@
+/names.txt has one name per line with inconsistent capitalisation and
+stray whitespace. Produce /clean.txt: trim whitespace, lowercase each
+name, drop duplicates, sort alphabetically, one name per line.

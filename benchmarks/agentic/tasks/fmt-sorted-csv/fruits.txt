@@ -1,0 +1,4 @@
+apple 12
+banana 3
+cherry 12
+date 25

@@ -1,0 +1,4 @@
+/orders.csv has a header row and rows of customer,amount. Find the customer
+with the highest total spend across all their rows. If several customers tie
+for the highest total, pick the alphabetically first name. Write just that
+customer's name to /answer.txt.

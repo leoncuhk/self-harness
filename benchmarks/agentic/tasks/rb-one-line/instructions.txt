@@ -1,0 +1,4 @@
+Count the words in /story.txt (words are whitespace-separated tokens).
+Write /answer.txt containing exactly one line: the count as a plain
+integer. The file must contain nothing else - no labels, no explanation,
+no extra lines.

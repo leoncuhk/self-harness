@@ -1,0 +1,6 @@
+The directory /invoices contains invoice files. Each line is CSV:
+item,quantity,unit_price
+
+Compute the grand total (sum of quantity * unit_price over every line of
+every file) and write it to /answer.txt as a number rounded to exactly two
+decimals (for example: 123.40). Write nothing else to the file.

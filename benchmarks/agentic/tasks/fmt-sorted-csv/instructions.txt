@@ -1,0 +1,3 @@
+/fruits.txt has lines of: name quantity. Write /sorted.csv with a header
+line 'name,qty' followed by one row per fruit as name,qty, sorted by
+quantity descending; ties broken by name ascending.

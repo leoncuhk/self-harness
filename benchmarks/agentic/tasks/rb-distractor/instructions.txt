@@ -1,0 +1,2 @@
+Compute the sum of the amount column in /data.csv (it has a header row).
+Write the sum to /answer.txt as a plain integer.
