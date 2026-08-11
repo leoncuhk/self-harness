@@ -122,3 +122,31 @@ No scorecard output was ever read; `runs/*-rev0` and rev1 run dirs are preserved
   retroactively for these.
 - The cost-veto path on this suite was never exercised under evolution (M3
   cancelled); it remains verified only at the unit-test level.
+
+---
+
+# MVP-2 — in progress
+
+Pre-registration: [mvp.md](mvp.md#mvp-2-pre-registration). Execution log, appended
+as stages complete.
+
+## Calibration (2026-08-11)
+
+All probes reported per the frozen rule:
+
+| Candidate | Tool smoke | Baseline (repeats=3) | Verdict |
+| --- | --- | --- | --- |
+| qwen3-4b | ❌ provider 403 | — | excluded |
+| qwen3-8b | ❌ provider requires `enable_thinking=false` param not in standard config | — | excluded |
+| **gpt-4.1-nano** | ✅ | train 0.125, holdout 0.500, **combined 0.25 ∈ [0.20, 0.85]** | **selected** |
+| gpt-4o-mini | ✅ | not needed | — |
+| gpt-4.1-mini | ✅ | not needed | — |
+
+Calibration observations (`runs/calib-nano`): 6/8 train tasks fail outright
+(invoice discounts, fixed-width, checksum, distractor, empty-edge, invoice
+quoting); 3 train tasks are genuinely **flaky at temperature 0** (pass fraction
+0.33) — the first non-degenerate data for the repeats machinery. Holdout has real
+headroom (0.50) with a wide CI (±0.50 at n=4), as the power disclosure anticipated.
+
+Inner agent: `openai:gpt-4.1-nano`. Proposer: `openai:deepseek-v4-flash`
+(updater≠beneficiary configuration, disclosed in the pre-registration).
