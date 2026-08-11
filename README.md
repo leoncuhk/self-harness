@@ -8,6 +8,7 @@
 > - [`docs/verification.md`](docs/verification.md) — the L0–L5 ladder and falsification criteria
 > - [`docs/mvp.md`](docs/mvp.md) — pre-registration registry (MVP-1, MVP-2), append-only
 > - [`docs/results.md`](docs/results.md) — outcomes, gaps disclosed
+> - [`docs/agent-stack.md`](docs/agent-stack.md) — reference: Deep Agents / LangChain / LangGraph layers
 > - `benchmarks/agentic/` — 16-task suite, real inner agent, deterministic verifiers
 > - `scripts/` — task generator, M1 verifier, analysis (baseline CI / pass@N / tokens / M4 compare)
 >
