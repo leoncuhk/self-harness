@@ -31,7 +31,7 @@ include = ["better_harness*"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-exclude = [".runtime/**", "**/_runtime/**", "examples/**", "runs/**"]
+exclude = [".runtime/**", "**/_runtime/**", "examples/**", "runs/**", "benchmarks/agentic/workspace/**"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -69,6 +69,8 @@ ignore = [
     "TC003",
 ]
 "better_harness/core.py" = ["PLC0415", "T201", "S101"]
+"scripts/**" = ["T201", "S101", "D103", "INP001", "PLC0415", "PLR2004", "C901", "PLR0912", "PLR0915", "FBT001", "FBT002", "S311"]
+"benchmarks/**" = ["INP001", "S101", "D100", "D103", "T201", "PLC0415", "DTZ007"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
