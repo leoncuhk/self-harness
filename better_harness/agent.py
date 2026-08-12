@@ -54,6 +54,30 @@ Predict honestly rather than optimistically. The next evaluation grades this blo
 flips that actually happen, and a prediction that never holds is evidence the edit was a guess."""
 
 
+# A stalled request otherwise runs into the OpenAI SDK's 600s default before it
+# surfaces as a connection error. Observed on a live M3 stage: one proposer call
+# hung 545s and then failed, which burns most of a retry budget on a request
+# that was never going to answer. A short explicit timeout turns a stall into a
+# fast, cheap retry.
+PROPOSER_REQUEST_TIMEOUT_S = 120
+PROPOSER_CLIENT_RETRIES = 2
+
+
+def build_proposer_model(model: str):
+    """Return a chat model for the outer agent with an explicit request timeout.
+
+    ``create_deep_agent`` accepts a model string and builds the client with
+    library defaults, which is how the proposer ended up with no timeout while
+    the inner agent had one.
+    """
+    init_chat_model = importlib.import_module("langchain.chat_models").init_chat_model
+    return init_chat_model(
+        model,
+        timeout=PROPOSER_REQUEST_TIMEOUT_S,
+        max_retries=PROPOSER_CLIENT_RETRIES,
+    )
+
+
 @dataclass(frozen=True)
 class ProposerWorkspace:
     """Materialized workspace for the outer Deep Agent."""
@@ -294,7 +318,7 @@ def invoke_deepagents_proposer(
         human_message_cls = messages_module.HumanMessage
         backend = filesystem_backend_cls(root_dir=str(workspace.root), virtual_mode=True)
         agent = create_deep_agent(
-            model=experiment.better_agent_model,
+            model=build_proposer_model(experiment.better_agent_model),
             system_prompt=_compose_system_prompt(experiment),
             backend=backend,
         )
@@ -744,7 +768,7 @@ def main(argv: list[str] | None = None) -> int:
 
     backend = filesystem_backend_cls(root_dir=str(payload["workspace_root"]), virtual_mode=True)
     agent = create_deep_agent(
-        model=str(payload["model"]),
+        model=build_proposer_model(str(payload["model"])),
         system_prompt=str(payload["system_prompt"]),
         backend=backend,
     )
