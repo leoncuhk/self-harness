@@ -21,7 +21,7 @@ until you compare it against a baseline.
 | **L0.5** | **Do the recorded numbers match what was measured?** | ✅ after Phase 0 — **it did not before** ([artifact fidelity](#l05--artifact-fidelity)) |
 | L1 | Does the loop run with a **real** outer agent? | ✅ M1 2026-08-11, all 6 criteria ([results](results.md)) |
 | L2 | What is the real baseline, and how noisy is it? | ✅ measured — MVP-1 saturated (0.917, 0 flaky) and the stop rule fired |
-| L3 | Does the proposer understand what it is doing? | ⏳ MVP-2 ([mvp.md](mvp.md)) |
+| L3 | Does the proposer understand what it is doing? | ⚠️ one graded prediction, **below base rate** (0.200 vs 0.286); n=1, underpowered ([results](results.md)) |
 | L4 | Does evolution beat spending the same budget on retries? | ⏳ MVP-2 — the decisive test |
 | L5 | Does the gain survive a locked test and transfer? | ❌ post-MVP |
 

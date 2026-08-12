@@ -314,6 +314,142 @@ provider model changed mid-run. No code enforced it; there is now.
 
 ## Status
 
-MVP-2's M3 is void and will be re-run on the corrected instrument. The
+MVP-2's M3 is void and was re-run on the corrected instrument. The
 pre-registration is unchanged in every respect that governs a decision; the
 instrument changes are recorded in [mvp.md](mvp.md) Amendment 3.
+
+---
+
+# MVP-2 M3 on the corrected instrument — terminated incomplete at iteration 3
+
+**Run:** `runs/mvp2-evolve-v2`, code at commit `d400ec1`, working tree clean.
+**Outcome:** 2 of 5 iterations completed. The run could not continue, for a
+reason that is itself a finding rather than bad luck (see *Why it stopped*).
+
+## The instrument held
+
+**[L0.5](verification.md#l05--artifact-fidelity) passes for the first time in
+this repo's history:** 168 cases audited, recorded passed 35 = derived passed
+35, **zero discrepancies**. Apparatus failures: **0** on every split. One
+provider fingerprint throughout (`fp_e010545658`), no drift.
+
+The corrected baseline reproduces the old one within noise — train
+0.125 (3/24) against the previous 0.175, holdout 0.500 (6/12) exactly — so the
+fixes changed what is *recorded*, not what is *measured*.
+
+## What the two iterations show
+
+| Iteration | Outcome |
+| --- | --- |
+| 1 | rejected by the edit guard: `surface_bloat`, 4717B from a 783B seed (6.02× > 3.00×). No evaluation spent |
+| 2 | evaluated, then rejected by the conservative gate: **Δ_in=+5, Δ_ho=−5** |
+
+Iteration 2 is the textbook case P0-2 exists for. Per split:
+
+| | baseline | candidate |
+| --- | --- | --- |
+| train (visible) | 3/24 = 0.125 | **8/24 = 0.333** |
+| holdout (invisible) | 6/12 = 0.500 | **1/12 = 0.083** |
+
+Per case — train flips `fmt-fixed-width` and `rb-empty-edge` to passing and
+breaks `ms-even-pipeline`; holdout breaks `fmt-json-report` and
+`rb-messy-names`, which were both stably passing at baseline. The edit bought
+visible cases with invisible ones. Upstream's `combined` gate would have scored
+this Δ_in+Δ_ho = 0 and also rejected it, but only by a hair.
+
+## L3 — the prediction ledger, read before the pass rate
+
+The proposer's own frozen prediction for iteration 2, graded against what
+actually happened:
+
+| | |
+| --- | --- |
+| predicted to flip | 5 cases |
+| actually flipped | 1 of those 5 (`fmt-fixed-width`) |
+| **precision** | **0.200** |
+| **base rate** (flips ÷ failing cases on the visible split) | **2/7 = 0.286** |
+| unexpected pass | `rb-empty-edge` — flipped without being predicted |
+| regressions it warned about | `ms-even-pipeline` — **1 of 1** it could see |
+| unpredicted regressions | `fmt-json-report`, `rb-messy-names` — both holdout, structurally invisible to it |
+
+**Precision 0.200 is below the 0.286 base rate.** Under the frozen reading
+rule: *at or below base rate → the proposer is guessing; this caps the claim at
+"search", not "engineering".* Recorded as such.
+
+Two qualifications, in both directions. Against the proposer: this is the
+number the pre-registration said to read first, and it is negative. In its
+favour: **n = 1 evaluated candidate.** One iteration cannot separate a guessing
+proposer from an unlucky one, and its two unpredicted regressions were in a
+split it is not allowed to see, so they are a property of the design rather than
+of its reasoning. The honest summary is that MVP-2 produced **one** L3 data
+point, and it did not clear the bar.
+
+## The diagnosis was right; the edit that fit was not
+
+Both proposals identified the same root cause, and it is mechanically correct:
+
+> the harness provides no code-execution capability and no pre-submit
+> verification requirement, so the agent estimates derived values (counts, sums,
+> date parses, column widths) and writes the first answer it believes.
+
+That is a true statement about this suite — the tasks require exact arithmetic
+and formatting, and the inner agent has no code execution. Box ② was diagnosing,
+not pattern-matching. But:
+
+- the edit that acts on that diagnosis (add a code-execution tool) **exceeded the
+  bloat guard** and was rejected at iteration 1;
+- the edit that fits under the guard **improved train and destroyed holdout**.
+
+So on this configuration, edits that fit the 3× budget do not generalise and
+edits that generalise do not fit. That is a property of the frozen config, not
+of the model. The thresholds were left untouched; registered for MVP-3.
+
+## Why it stopped — and why that is a finding
+
+Iteration 3's proposer call never completed, across two independent attempts
+(the original run and a `--resume`). Each attempt failed with
+`APIConnectionError` after 272–545 s, and the wall-clock retry budget (600 s)
+permits roughly one retry when a single attempt costs that much.
+
+This is **not** random provider flakiness, and the evidence separates the two:
+
+| | context per request | transport failures |
+| --- | --- | --- |
+| inner-agent rollouts (72 of them) | ~17k tokens total per rollout | ≈ 0 |
+| direct probe | ~20 tokens | 0 (HTTP 200 in 1.5–2.9 s) |
+| **proposer calls** | **largest single request 78,065 input tokens** | **every attempt** |
+
+The proposer's transcripts run 60–76 messages and 0.9–1.3M cumulative tokens per
+iteration. Small requests return in seconds; large ones are dropped after
+minutes.
+
+The methodological half of this matters more than the infrastructure half.
+Self-Harness (2606.09498) specifies a **bounded proposal context** — editable
+surfaces, structured failure patterns, passing behaviour to preserve, prior edit
+records. This implementation's proposer workspace additionally carries copied
+prior-iteration artifacts, visible history, and train case sources, and the
+context reaches 78k tokens. **A proposer swimming in 78k tokens of its own
+history is the harness-bloat failure this project warns about, occurring in the
+outer loop — while a guard downstairs rejects a 3× expansion of the inner one.**
+
+Registered for MVP-3 under two headings, and deliberately **not** fixed
+mid-experiment:
+
+1. *Infrastructure* — iteration-internal checkpointing, so a proposer call that
+   dies does not discard the whole iteration ([roadmap](roadmap.md) gap 5, finer grained).
+2. *Method* — bound the proposer's context. This is the fix that addresses the
+   transport symptom and the fidelity-to-the-paper problem at once, and it may
+   well be improving proposal quality rather than merely enabling the run.
+
+## What MVP-2 can and cannot claim now
+
+Established: the corrected instrument records what it measures (L0.5 passes,
+0 apparatus, no fingerprint drift); the conservative gate caught a real
+holdout-robbing edit that the combined gate would have nearly promoted; the
+proposer produces a mechanically correct diagnosis; one graded prediction landed
+below its base rate.
+
+Not established: anything about efficacy, about L3 with usable statistical
+power, or about L4. MVP-2 stops here as an **incomplete L3 experiment with a
+single graded prediction**, and the next question belongs to a fresh
+pre-registration.

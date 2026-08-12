@@ -126,3 +126,20 @@ by costing something. Append-only.
   parallel session fixed the same bug independently; its patch was redundant, its
   *root-cause analysis* was not — it found the pytest mechanism and the resume
   path this side had missed while writing a confident and wrong commit message.
+- **Retrying a long agent loop as an atomic unit does not work.** The proposer
+  call costs 300–545 s, so a 600 s retry budget buys about one retry, and a
+  provider that is down for two minutes ends the stage. The fix is not a bigger
+  budget — that just moves the threshold — it is a checkpoint *inside* the
+  iteration. Budgets sized in wall-clock are still the right shape; they just
+  cannot rescue an operation whose unit cost approaches the budget.
+- **Distinguish "the provider is flaky" from "our requests are the problem"
+  before blaming the provider.** 72 inner-agent rollouts at ~17k tokens: no
+  transport failures. Every proposer call at up to 78k input tokens: failed.
+  Direct 20-token probes: 200 in under 3 s. Same endpoint, same minutes. The
+  variable was our request size, not their uptime — and the diagnosis only
+  arrived after measuring the transcripts instead of re-reading the traceback.
+- **Set the stop rule for infrastructure too, and then honour it.** After the
+  fourth crash the commitment was: one more fix, and if it fails again for the
+  same reason, stop and report. It did, and it stopped. Otherwise "just one more
+  patch and rerun" becomes the same unfalsifiable loop as "just one more tuning
+  pass", wearing an engineering costume.
