@@ -9,6 +9,7 @@ usage.
 
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -18,9 +19,14 @@ RECURSION_LIMIT = 60
 # One M3 stage makes ~180 inner-agent rollouts, each many API calls, against a
 # third-party proxy. Retry coverage previously existed only on the single
 # proposer call per iteration, which is why a transient disconnect kept killing
-# whole stages. Backoff is 5/10/15/20s; task-level failures are never retried.
-MAX_ATTEMPTS = 5
-BACKOFF_S = 5
+# whole stages.
+#
+# The budget is stated in wall-clock, not attempts. Two earlier ladders (2s/4s,
+# then 5 attempts over ~50s) were each exhausted by a single outage that the
+# endpoint recovered from minutes later. Task-level failures are never retried.
+MAX_TOTAL_S = 600.0
+INITIAL_BACKOFF_S = 5.0
+MAX_BACKOFF_S = 60.0
 REQUEST_TIMEOUT_S = 120
 MODEL_MAX_RETRIES = 3
 
@@ -123,15 +129,24 @@ def run_task(*, task_root: str, model: str) -> dict[str, Any]:
     }
     attempts_used = 0
     result = None
-    for attempt in range(MAX_ATTEMPTS):
-        attempts_used = attempt + 1
+    started = time.monotonic()
+    interval = INITIAL_BACKOFF_S
+    while True:
+        attempts_used += 1
         try:
             result = agent.invoke(payload, config={"recursion_limit": RECURSION_LIMIT})
             break
         except BaseException as exc:  # noqa: BLE001 - langgraph wraps transport errors in many types
-            if attempt == MAX_ATTEMPTS - 1 or not is_transient(exc):
+            elapsed = time.monotonic() - started
+            if not is_transient(exc) or elapsed + interval > MAX_TOTAL_S:
                 raise
-            time.sleep(BACKOFF_S * (attempt + 1))
+            sys.stderr.write(
+                f"[retry] inner agent: attempt {attempts_used} failed after "
+                f"{elapsed:.0f}s ({type(exc).__name__}); sleeping {interval:.0f}s\n"
+            )
+            sys.stderr.flush()
+            time.sleep(interval)
+            interval = min(interval * 2, MAX_BACKOFF_S)
     if result is None:  # pragma: no cover - unreachable: the loop returns or raises
         msg = "inner agent produced no result"
         raise RuntimeError(msg)

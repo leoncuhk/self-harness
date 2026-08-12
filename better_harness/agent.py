@@ -8,7 +8,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -18,6 +17,7 @@ from typing import Any
 from better_harness.core import Experiment, Proposal, RunLayout, SplitResult, Variant
 from better_harness.ledger import Prediction, parse_prediction
 from better_harness.patching import build_variant, prepend_pythonpath
+from better_harness.retry import retry_transient
 from better_harness.signatures import FailureCluster
 
 DEFAULT_SYSTEM_PROMPT = """You are Better Agent, an outer-loop Deep Agent that improves another agent harness.
@@ -298,27 +298,22 @@ def invoke_deepagents_proposer(
             system_prompt=_compose_system_prompt(experiment),
             backend=backend,
         )
-        result = None
-        for attempt in range(5):
-            try:
-                result = agent.invoke(
-                    {
-                        "messages": [
-                            human_message_cls(
-                                content=(
-                                    "Read /task.md first. Then inspect the current surface files, visible history, and failing "
-                                    "train cases, edit only /current, and finish by updating /proposal.md."
-                                )
+        result = retry_transient(
+            lambda: agent.invoke(
+                {
+                    "messages": [
+                        human_message_cls(
+                            content=(
+                                "Read /task.md first. Then inspect the current surface files, visible history, and failing "
+                                "train cases, edit only /current, and finish by updating /proposal.md."
                             )
-                        ]
-                    },
-                    config={"recursion_limit": experiment.better_agent_max_turns},
-                )
-                break
-            except Exception as exc:  # pragma: no cover - real env only
-                if attempt == 4 or not _is_transient_model_error(str(exc)):
-                    raise
-                time.sleep(5 * (attempt + 1))
+                        )
+                    ]
+                },
+                config={"recursion_limit": experiment.better_agent_max_turns},
+            ),
+            label="proposer (in-process)",
+        )
     if result is None:  # pragma: no cover - defensive fallback
         msg = "outer Deep Agent produced no result"
         raise RuntimeError(msg)
@@ -633,22 +628,14 @@ def _invoke_via_uv_project_with_retries(
     workspace: ProposerWorkspace,
     deepagents_root: Path,
 ) -> str | None:
-    last_error: str | None = None
-    for attempt in range(5):
-        try:
-            return _invoke_via_uv_project_once(
-                experiment=experiment,
-                workspace=workspace,
-                deepagents_root=deepagents_root,
-            )
-        except RuntimeError as exc:
-            last_error = str(exc)
-            if attempt == 4 or not _is_transient_model_error(last_error):
-                raise
-            time.sleep(5 * (attempt + 1))
-    if last_error is None:
-        return None
-    raise RuntimeError(last_error)
+    return retry_transient(
+        lambda: _invoke_via_uv_project_once(
+            experiment=experiment,
+            workspace=workspace,
+            deepagents_root=deepagents_root,
+        ),
+        label="proposer (uv subprocess)",
+    )
 
 
 def _invoke_via_uv_project_once(
@@ -706,30 +693,6 @@ def _invoke_via_uv_project_once(
     final_message = payload.get("final_message")
     return None if final_message is None else str(final_message)
 
-
-def _is_transient_model_error(message: str) -> bool:
-    lowered = message.lower()
-    return any(
-        token in lowered
-        for token in (
-            "overloaded",
-            "overloaded_error",
-            "error code: 529",
-            "529 -",
-            "rate limit",
-            "timeout",
-            # Transient transport failures: the request never got a response, so
-            # retrying is safe and almost always what the caller wants.
-            "server disconnected",
-            "connection error",
-            "connection reset",
-            "connection aborted",
-            "remoteprotocolerror",
-            "error code: 502",
-            "error code: 503",
-            "error code: 504",
-        )
-    )
 
 
 def _resolve_deepagents_root(root: Path | None) -> Path | None:

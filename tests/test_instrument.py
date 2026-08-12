@@ -29,6 +29,7 @@ from better_harness.gate import decide
 from better_harness.guards import VIOLATION_UNPARSEABLE, check_variant
 from better_harness.patching import build_baseline_variant, build_variant
 from better_harness.repeats import aggregate_split_results
+from better_harness.retry import retry_transient
 from better_harness.runners import (
     UnresolvedCaseError,
     parse_pytest_outcomes,
@@ -474,3 +475,68 @@ def test_junit_with_no_testcases_is_apparatus_not_a_failure(tmp_path):
     )
     assert outcomes[0].status == "apparatus"
     assert outcomes[0].is_apparatus
+
+
+# --- retry policy --------------------------------------------------------------
+
+
+def test_retry_keeps_trying_across_a_multi_minute_outage():
+    """The two earlier ladders (2s/4s, then ~50s) were each exhausted by one outage."""
+    clock = {"t": 0.0}
+    slept: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        slept.append(seconds)
+        clock["t"] += seconds
+
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 8:
+            msg = "Server disconnected without sending a response."
+            raise ConnectionError(msg)
+        return "ok"
+
+    assert (
+        retry_transient(flaky, label="test", sleep=fake_sleep, now=lambda: clock["t"]) == "ok"
+    )
+    assert calls["n"] == 8
+    # Backoff doubles and caps, and the outage it survives is minutes long.
+    assert slept == [5.0, 10.0, 20.0, 40.0, 60.0, 60.0, 60.0]
+    assert sum(slept) > 200
+
+
+def test_retry_gives_up_at_the_time_budget_not_at_an_attempt_count():
+    clock = {"t": 0.0}
+
+    def fake_sleep(seconds: float) -> None:
+        clock["t"] += seconds
+
+    def always_down():
+        msg = "Connection error."
+        raise ConnectionError(msg)
+
+    with pytest.raises(ConnectionError):
+        retry_transient(
+            always_down,
+            label="test",
+            max_total_s=30.0,
+            sleep=fake_sleep,
+            now=lambda: clock["t"],
+        )
+    assert clock["t"] <= 30.0
+
+
+def test_a_wrong_answer_is_never_retried():
+    """Resampling until the answer is convenient is a different experiment."""
+    calls = {"n": 0}
+
+    def wrong():
+        calls["n"] += 1
+        msg = "assert '6' == '4'"
+        raise AssertionError(msg)
+
+    with pytest.raises(AssertionError):
+        retry_transient(wrong, label="test", sleep=lambda _s: None, now=lambda: 0.0)
+    assert calls["n"] == 1

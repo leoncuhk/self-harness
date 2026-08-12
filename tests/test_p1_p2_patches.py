@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from better_harness.agent import _is_transient_model_error
 from better_harness.core import CaseOutcome, SplitResult, Surface, Variant, load_experiment
 from better_harness.cost import CostProfile, check_budget, profile_split
 from better_harness.guards import (
@@ -27,6 +26,7 @@ from better_harness.ledger import (
     summarize,
     write_ledger,
 )
+from better_harness.retry import is_transient as _is_transient_model_error
 from better_harness.signatures import (
     AGENT_CAUSED,
     CAUSE_MISSING_FILE,

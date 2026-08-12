@@ -24,6 +24,9 @@ caffeinate -is uv run better-harness run "$CONFIG" \
   --max-iterations "$ITERATIONS" \
   --repeats "$REPEATS" \
   "$@"
-status=$?
-echo "${MARKER}_DONE exit=${status}"
-exit "${status}"
+# NOT `status`: zsh reserves it as a read-only alias for $?, so assigning to it
+# aborts the script — before the marker line, which is the one thing this
+# wrapper exists to print. Cost: one dead stage that looked like a silent hang.
+exit_code=$?
+echo "${MARKER}_DONE exit=${exit_code}"
+exit "${exit_code}"
