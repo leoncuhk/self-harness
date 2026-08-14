@@ -1,0 +1,614 @@
+[
+  {
+    "id": "q004",
+    "question": "For NASDAQ: CRWD and NASDAQ: PANW,  which company achieved the higher 2-year revenue CAGR, and by how many basis points from FY 2023 to FY 2025?",
+    "category": "General Quantitative Analysis",
+    "expert_mins": 15,
+    "criteria": [
+      {
+        "text": "CRWD 2-year revenue Compound Annual Growth Rate (CAGR) is 32.82%.",
+        "severity": 2.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 32.82,
+            "unit": "percent",
+            "scale": "",
+            "raw": "32.82%"
+          }
+        ]
+      },
+      {
+        "text": "PANW 2-year revenue Compound Annual Growth Rate (CAGR) is 15.67%.",
+        "severity": 2.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 15.67,
+            "unit": "percent",
+            "scale": "",
+            "raw": "15.67%"
+          }
+        ]
+      },
+      {
+        "text": "The response states that CRWD achieved the higher 2-year revenue Compound Annual Growth Rate (CAGR) compared to PANW.",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": []
+      },
+      {
+        "text": "CRWD 2-year revenue Compound Annual Growth Rate (CAGR) exceeds PANW by 1,715 basis points (bps).",
+        "severity": 3.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 1715.0,
+            "unit": "bps",
+            "scale": "",
+            "raw": "1,715 basis points"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q007",
+    "question": "NYSE:SUI made an announcement about a CEO transition in July 2025. Use the 8-K from July 2025 to determine who the new CEO will be and when they will start in that position. Calculate the percent change in closing share price for the 1-Calendar day, 14-Calendar Day, and 30-Calendar day period following the announcement of SUI's CEO transition in July 2025. Use the change in share price to gauge market sentiment during each period. If any day falls on non-trading day, use the next day that the market is open.",
+    "category": "Market Analysis",
+    "expert_mins": 20,
+    "criteria": [
+      {
+        "text": "States the new CEO will be Charles D. Young",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": []
+      },
+      {
+        "text": "States the new CEO will start October 1, 2025",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": []
+      },
+      {
+        "text": "1-Calendar Day change is equal to (2.79%)",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": -2.79,
+            "unit": "percent",
+            "scale": "",
+            "raw": "(2.79%)"
+          }
+        ]
+      },
+      {
+        "text": "14-Calendar Day change is equal to 0.80%",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 14.0,
+            "unit": "plain",
+            "scale": "",
+            "raw": "14"
+          },
+          {
+            "value": 0.8,
+            "unit": "percent",
+            "scale": "",
+            "raw": "0.80%"
+          }
+        ]
+      },
+      {
+        "text": "30-Calendar Day change is equal to 2.20%",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 30.0,
+            "unit": "plain",
+            "scale": "",
+            "raw": "30"
+          },
+          {
+            "value": 2.2,
+            "unit": "percent",
+            "scale": "",
+            "raw": "2.20%"
+          }
+        ]
+      },
+      {
+        "text": "States that there was negative market sentiment based on the 1-Calendar Day return metrics",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": []
+      },
+      {
+        "text": "States that there was positive market sentiment based on the 14-Calendar Day returns metrics",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 14.0,
+            "unit": "plain",
+            "scale": "",
+            "raw": "14"
+          }
+        ]
+      },
+      {
+        "text": "States that there was positive market sentiment based on the 30-Calendar Day returns metrics",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 30.0,
+            "unit": "plain",
+            "scale": "",
+            "raw": "30"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q012",
+    "question": "Using share prices as of March 31, 2025 and fiscal year 2024 financial results from each company's most recently filed annual report, compare the GAAP EV/EBITDA multiple and GAAP EBITDA margin for NASDAQ: LULU and NYSE: VSCO. Which company traded at the higher EV/EBITDA multiple and which company had the higher EBITDA margin as of that date? For the EV calculations, include operating leases as debt-like items.",
+    "category": "Comparables",
+    "expert_mins": 40,
+    "criteria": [
+      {
+        "text": "LULU GAAP EBITDA margin is 27.88%",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 27.88,
+            "unit": "percent",
+            "scale": "",
+            "raw": "27.88%"
+          }
+        ]
+      },
+      {
+        "text": "LULU EV/EBITDA is 11.47x",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 11.47,
+            "unit": "multiple",
+            "scale": "",
+            "raw": "11.47x"
+          }
+        ]
+      },
+      {
+        "text": "VSCO GAAP EBITDA margin is 9.12%",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 9.12,
+            "unit": "percent",
+            "scale": "",
+            "raw": "9.12%"
+          }
+        ]
+      },
+      {
+        "text": "VSCO EV/EBITDA is 7.03x",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 7.03,
+            "unit": "multiple",
+            "scale": "",
+            "raw": "7.03x"
+          }
+        ]
+      },
+      {
+        "text": "Response states LULU traded at the higher EV/EBITDA multiple at 11.47x versus VSCO at 7.03x",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 11.47,
+            "unit": "multiple",
+            "scale": "",
+            "raw": "11.47x"
+          },
+          {
+            "value": 7.03,
+            "unit": "multiple",
+            "scale": "",
+            "raw": "7.03x"
+          }
+        ]
+      },
+      {
+        "text": "Response states LULU had the higher EBITDA margin at 27.88% versus VSCO at 9.12%",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 27.88,
+            "unit": "percent",
+            "scale": "",
+            "raw": "27.88%"
+          },
+          {
+            "value": 9.12,
+            "unit": "percent",
+            "scale": "",
+            "raw": "9.12%"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q015",
+    "question": "NYSE: PFE announced the all-cash acquisition of NASDAQ: SGEN on March 13, 2023. Using the SGEN 8-K filed on March 13, 2023 and the SGEN FY2022 filing, calculate: (1) the implied equity value using the merger consideration per share and shares outstanding from the FY2022 cover page; (2) the enterprise value using cash, cash equivalents, and short-term investments from the December 31, 2022 balance sheet and any long-term debt outstanding at that date; and (3) the EV / FY2022 Revenue transaction multiple using total revenues from the FY2022 income statement.",
+    "category": "Precedents",
+    "expert_mins": 15,
+    "criteria": [
+      {
+        "text": "Merger consideration was $229.00 per share in cash",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 229.0,
+            "unit": "plain",
+            "scale": "",
+            "raw": "$229.00"
+          }
+        ]
+      },
+      {
+        "text": "Shares outstanding were 186,789,367",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 186789367.0,
+            "unit": "plain",
+            "scale": "",
+            "raw": "186,789,367"
+          }
+        ]
+      },
+      {
+        "text": "Implied equity value was $42,774.77 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 42774.77,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$42,774.77"
+          }
+        ]
+      },
+      {
+        "text": "Cash and cash equivalents at December 31, 2022 were $319.94 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 319.94,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$319.94"
+          }
+        ]
+      },
+      {
+        "text": "Short-term investments at December 31, 2022 were $1,415.13 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 1415.13,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$1,415.13"
+          }
+        ]
+      },
+      {
+        "text": "Seagen had no long-term debt outstanding at December 31, 2022",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": []
+      },
+      {
+        "text": "Enterprise Value was $41,039.70 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 41039.7,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$41,039.70"
+          }
+        ]
+      },
+      {
+        "text": "FY2022 total revenues were $1,962.41 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 1962.41,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$1,962.41"
+          }
+        ]
+      },
+      {
+        "text": "EV / FY2022 Revenue was 20.91x",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 20.91,
+            "unit": "multiple",
+            "scale": "",
+            "raw": "20.91x"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q019",
+    "question": "For NASDAQ: VSEC, using the midpoint of any guidance ranges provided, what is the 2026 implied revenue and Adjusted EBITDA based on the Q4 2025 earnings release, and how does the implied Adjusted EBITDA margin compare to FY2023, FY2024, and FY2025 in basis points?",
+    "category": "Earnings Analysis",
+    "expert_mins": 30,
+    "criteria": [
+      {
+        "text": "VSEC FY2023 Adjusted EBITDA margin is 13.23%",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 13.23,
+            "unit": "percent",
+            "scale": "",
+            "raw": "13.23%"
+          }
+        ]
+      },
+      {
+        "text": "VSEC FY2024 Adjusted EBITDA margin is 14.88%",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 14.88,
+            "unit": "percent",
+            "scale": "",
+            "raw": "14.88%"
+          }
+        ]
+      },
+      {
+        "text": "VSEC FY2025 Adjusted EBITDA margin is 16.45%",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 16.45,
+            "unit": "percent",
+            "scale": "",
+            "raw": "16.45%"
+          }
+        ]
+      },
+      {
+        "text": "VSEC 2026E implied revenue is $1,345.85 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 1345.85,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$1,345.85"
+          }
+        ]
+      },
+      {
+        "text": "VSEC 2026E implied Adjusted EBITDA is $229.47 million",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 229.47,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$229.47"
+          }
+        ]
+      },
+      {
+        "text": "VSEC 2026E implied Adjusted EBITDA margin is 17.05%",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 17.05,
+            "unit": "percent",
+            "scale": "",
+            "raw": "17.05%"
+          }
+        ]
+      },
+      {
+        "text": "VSEC 2026E implied Adjusted EBITDA margin is 60.41 basis points higher than FY2025",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 60.41,
+            "unit": "bps",
+            "scale": "",
+            "raw": "60.41 basis points"
+          }
+        ]
+      },
+      {
+        "text": "VSEC 2026E implied Adjusted EBITDA margin is 216.59 basis points higher than FY2024",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 216.59,
+            "unit": "bps",
+            "scale": "",
+            "raw": "216.59 basis points"
+          }
+        ]
+      },
+      {
+        "text": "VSEC 2026E implied Adjusted EBITDA margin is 382.11 basis points higher than FY2023",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": [
+          {
+            "value": 382.11,
+            "unit": "bps",
+            "scale": "",
+            "raw": "382.11 basis points"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q024",
+    "question": "For NASDAQ: AMZN, what does the reversal in server useful life from five years to six years effective January 1, 2024, and back to five years effective January 1, 2025, suggest about the pace of the company's artificial intelligence and machine learning investment during fiscal 2025? Support your conclusion with the disclosed management rationale for both changes, the Q1 2025 share of the full-year 2025 depreciation impact, and the Q1 2025 share of the full-year 2025 net income impact from the 2025 change.",
+    "category": "Disclosure Analysis",
+    "expert_mins": 30,
+    "criteria": [
+      {
+        "text": "Response states the AMZN Q1 FY2024 increase in server useful life from five years to six years is attributed to continuous improvements in hardware, software, and data center designs.",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": []
+      },
+      {
+        "text": "Response states the AMZN Q1 FY2025 reduction in server useful life from six years to five years is attributed to the increased pace of technology development, particularly in artificial intelligence and machine learning.",
+        "severity": 1.0,
+        "must_pass": true,
+        "numeric": []
+      },
+      {
+        "text": "Response states AMZN Q1 FY2025 change increases depreciation expense by $217 million.",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 217.0,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$217"
+          }
+        ]
+      },
+      {
+        "text": "Response states AMZN FY2025 change increases depreciation expense by $1.40 billion.",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": []
+      },
+      {
+        "text": "Response states AMZN Q1 FY2025 represents 15.50% of the FY2025 depreciation impact from the Q1 FY2025 change.",
+        "severity": 2.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 15.5,
+            "unit": "percent",
+            "scale": "",
+            "raw": "15.50%"
+          }
+        ]
+      },
+      {
+        "text": "Response states AMZN Q1 FY2025 change reduces net income by $162 million.",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 162.0,
+            "unit": "plain",
+            "scale": "million",
+            "raw": "$162"
+          }
+        ]
+      },
+      {
+        "text": "Response states AMZN FY2025 change reduces net income by $1.0 billion.",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": []
+      },
+      {
+        "text": "Response states AMZN Q1 FY2025 represents 16.20% of the FY2025 net income impact from the Q1 FY2025 change.",
+        "severity": 2.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 16.2,
+            "unit": "percent",
+            "scale": "",
+            "raw": "16.20%"
+          }
+        ]
+      },
+      {
+        "text": "Response states the support shows a shift from improving server longevity in Q1 FY2024 to faster artificial intelligence and machine learning-driven technology turnover in Q1 FY2025.",
+        "severity": 2.0,
+        "must_pass": false,
+        "numeric": []
+      },
+      {
+        "text": "Response states that the shift from a useful life extension in Q1 FY2024 to a useful life reduction in Q1 FY2025, combined with Q1 2025 representing only 15.50% of the full year depreciation impact, suggests that AI and ML investment accelerated as FY2025 progressed with the majority of infrastructure reinvestment occurring in later quarters",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": [
+          {
+            "value": 15.5,
+            "unit": "percent",
+            "scale": "",
+            "raw": "15.50%"
+          }
+        ]
+      },
+      {
+        "text": "States that most of the FY2025 depreciation and net income impact occurs after Q1 2025",
+        "severity": 1.0,
+        "must_pass": false,
+        "numeric": []
+      },
+      {
+        "text": "Concludes that artificial intelligence and machine learning-related infrastructure investment increased as FY2025 progressed.",
+        "severity": 2.0,
+        "must_pass": true,
+        "numeric": []
+      }
+    ]
+  }
+]
