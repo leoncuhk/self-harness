@@ -295,11 +295,11 @@ def test_stage_output_withholds_the_sealed_scorecard(tmp_path, monkeypatch, caps
 
     assert main(["run", str(config), "--output-dir", str(output_dir), "--max-iterations", "1"]) == 0
     withheld = capsys.readouterr().out
-    assert "| Scorecard | *sealed* | *sealed* |" in withheld
+    assert "| Locked test | *sealed* | *sealed* |" in withheld
     assert "Scorecard withheld from stdout" in withheld
 
     # The artifact on disk stays complete: reading it is a deliberate act.
-    assert "| Scorecard | `" in (output_dir / "report.md").read_text()
+    assert "| Locked test | `" in (output_dir / "report.md").read_text()
 
     assert (
         main(
@@ -316,4 +316,4 @@ def test_stage_output_withholds_the_sealed_scorecard(tmp_path, monkeypatch, caps
         )
         == 0
     )
-    assert "| Scorecard | `" in capsys.readouterr().out
+    assert "| Locked test | `" in capsys.readouterr().out
