@@ -15,6 +15,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Sequence
 
 from better_harness.apparatus import STATUS_APPARATUS, apparatus_kind
+from better_harness.coding import CodingProjectRunner
 from better_harness.core import (
     CaseOutcome,
     EvalCase,
@@ -447,6 +448,8 @@ def build_runner(experiment: Experiment):
         return PytestRunner()
     if experiment.runner == "harbor":
         return HarborRunner()
+    if experiment.runner == "coding":
+        return CodingProjectRunner()
     msg = f"unknown runner {experiment.runner!r}"
     raise ValueError(msg)
 

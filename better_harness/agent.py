@@ -425,6 +425,20 @@ def _write_train_artifacts(
             task_dir = tasks_root / rendered
             if task_dir.exists():
                 shutil.copytree(task_dir, train_cases_dir / rendered, dirs_exist_ok=True)
+    elif experiment.runner == "coding":
+        task_root = Path(str(experiment.runner_config["task_root"]))
+        for case in experiment.cases_for_split("train"):
+            rendered = case.render(model=experiment.model)
+            if rendered in private_sources:
+                withheld.append(rendered)
+                continue
+            source = task_root / rendered
+            if source.is_file():
+                target = train_cases_dir / rendered
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            elif source.is_dir():
+                shutil.copytree(source, train_cases_dir / rendered, dirs_exist_ok=True)
     if withheld:
         (train_cases_dir / "WITHHELD.md").write_text(
             "# Withheld case sources\n\n"

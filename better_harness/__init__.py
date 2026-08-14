@@ -1,6 +1,7 @@
 """Public exports for better-harness."""
 
 from better_harness.apparatus import STATUS_APPARATUS, apparatus_kind, is_measurable
+from better_harness.coding import CodingProjectRunner
 from better_harness.contracts import GoalContract, MetricConstraint, load_goal_contract
 from better_harness.core import (
     CaseOutcome,
@@ -57,6 +58,7 @@ __all__ = [
     "STATUS_APPARATUS",
     "BudgetDecision",
     "CaseOutcome",
+    "CodingProjectRunner",
     "CostProfile",
     "EvalCase",
     "Experiment",

@@ -1,0 +1,49 @@
+[experiment]
+name = "coding-two-loop-demo"
+runner = "coding"
+workspace_root = "../benchmarks/coding/harness"
+model = "deterministic-coding-agent"
+max_iterations = 1
+repeats = 1
+gate = "conservative"
+candidates = 1
+
+[goal]
+primary_metric = "score"
+direction = "maximize"
+min_delta = 0.0
+require_no_pass_regression = true
+
+[better_agent]
+model = "openai/deepseek-v4-flash"
+max_turns = 20
+
+[runner.coding]
+product_root = "../benchmarks/coding/product"
+task_root = "../benchmarks/coding/tasks"
+agent_command = ["python3", "../benchmarks/coding/agent.py"]
+ci_commands = [["python3", "-m", "pytest", "-q"]]
+timeout_s = 30
+ci_timeout_s = 30
+keep_workspaces = false
+
+[surfaces.developer]
+kind = "workspace_file"
+target = "developer.md"
+filename = "developer.md"
+base_file = "../benchmarks/coding/harness/developer.md"
+
+[[cases]]
+case_id = "fix-add.md"
+split = "train"
+stratum = "bugfix"
+
+[[cases]]
+case_id = "fix-negative.md"
+split = "holdout"
+stratum = "bugfix"
+
+[[cases]]
+case_id = "fix-regression.md"
+split = "scorecard"
+stratum = "bugfix"

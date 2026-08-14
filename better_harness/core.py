@@ -53,7 +53,7 @@ SPLIT_ALIASES = {
 VISIBLE_SPLITS = {"train"}
 PRIVATE_SPLITS = {"holdout", "scorecard"}
 VALID_SURFACE_KINDS = ("module_attr", "workspace_file")
-VALID_RUNNERS = ("pytest", "harbor")
+VALID_RUNNERS = ("pytest", "harbor", "coding")
 # P0-1: repeat every split this many times unless the config overrides it. One
 # rollout per candidate cannot separate a real gain from run-to-run noise.
 DEFAULT_REPEATS = 3
@@ -792,6 +792,10 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         runner_config.setdefault("command", ["harbor"])
         runner_config.setdefault("extra_args", [])
         runner_config.setdefault("pass_threshold", 1.0)
+    elif runner == "coding":
+        runner_config.setdefault("task_root", "tasks")
+        runner_config.setdefault("product_root", "product")
+        runner_config.setdefault("ci_commands", [["uv", "run", "pytest", "-q"]])
 
     if "command" in runner_config:
         runner_config["command"] = _resolve_command_tokens(
@@ -799,7 +803,18 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
             [str(item) for item in runner_config["command"]],
         )
 
-    for key in ("project_root", "tasks_root"):
+    if "agent_command" in runner_config:
+        runner_config["agent_command"] = _resolve_command_tokens(
+            config_path,
+            [str(item) for item in runner_config["agent_command"]],
+        )
+    if "ci_commands" in runner_config:
+        runner_config["ci_commands"] = [
+            _resolve_command_tokens(config_path, [str(item) for item in command])
+            for command in runner_config["ci_commands"]
+        ]
+
+    for key in ("project_root", "tasks_root", "task_root", "product_root"):
         if key in runner_config:
             runner_config[key] = str(_resolve_path(config_path, str(runner_config[key])))
 
@@ -967,6 +982,11 @@ def validate_experiment(experiment: Experiment) -> None:
         if not experiment.runner_config.get("command"):
             msg = "harbor runner requires runner.harbor.command"
             raise ValueError(msg)
+    if experiment.runner == "coding":
+        for key in ("task_root", "product_root", "agent_command", "ci_commands"):
+            if not experiment.runner_config.get(key):
+                msg = f"coding runner requires runner.coding.{key}"
+                raise ValueError(msg)
 
 
 def write_split_manifest(experiment: Experiment, output_dir: Path) -> None:
