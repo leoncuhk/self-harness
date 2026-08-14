@@ -1,226 +1,123 @@
-# better-harness (self-harness fork)
+# Self-Harness
 
-> **Fork index.** This is a fork of upstream `examples/better-harness` with an
-> experimental-rigor layer and pre-registered MVP experiments. Docs live in `docs/`:
->
-> - [`docs/overview.md`](docs/overview.md) — self-harness 认知: concept, loop, landscape, evidence priors
-> - [`docs/design.md`](docs/design.md) — the fork's rigor layer (P0–P2), eval methodology, suite, risks
-> - [`docs/verification.md`](docs/verification.md) — the L0–L5 ladder and falsification criteria
-> - [`docs/mvp.md`](docs/mvp.md) — pre-registration registry (MVP-1, MVP-2), append-only
-> - [`docs/results.md`](docs/results.md) — outcomes, gaps disclosed
-> - [`docs/roadmap.md`](docs/roadmap.md) — standing vs the 2026 literature, gap list, build order
-> - [`docs/agent-stack.md`](docs/agent-stack.md) — reference: Deep Agents / LangChain / LangGraph layers
-> - [`docs/paper-study.md`](docs/paper-study.md) — running study notes on relevant papers (starts with 2606.09498)
-> - [`docs/lessons.md`](docs/lessons.md) — practice lessons from MVP-1/MVP-2, append-only
-> - `benchmarks/agentic/` — 16-task suite, real inner agent, deterministic verifiers
-> - `scripts/` — task generator, M1 verifier, analysis (baseline CI / pass@N / tokens / M4 compare)
->
-> Upstream README follows unchanged.
+An eval-driven system that improves the development harness around a fixed
+coding agent. The optimizer may edit declared prompts, skills, tools, workflow,
+memory policy, and middleware; it may not edit the goal, evaluator, task splits,
+budgets, promotion rule, or audit evidence.
 
-System for autonomous harness optimization. Inspired by previous harness engineering work at LangChain in [Improving Deep Agents with Harness Engineering](https://blog.langchain.com/improving-deep-agents-with-harness-engineering/), [karpathy/autoresearch](https://github.com/karpathy/autoresearch), and [Meta-Harness](https://arxiv.org/abs/2603.28052).
+The repository implements two causally separate loops:
 
-`better-harness` lets one [Deep Agent](https://github.com/langchain-ai/deepagents) improve another agent harness with evals.
+```text
+inner: task -> coding agent + harness -> disposable product diff -> frozen CI
+outer: traces -> diagnosis -> candidate harness -> inner-loop replay -> promotion
+```
 
-This repo is a research artifact for building and studying a harness-optimization loop. It is meant to be simple, editable, and easy to adapt to your own agent stack.
+“Best” always means the best validated candidate found within the declared
+budget. It does not mean a global optimum.
 
-The easiest way to run this is by pointing your favorite agent at this repo and prompting:
+## What is implemented
 
-- `set up this repo using my evals`
-- `set up this repo to optimize for X task. I don't have evals so go and bootstrap them in this repo and run the optimization loop`
+- immutable goal contracts with continuous objectives and hard constraints;
+- private run-local harness snapshots for concurrent, attributable evaluation;
+- disposable product workspaces and CI executed outside the coding agent;
+- train, adaptive-validation (`holdout`), and one-shot locked-test (`scorecard`) splits;
+- trace-grounded failure signatures and 1–K bounded candidate proposals;
+- static anti-leak, syntax, path, and surface-growth guards;
+- no-regression, objective, latency, token, and cost gates;
+- candidate lineage, accepted/rejected evidence, predictions, and an anytime leaderboard;
+- explicit apparatus-failure classification and independent artifact auditing;
+- Pytest, Harbor, and generic command-based coding-project runners.
 
-## What it does
-
-You give `better-harness`:
-
-- a target workspace
-- a small set of editable harness surfaces
-- explicit `train` and `holdout` eval cases
-- an outer Deep Agent model
-
-It then:
-
-1. runs the baseline
-2. builds a proposer workspace for the outer agent
-3. lets that outer agent edit the allowed surfaces
-4. tests the edited inner agent on `train` and `holdout`
-5. keeps the change only if the combined pass count improves
-6. optionally runs `scorecard` on baseline and final only
-
-![Better Harness Optimization](better_harness_optimization.svg)
-
-## Start here
-
-Start from [`examples/deepagents_example.toml`](examples/deepagents_example.toml). It is the one public worked example in this repo.
-
-It shows how to expose:
-
-- a prompt surface
-- a tools file
-- a skills file
-- a middleware implementation file
-- a middleware registration file
-
-Middleware usually needs both implementation and wiring. If you only expose the middleware code but not the place where the agent loads `middleware=[...]`, the outer agent cannot actually turn that middleware on.
-
-Useful docs:
-
-- [Deep Agents repo](https://github.com/langchain-ai/deepagents)
-- [Custom middleware in LangChain](https://docs.langchain.com/oss/python/langchain/middleware/custom)
-- [Middleware in Deep Agents customization](https://docs.langchain.com/oss/python/deepagents/customization#middleware)
+See [architecture](docs/architecture.md), [verification ladder](docs/verification.md),
+and [field synthesis](docs/overview.md) before interpreting an experiment.
 
 ## Quick start
 
-Requirements:
-
-- Python 3.11+
-- `uv`
-- [deepagents](https://github.com/langchain-ai/deepagents) installed, or `DEEPAGENTS_ROOT` pointing at a local checkout
-
-Install dependencies:
+Requirements: Python 3.12+, `uv`, and credentials for the models used by a live
+experiment.
 
 ```bash
 uv sync --extra dev
+uv run self-harness validate configs/coding_demo.toml
+uv run pytest -q
+uv run ruff check better_harness tests scripts
 ```
 
-Copy the example and edit it for your repo:
+The deterministic coding fixture proves both loops without model spend:
 
 ```bash
-cp examples/deepagents_example.toml my_experiment.toml
+uv run pytest -q tests/test_coding_runner.py::test_outer_loop_improves_the_coding_harness_and_inner_product
 ```
 
-Then run:
+Run a declared experiment:
 
 ```bash
-uv run better-harness validate my_experiment.toml
-
-uv run better-harness run my_experiment.toml \
-  --output-dir runs/my-harness \
-  --max-iterations 3
+uv run self-harness inventory configs/coding_demo.toml
+uv run self-harness run configs/coding_demo.toml \
+  --output-dir runs/coding-demo
 ```
 
-If you just want to verify this repo itself:
+Run outputs contain the frozen manifest, variant values, workspace snapshots,
+per-case traces and diffs, split results, candidate decisions, archive, ledger,
+and final report. `runs/` is intentionally ignored because it can contain large
+or sensitive execution evidence.
+
+## Promotion protocol
+
+For each generation the outer agent sees only current surfaces, visible training
+failures, and prior visible evidence. A proposed edit is promoted only when:
+
+1. all static guards pass;
+2. the primary objective improves by the configured minimum;
+3. binary pass rate and declared constraints do not regress;
+4. resource growth stays within its frozen ceiling;
+5. both train and adaptive validation satisfy the gate.
+
+The locked test is unavailable to the proposer and is read for the baseline and
+final selected harness only. Because adaptive validation participates in every
+selection, it is not called a truly untouched holdout in the architecture docs.
+
+## Repository map
+
+```text
+better_harness/       optimization kernel and runner adapters
+benchmarks/coding/    deterministic dual-loop product fixture
+benchmarks/agentic/   generic agent fixture and deterministic verifiers
+benchmarks/fabv2/     bounded finance-research case study
+configs/              reproducible experiment contracts
+docs/                 architecture, evidence, limits, and results
+scripts/              artifact auditor and analysis utilities
+tests/                unit, contract, resume, and end-to-end tests
+```
+
+The Python package retains the historical `better_harness` name for artifact
+compatibility. `self-harness` is the preferred CLI.
+
+## Evidence standard
+
+A green test suite establishes orchestration correctness, not self-improvement.
+A credible efficacy claim additionally needs non-degenerate baseline headroom,
+replicated train/validation gain, one-shot locked-test gain, equal-budget retry
+or refinement comparators, and ideally transfer to new projects or models. The
+small FAB v2 study is an integration case study, not a competition-wide result.
+
+Before citing any run:
 
 ```bash
-uv run pytest
+uv run python scripts/verify_artifacts.py runs/<run-name>
 ```
 
-## Outer and inner agents
+## Safety boundary
 
-There are always two agents in the loop:
+Workspace surfaces are copied into private run directories and path traversal is
+rejected. This protects causal attribution and the source workspace. It is not a
+complete hostile-code sandbox: live coding agents and benchmark tools should
+still run inside an OS/container sandbox with least-privilege credentials and
+network policy appropriate to the project.
 
-- outer agent
-  - a Deep Agent that reads visible eval data and edits the harness surfaces
-- inner agent
-  - the target agent you are trying to improve
+## Acknowledgements
 
-The outer agent sees:
-
-- the current editable surface files
-- visible `train` failures
-- copied source files for the visible `train` cases
-- prior visible artifacts and earlier keep/discard decisions
-
-It does not edit the target repo directly. It edits a temporary proposer workspace. `better-harness` turns those edits into one candidate harness, runs the evals, and either keeps or discards that candidate.
-
-## Editable surfaces
-
-Each surface is a real thing the target agent loads during eval. Common surfaces are:
-
-- prompt text
-- tool files
-- skill files
-- middleware code
-- middleware registration or agent-construction code
-
-The visible/private split in this repo is meant to support train-vs-holdout optimization, but it is not a hard sandbox boundary yet. Treat it as research infrastructure, not strict isolation.
-
-Two load modes are supported:
-
-- `module_attr`
-  - patch a Python attribute such as `package.module:ATTRIBUTE`
-- `workspace_file`
-  - temporarily replace a file in the target workspace for one eval run
-
-Each surface must define exactly one of:
-
-- `base_file`
-  - read the starting value from a file
-- `base_value`
-  - inline the starting value directly in the config
-
-Use `base_value` when you want one self-contained config file. Use `base_file` when you want the config to point at existing source files.
-
-## Config shape
-
-Minimal shape:
-
-```toml
-[experiment]
-name = "my-harness"
-runner = "pytest"
-workspace_root = "/abs/path/to/workspace"
-model = "claude-sonnet-4-6"
-max_iterations = 3
-
-[better_agent]
-model = "claude-sonnet-4-6"
-max_turns = 40
-
-[runner.pytest]
-project_root = "/abs/path/to/workspace/libs/evals"
-model_flag = "--model"
-summary_flag = "--evals-report-file"
-pytest_args = ["-q"]
-
-[surfaces.prompt]
-kind = "module_attr"
-target = "my_agent.graph:BASE_PROMPT"
-filename = "prompt.txt"
-base_value = """
-You are a helpful agent.
-"""
-
-[surfaces.middleware_impl]
-kind = "workspace_file"
-target = "my_agent/middleware.py"
-filename = "middleware.py"
-base_file = "middleware.py"
-
-[surfaces.middleware_registration]
-kind = "workspace_file"
-target = "my_agent/graph.py"
-filename = "graph.py"
-base_file = "graph.py"
-
-[[cases]]
-case_id = "tests/evals/test_one.py::test_case[{model}]"
-split = "train"
-stratum = "tool_use"
-
-[[cases]]
-case_id = "tests/evals/test_two.py::test_case[{model}]"
-split = "holdout"
-stratum = "tool_use"
-```
-
-Supported runners:
-
-- `pytest`
-- `harbor`
-
-Supported splits:
-
-- `train`
-- `holdout`
-- `scorecard` optional
-
-## Traces
-
-Local artifacts are the source of truth.
-
-If pytest or Harbor logs include trace links, `better-harness` saves them into the run directory. LangSmith is supported the same way: if trace URLs are present in logs or summaries, they are captured and written with the run.
-
-## Resources
-
-- [LangChain Academy](https://academy.langchain.com/) — Comprehensive, free courses on LangChain libraries and products, made by the LangChain team.
-- [Code of Conduct](https://github.com/langchain-ai/langchain/?tab=coc-ov-file) — community guidelines and standards
+The design builds on Self-Harness, Agentic Harness Engineering, Meta-Harness,
+Deep Agents harness engineering, and the broader autoresearch/evolution family.
+The project began as a fork of LangChain's `better-harness` example; upstream
+API names are retained where doing so preserves old experiments.
