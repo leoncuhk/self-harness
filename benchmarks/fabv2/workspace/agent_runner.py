@@ -43,6 +43,8 @@ from model_library.exceptions import MaxContextWindowExceededError
 from model_library.registry_utils import get_registry_model
 from simpleeval import SimpleEval
 
+from better_harness.usage import total_tokens
+
 MAX_END_DATE = "2026-03-01"
 UA = {"User-Agent": "Fabv2Research harness-study@example.com"}
 FTS_URL = "https://efts.sec.gov/LATEST/search-index?q={q}&dateRange=custom&startdt={s}&enddt={e}"
@@ -581,14 +583,11 @@ def run_question(
         )
 
     result = asyncio.run(_run())
-    tokens = 0
-    try:
-        meta = result.final_aggregated_metadata
-        tokens = int(getattr(meta, "total_tokens", 0) or 0) + int(
-            getattr(getattr(result, "final_compaction_metadata", None), "total_tokens", 0) or 0
-        )
-    except Exception:
-        pass
+    aggregate_tokens = total_tokens(getattr(result, "final_aggregated_metadata", None))
+    compaction_tokens = total_tokens(getattr(result, "final_compaction_metadata", None))
+    tokens = None
+    if aggregate_tokens is not None or compaction_tokens is not None:
+        tokens = (aggregate_tokens or 0) + (compaction_tokens or 0)
     return {
         "final_answer": result.final_answer or "",
         "success": bool(result.success),

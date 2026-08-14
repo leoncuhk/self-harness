@@ -12,7 +12,7 @@ sys.path.insert(0, str(WORKSPACE))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "frozen"))
 
 COUNTS = {"passed": 0, "failed": 0, "skipped": 0}
-TOKENS = {"total": 0}
+TOKENS = {"total": 0, "measured": False}
 FINGERPRINTS: set[str] = set()
 METRICS: dict[str, float] = {}
 
@@ -49,7 +49,9 @@ def agent_limits(pytestconfig: pytest.Config) -> dict[str, int]:
 @pytest.fixture
 def record_usage():
     def _record(usage: dict) -> None:
-        TOKENS["total"] += int(usage.get("total_tokens", 0))
+        if usage.get("total_tokens") is not None:
+            TOKENS["total"] += int(usage["total_tokens"])
+            TOKENS["measured"] = True
         FINGERPRINTS.update(usage.get("system_fingerprints", []))
 
     return _record
@@ -68,6 +70,7 @@ def pytest_configure(config: pytest.Config) -> None:
     for key in COUNTS:
         COUNTS[key] = 0
     TOKENS["total"] = 0
+    TOKENS["measured"] = False
     FINGERPRINTS.clear()
     METRICS.clear()
 
@@ -98,7 +101,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         "skipped": COUNTS["skipped"],
         "total": total,
         "correctness": 0.0 if total == 0 else COUNTS["passed"] / total,
-        "total_tokens": TOKENS["total"],
+        "total_tokens": TOKENS["total"] if TOKENS["measured"] else None,
         "system_fingerprints": sorted(FINGERPRINTS),
         "score": METRICS.get("partial_credit", 0.0),
         "metrics": dict(METRICS),
