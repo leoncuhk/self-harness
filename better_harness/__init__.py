@@ -1,6 +1,7 @@
 """Public exports for better-harness."""
 
 from better_harness.apparatus import STATUS_APPARATUS, apparatus_kind, is_measurable
+from better_harness.contracts import GoalContract, MetricConstraint, load_goal_contract
 from better_harness.core import (
     CaseOutcome,
     EvalCase,
@@ -64,8 +65,10 @@ __all__ = [
     "FingerprintDriftError",
     "FlipReport",
     "GateDecision",
+    "GoalContract",
     "GuardReport",
     "LedgerEntry",
+    "MetricConstraint",
     "Prediction",
     "Proposal",
     "RunReport",
@@ -87,6 +90,7 @@ __all__ = [
     "decide",
     "is_measurable",
     "load_experiment",
+    "load_goal_contract",
     "main",
     "parse_harbor_case",
     "parse_prediction",

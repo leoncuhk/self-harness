@@ -25,6 +25,7 @@ from better_harness.apparatus import (
     apparatus_rate,
     is_measurable,
 )
+from better_harness.contracts import GoalContract, load_goal_contract
 from better_harness.cost import (
     DEFAULT_MAX_COST_GROWTH,
     DEFAULT_MAX_LATENCY_GROWTH,
@@ -120,6 +121,7 @@ class Experiment:
     guards: dict[str, Any] = dc_field(default_factory=dict)
     budget: dict[str, Any] = dc_field(default_factory=dict)
     fingerprint_discipline: str = DEFAULT_FINGERPRINT_DISCIPLINE
+    goal: GoalContract = dc_field(default_factory=GoalContract)
 
     @property
     def guards_enabled(self) -> bool:
@@ -582,6 +584,7 @@ class RunLayout:
             "better_agent_deepagents_root": None
             if experiment.better_agent_deepagents_root is None
             else str(experiment.better_agent_deepagents_root),
+            "goal": experiment.goal.to_dict(),
         }
         (self.root / "manifest.json").write_text(json.dumps(payload, indent=2) + "\n")
         write_split_manifest(experiment, self.root)
@@ -812,6 +815,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     )
     guards = dict(raw.get("guards", {}))
     budget = dict(raw.get("budget", {}))
+    goal = load_goal_contract(raw.get("goal"))
 
     better_agent = raw.get("better_agent", {})
     better_agent_model = str(better_agent.get("model", model))
@@ -888,6 +892,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         guards=guards,
         budget=budget,
         fingerprint_discipline=fingerprint_discipline,
+        goal=goal,
     )
     validate_experiment(loaded)
     return loaded
