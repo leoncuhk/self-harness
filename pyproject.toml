@@ -17,6 +17,7 @@ dev = [
 
 [project.scripts]
 better-harness = "better_harness:main"
+self-harness = "better_harness:main"
 
 [build-system]
 requires = ["setuptools>=82.0.1"]

@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import logging
 import math
 import os
 import re
@@ -27,7 +26,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-import aiohttp
 import requests
 from bs4 import BeautifulSoup
 from model_library.agent import (
@@ -35,7 +33,6 @@ from model_library.agent import (
     AgentConfig,
     AgentHooks,
     TimeLimit,
-    ToolCallRecord,
     TurnLimit,
     TurnResult,
     default_before_query,
@@ -396,7 +393,8 @@ class WebSearchStub(Tool):
 def _wrap_llm_timeout(llm: LLM, timeout_s: float = 120, retries: int = 3) -> LLM:
     """Per-request timeout + retry around llm.query. Without this a single
     stuck provider request blocks forever: the agent TimeLimit only fires
-    between turns, never mid-request (the self-harness MVP-2 lesson)."""
+    between turns, never mid-request (the self-harness MVP-2 lesson).
+    """
     orig = llm.query
 
     async def query_with_timeout(*args, **kwargs):
@@ -404,11 +402,11 @@ def _wrap_llm_timeout(llm: LLM, timeout_s: float = 120, retries: int = 3) -> LLM
         for attempt in range(retries):
             try:
                 return await asyncio.wait_for(orig(*args, **kwargs), timeout=timeout_s)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last = TimeoutError(f"LLM request timed out after {timeout_s}s (attempt {attempt + 1}/{retries})")
             except Exception as e:
                 last = e
-        raise last if last else RuntimeError("llm query failed")
+        raise last or RuntimeError("llm query failed")
 
     llm.query = query_with_timeout  # type: ignore[method-assign]
     return llm
@@ -416,13 +414,40 @@ def _wrap_llm_timeout(llm: LLM, timeout_s: float = 120, retries: int = 3) -> LLM
 
 _PROXY_MODEL = "openai/deepseek-v4-flash"
 _PROXY_LOADED = False
+POLICY_FILES = (
+    "research_policy.md",
+    "verification_policy.md",
+    "submission_policy.md",
+)
+
+
+def compose_harness_prompt(prompt_file: Path) -> str:
+    """Compose independently evolvable policy surfaces into one system prompt."""
+    parts = [prompt_file.read_text().strip()]
+    enabled: set[str] = set()
+    if variant_file := os.environ.get("BETTER_HARNESS_VARIANT_FILE"):
+        try:
+            enabled = set(json.loads(Path(variant_file).read_text()).get("values", {}))
+        except (OSError, ValueError):
+            enabled = set()
+    for name in POLICY_FILES:
+        if name.removesuffix(".md") not in enabled:
+            continue
+        path = prompt_file.parent / name
+        if not path.exists():
+            continue
+        content = path.read_text().strip()
+        if content:
+            parts.append(f"## {path.stem.replace('_', ' ').title()}\n{content}")
+    return "\n\n".join(parts) + "\n"
 
 
 def _ensure_proxy_models() -> None:
     """Register a proxy-routed model entry (openai provider -> model name
     deepseek-v4-flash) by cloning an existing openai registry entry, so the
     standard OpenAI client picks up OPENAI_BASE_URL/OPENAI_API_KEY and the
-    proxy routes by model name. Idempotent."""
+    proxy routes by model name. Idempotent.
+    """
     global _PROXY_LOADED
     if _PROXY_LOADED:
         return
@@ -471,9 +496,8 @@ def get_agent(model_name: str, prompt_text: str, log_dir: Path, *, max_turns: in
         # assign_client is a no-op when the key is already taken. Overwrite the
         # registry entry with a standard OpenAI SDK client (default transport,
         # sane timeout) — the only combination that works against this proxy.
-        from openai import AsyncOpenAI
-
         import model_library.base as _ml_base
+        from openai import AsyncOpenAI
 
         _ml_base.client_registry[llm._client_registry_key] = AsyncOpenAI(
             api_key=os.environ.get("OPENAI_API_KEY"),
@@ -538,7 +562,7 @@ def run_question(
     temperature: float = 0.0,
     prompt_file: Path | None = None,
 ) -> dict[str, Any]:
-    prompt_text = (prompt_file or WORKSPACE / "prompt.txt").read_text()
+    prompt_text = compose_harness_prompt(prompt_file or WORKSPACE / "prompt.txt")
     agent = get_agent(
         model,
         prompt_text,

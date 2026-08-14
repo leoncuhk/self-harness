@@ -46,20 +46,28 @@ def test_rubric_leak_guard() -> None:
 
 @pytest.mark.timeout(900)
 @pytest.mark.parametrize("qid", ["q004", "q015", "q024", "q012", "q007", "q019"])
-def test_question(qid: str, tmp_path: Path, model: str, record_usage, record_metrics) -> None:
+def test_question(
+    qid: str,
+    artifact_dir: Path,
+    model: str,
+    agent_limits: dict[str, int],
+    record_usage,
+    record_metrics,
+) -> None:
     question = QUESTIONS[qid]
     out = agent_runner.run_question(
         question,
         model=model,
-        log_dir=tmp_path / "trajectory",
+        log_dir=artifact_dir / "trajectory",
         prompt_file=ROOT.parent / "workspace" / "prompt.txt",
+        **agent_limits,
     )
-    (tmp_path / "answer.txt").write_text(out["final_answer"])
-    (tmp_path / "run.json").write_text(json.dumps(out, indent=2, default=str))
+    (artifact_dir / "answer.txt").write_text(out["final_answer"])
+    (artifact_dir / "run.json").write_text(json.dumps(out, indent=2, default=str))
     record_usage({"total_tokens": out["tokens"], "system_fingerprints": []})
 
     verdict = judge.score_question(qid, out["final_answer"] or "")
-    (tmp_path / "judge.json").write_text(json.dumps(verdict, indent=2, ensure_ascii=False))
+    (artifact_dir / "judge.json").write_text(json.dumps(verdict, indent=2, ensure_ascii=False))
     record_metrics(
         {
             "partial_credit": verdict["partial_credit"],

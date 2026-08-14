@@ -76,6 +76,8 @@ def split(outcomes: list[CaseOutcome], *, variant: str = "v", apparatus: int = 0
         ("case missing from junit.xml", "junit_unreadable"),
         ("openai.APIConnectionError: Connection error.", "transport"),
         ("httpcore.RemoteProtocolError: Server disconnected", "transport"),
+        ("AttributeError: Missing config key: OPENAI_API_KEY", "provider_config"),
+        ("case process timed out", "case_timeout"),
         # Not apparatus: the agent ran and spent its budget.
         ("langgraph.errors.GraphRecursionError: Recursion limit of 60 reached", None),
         # Not apparatus: the proposer's own code is broken.

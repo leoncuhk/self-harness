@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,11 +20,30 @@ METRICS: dict[str, float] = {}
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--model", action="store", default="openai/deepseek-v4-flash")
     parser.addoption("--evals-report-file", action="store", default="")
+    parser.addoption("--max-turns", action="store", type=int, default=14)
+    parser.addoption("--max-time", action="store", type=int, default=600)
+    parser.addoption("--max-tokens", action="store", type=int, default=6000)
 
 
 @pytest.fixture
 def model(pytestconfig: pytest.Config) -> str:
     return str(pytestconfig.getoption("--model"))
+
+
+@pytest.fixture
+def artifact_dir(tmp_path: Path) -> Path:
+    path = Path(os.environ.get("SELF_HARNESS_CASE_ARTIFACTS", str(tmp_path)))
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+@pytest.fixture
+def agent_limits(pytestconfig: pytest.Config) -> dict[str, int]:
+    return {
+        "max_turns": int(pytestconfig.getoption("--max-turns")),
+        "max_time": int(pytestconfig.getoption("--max-time")),
+        "max_tokens": int(pytestconfig.getoption("--max-tokens")),
+    }
 
 
 @pytest.fixture

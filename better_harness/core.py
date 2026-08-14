@@ -491,32 +491,42 @@ class RunReport:
             f"- Repeats per split: `{self.repeats}`"
             + ("" if self.repeats >= 3 else "  ⚠️ **fewer than 3 repeats: deltas are not separable from noise**"),
             f"- Promotion gate: `{self.gate}`"
-            + ("" if self.gate == "conservative" else "  ⚠️ **combined gate allows one split to regress**"),
+            + (
+                "  ⚠️ **combined gate allows one split to regress**"
+                if self.gate == "combined"
+                else ""
+            ),
             f"- Baseline changed surfaces: `{', '.join(self.baseline.changed_surfaces) or 'none'}`",
             f"- Final changed surfaces: `{', '.join(self.final.changed_surfaces) or 'none'}`",
             "",
             "| Split | Baseline | Final | Apparatus (baseline / final) |",
             "| --- | --- | --- | --- |",
             (
-                f"| Train | `{self.baseline_train.passed}/{self.baseline_train.total}` | "
-                f"`{self.final_train.passed}/{self.final_train.total}` | "
+                f"| Train | `{self.baseline_train.passed}/{self.baseline_train.total}` "
+                f"(score {self.baseline_train.score:.4f}) | "
+                f"`{self.final_train.passed}/{self.final_train.total}` "
+                f"(score {self.final_train.score:.4f}) | "
                 f"{_apparatus_cell(self.baseline_train, self.final_train)} |"
             ),
             (
-                f"| Holdout | `{self.baseline_holdout.passed}/{self.baseline_holdout.total}` | "
-                f"`{self.final_holdout.passed}/{self.final_holdout.total}` | "
+                f"| Validation | `{self.baseline_holdout.passed}/{self.baseline_holdout.total}` "
+                f"(score {self.baseline_holdout.score:.4f}) | "
+                f"`{self.final_holdout.passed}/{self.final_holdout.total}` "
+                f"(score {self.final_holdout.score:.4f}) | "
                 f"{_apparatus_cell(self.baseline_holdout, self.final_holdout)} |"
             ),
         ]
         if self.baseline_scorecard is not None and self.final_scorecard is not None:
             lines.append(
                 (
-                    f"| Scorecard | `{self.baseline_scorecard.passed}/{self.baseline_scorecard.total}` | "
-                    f"`{self.final_scorecard.passed}/{self.final_scorecard.total}` | "
+                    f"| Locked test | `{self.baseline_scorecard.passed}/{self.baseline_scorecard.total}` "
+                    f"(score {self.baseline_scorecard.score:.4f}) | "
+                    f"`{self.final_scorecard.passed}/{self.final_scorecard.total}` "
+                    f"(score {self.final_scorecard.score:.4f}) | "
                     f"{_apparatus_cell(self.baseline_scorecard, self.final_scorecard)} |"
                 )
                 if include_scorecard
-                else "| Scorecard | *sealed* | *sealed* | *sealed* |"
+                else "| Locked test | *sealed* | *sealed* | *sealed* |"
             )
         lines.extend(["", "## Iterations", ""])
         for iteration in self.iterations:

@@ -159,26 +159,52 @@ class PytestRunner:
                     + "\n"
                 )
 
-                completed = subprocess.run(
-                    command,
-                    cwd=project_root,
-                    env=env,
-                    capture_output=True,
-                    check=False,
-                    text=True,
-                )
+                case_env = dict(env)
+                case_env["SELF_HARNESS_CASE_ARTIFACTS"] = str(case_dir)
+                try:
+                    completed = subprocess.run(
+                        command,
+                        cwd=project_root,
+                        env=case_env,
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                        timeout=float(experiment.runner_config.get("case_timeout_s", 0)) or None,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+                    stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+                    completed = subprocess.CompletedProcess(
+                        command,
+                        124,
+                        stdout,
+                        f"{stderr}\ncase process timed out".strip(),
+                    )
                 (case_dir / "stdout.log").write_text(completed.stdout)
                 (case_dir / "stderr.log").write_text(completed.stderr)
                 split_stdout.append(f"## {rendered}\n{completed.stdout}")
                 split_stderr.append(f"## {rendered}\n{completed.stderr}")
                 returncodes.append(completed.returncode)
 
-                case_outcome = parse_pytest_outcomes(
-                    junit_path=junit_path,
-                    cases=[case],
-                    model=experiment.model,
-                    artifacts_dir=case_dir,
-                )[0]
+                if junit_path.exists():
+                    case_outcome = parse_pytest_outcomes(
+                        junit_path=junit_path,
+                        cases=[case],
+                        model=experiment.model,
+                        artifacts_dir=case_dir,
+                    )[0]
+                else:
+                    kind = "case_timeout" if completed.returncode == 124 else "junit_unreadable"
+                    case_outcome = CaseOutcome(
+                        case_id=rendered,
+                        split=case.split,
+                        stratum=case.stratum,
+                        status=STATUS_APPARATUS,
+                        score=0.0,
+                        duration_s=0.0,
+                        failure_message=f"[apparatus:{kind}] {completed.stderr}",
+                        artifacts_dir=str(case_dir),
+                    )
 
                 if summary_path.exists():
                     summary_payload: dict[str, Any] | None = json.loads(summary_path.read_text())
