@@ -19,6 +19,7 @@ from better_harness.ledger import Prediction, parse_prediction
 from better_harness.patching import build_variant, prepend_pythonpath
 from better_harness.retry import retry_transient
 from better_harness.signatures import FailureCluster
+from better_harness.traces import write_experience_bundle
 
 DEFAULT_SYSTEM_PROMPT = """You are Better Agent, an outer-loop Deep Agent that improves another agent harness.
 
@@ -393,6 +394,7 @@ def _write_train_artifacts(
     ]
     (root / "train_failures.json").write_text(json.dumps(failures_payload, indent=2) + "\n")
     (root / "train_summary.json").write_text(json.dumps(train_result.to_dict(), indent=2) + "\n")
+    write_experience_bundle(root / "experience", train_result.failing_outcomes())
 
     train_cases_dir = root / "train_cases"
     train_cases_dir.mkdir(parents=True, exist_ok=True)
@@ -461,6 +463,9 @@ def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
     if not summaries:
         summaries.append("- No previous iterations yet.")
     (history_dir / "visible_history.md").write_text("# Visible History\n\n" + "\n".join(summaries) + "\n")
+    leaderboard = layout.root / "archive" / "leaderboard.md"
+    if leaderboard.exists():
+        shutil.copy2(leaderboard, history_dir / "candidate_leaderboard.md")
 
 
 def _copy_prior_visible_artifacts(*, layout: RunLayout, root: Path, iteration: int) -> None:
@@ -559,6 +564,7 @@ def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iterati
                 "- If you change tool or middleware behavior, update both the implementation and any registration or wiring surfaces you were given.",
                 "- Use `surface_manifest.json` to understand how each editable file maps back to the target harness.",
                 "- Use the visible train failures and train case files to decide what to change.",
+                "- Read `experience/records.jsonl` for bounded execution evidence before diagnosing a failure.",
                 "- Keep changes concise and coherent.",
                 "- When you finish, update `proposal.md` with a short summary and the prediction JSON block.",
                 "- The prediction block is graded against the next run. Predict honestly, not optimistically.",

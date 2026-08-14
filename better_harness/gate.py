@@ -21,12 +21,13 @@ rejected too. ``combined`` is kept for A/B comparison against upstream behaviour
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from better_harness.contracts import GoalContract
     from better_harness.core import SplitResult
 
-VALID_GATES = ("conservative", "combined")
+VALID_GATES = ("conservative", "combined", "objective")
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,8 @@ class GateDecision:
     delta_ho: int
     delta_in_rate: float
     delta_ho_rate: float
+    delta_in_score: float = 0.0
+    delta_ho_score: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the decision."""
@@ -53,13 +56,14 @@ def _deltas(current: SplitResult, candidate: SplitResult) -> tuple[int, float]:
     )
 
 
-def decide(
+def decide(  # noqa: PLR0913 - the gate compares two splits before and after one edit
     *,
     gate: str,
     current_train: SplitResult,
     current_holdout: SplitResult,
     candidate_train: SplitResult,
     candidate_holdout: SplitResult,
+    goal: GoalContract | None = None,
 ) -> GateDecision:
     """Return the promotion decision for one candidate."""
     if gate not in VALID_GATES:
@@ -68,6 +72,8 @@ def decide(
 
     delta_in, delta_in_rate = _deltas(current_train, candidate_train)
     delta_ho, delta_ho_rate = _deltas(current_holdout, candidate_holdout)
+    delta_in_score = candidate_train.score - current_train.score
+    delta_ho_score = candidate_holdout.score - current_holdout.score
 
     # An evaluation that mostly failed to run cannot promote anything. Apparatus
     # failures are excluded from the denominator, which is right for the estimate
@@ -88,9 +94,49 @@ def decide(
             delta_ho=delta_ho,
             delta_in_rate=delta_in_rate,
             delta_ho_rate=delta_ho_rate,
+            delta_in_score=delta_in_score,
+            delta_ho_score=delta_ho_score,
         )
 
-    if gate == "combined":
+    if gate == "objective":
+        if goal is None:
+            msg = "objective gate requires a goal contract"
+            raise ValueError(msg)
+        current_in = current_train.metric(goal.primary_metric)
+        current_ho = current_holdout.metric(goal.primary_metric)
+        candidate_in = candidate_train.metric(goal.primary_metric)
+        candidate_ho = candidate_holdout.metric(goal.primary_metric)
+        if None in (current_in, current_ho, candidate_in, candidate_ho):
+            accepted = False
+            reason = f"objective gate: metric {goal.primary_metric!r} was not measured"
+        else:
+            current_in = cast("float", current_in)
+            current_ho = cast("float", current_ho)
+            candidate_in = cast("float", candidate_in)
+            candidate_ho = cast("float", candidate_ho)
+            delta_in_score = goal.improvement(current_in, candidate_in)
+            delta_ho_score = goal.improvement(current_ho, candidate_ho)
+            constraints_ok = all(
+                constraint.accepts(candidate_train.metric(constraint.metric))
+                and constraint.accepts(candidate_holdout.metric(constraint.metric))
+                for constraint in goal.constraints
+            )
+            pass_ok = not goal.require_no_pass_regression or (delta_in >= 0 and delta_ho >= 0)
+            non_degrading = goal.non_degrading(current_in, candidate_in) and goal.non_degrading(
+                current_ho,
+                candidate_ho,
+            )
+            improved = goal.improved(current_in, candidate_in) or goal.improved(
+                current_ho,
+                candidate_ho,
+            )
+            accepted = constraints_ok and pass_ok and non_degrading and improved
+            reason = (
+                f"objective gate ({goal.primary_metric}, {goal.direction}): "
+                f"Δ_in={delta_in_score:+.4f} Δ_ho={delta_ho_score:+.4f}; "
+                + ("accepted" if accepted else "constraint, regression, or effect floor failed")
+            )
+    elif gate == "combined":
         accepted = (delta_in + delta_ho) > 0
         reason = (
             f"combined gate: Δ_in={delta_in:+d} Δ_ho={delta_ho:+d} "
@@ -117,4 +163,6 @@ def decide(
         delta_ho=delta_ho,
         delta_in_rate=delta_in_rate,
         delta_ho_rate=delta_ho_rate,
+        delta_in_score=delta_in_score,
+        delta_ho_score=delta_ho_score,
     )

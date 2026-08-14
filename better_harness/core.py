@@ -25,6 +25,7 @@ from better_harness.apparatus import (
     apparatus_rate,
     is_measurable,
 )
+from better_harness.archive import CandidateArchive, baseline_entry, candidate_entry
 from better_harness.contracts import GoalContract, load_goal_contract
 from better_harness.cost import (
     DEFAULT_MAX_COST_GROWTH,
@@ -244,6 +245,7 @@ class CaseOutcome:
     failure_message: str | None = None
     artifacts_dir: str | None = None
     trace_ref: str | None = None
+    metrics: dict[str, float] = dc_field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
@@ -276,6 +278,7 @@ class SplitResult:
     outcomes: tuple[CaseOutcome, ...]
     apparatus: int = 0
     fingerprints: tuple[str, ...] = ()
+    metrics: dict[str, float] = dc_field(default_factory=dict)
 
     @property
     def correctness(self) -> float:
@@ -291,6 +294,15 @@ class SplitResult:
     def measurable(self) -> bool:
         """Return whether enough of this split ran to support a decision."""
         return is_measurable(apparatus=self.apparatus, measured=self.total)
+
+    def metric(self, name: str) -> float | None:
+        """Return a named objective value using stable built-in aliases."""
+        builtins = {
+            "score": self.score,
+            "correctness": self.correctness,
+            "passed": float(self.passed),
+        }
+        return builtins.get(name, self.metrics.get(name))
 
     def passing_case_ids(self) -> set[str]:
         """Return the set of passed case ids."""
@@ -326,6 +338,7 @@ class SplitResult:
             "apparatus_rate": self.apparatus_rate,
             "measurable": self.measurable,
             "fingerprints": list(self.fingerprints),
+            "metrics": self.metrics,
             "returncode": self.returncode,
             "run_dir": self.run_dir,
             "outcomes": [asdict(outcome) for outcome in self.outcomes],
@@ -353,6 +366,7 @@ class SplitResult:
             # Absent in results written before the apparatus partition existed.
             apparatus=int(payload.get("apparatus", 0)),
             fingerprints=tuple(str(item) for item in payload.get("fingerprints", ())),
+            metrics={str(key): float(value) for key, value in payload.get("metrics", {}).items()},
         )
 
 
@@ -1182,6 +1196,19 @@ def run_experiment(
     )
     current_train = baseline_train
     current_holdout = baseline_holdout
+    archive = CandidateArchive(
+        objective_name=experiment.goal.primary_metric,
+        direction=experiment.goal.direction,
+    )
+    archive.add(
+        baseline_entry(
+            variant=baseline,
+            train=baseline_train,
+            validation=baseline_holdout,
+            objective_name=experiment.goal.primary_metric,
+        )
+    )
+    archive.save(layout.root / "archive")
     # Fail fast rather than at the end: a stage that has already drifted cannot
     # be salvaged by finishing it, and every further rollout is spend on a stage
     # the protocol will void.
@@ -1264,6 +1291,7 @@ def run_experiment(
             check_fingerprint_discipline(stage_results, discipline=experiment.fingerprint_discipline)
             gate_decision = decide(
                 gate=experiment.gate,
+                goal=experiment.goal,
                 current_train=current_train,
                 current_holdout=current_holdout,
                 candidate_train=train,
@@ -1323,6 +1351,7 @@ def run_experiment(
             break
 
         winner = _select_winner(evaluated)
+        parent_fingerprint = current.fingerprint
         for position, (candidate, _candidate_variant, train, holdout) in enumerate(evaluated):
             is_winner = winner is not None and position == winner
             ledger.append(
@@ -1351,6 +1380,21 @@ def run_experiment(
                     candidate=candidate,
                 )
             )
+            archive.add(
+                candidate_entry(
+                    iteration=index,
+                    variant=_candidate_variant,
+                    parent_fingerprint=parent_fingerprint,
+                    promoted=is_winner,
+                    changed_surfaces=candidate.proposal.changed_surfaces,
+                    train=train,
+                    validation=holdout,
+                    objective_name=experiment.goal.primary_metric,
+                    reason=candidate.reason,
+                )
+            )
+
+        archive.save(layout.root / "archive")
 
         if winner is not None:
             _, current, current_train, current_holdout = evaluated[winner]
@@ -1413,11 +1457,16 @@ def _select_winner(
     actually generalizes.
     """
     best: int | None = None
-    best_key: tuple[int, int] | None = None
+    best_key: tuple[float, float, float, float] | None = None
     for position, (candidate, _variant, _train, _holdout) in enumerate(evaluated):
         if not candidate.accepted or candidate.gate_decision is None:
             continue
-        key = (candidate.gate_decision.delta_ho, candidate.gate_decision.delta_in)
+        key = (
+            candidate.gate_decision.delta_ho_score,
+            candidate.gate_decision.delta_in_score,
+            float(candidate.gate_decision.delta_ho),
+            float(candidate.gate_decision.delta_in),
+        )
         if best_key is None or key > best_key:
             best_key = key
             best = position

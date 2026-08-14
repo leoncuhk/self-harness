@@ -122,6 +122,7 @@ def aggregate_split_results(
             outcomes=first.outcomes,
             apparatus=first.apparatus,
             fingerprints=first.fingerprints,
+            metrics=first.metrics,
         )
 
     order: list[str] = []
@@ -157,6 +158,7 @@ def aggregate_split_results(
                     failure_message=_first([outcome.failure_message for outcome in outcomes]),
                     artifacts_dir=evidence.artifacts_dir,
                     trace_ref=_first([outcome.trace_ref for outcome in outcomes]),
+                    metrics={},
                 )
             )
             continue
@@ -186,6 +188,10 @@ def aggregate_split_results(
                 failure_message=_first([outcome.failure_message for outcome in measured]),
                 artifacts_dir=evidence.artifacts_dir,
                 trace_ref=_first([outcome.trace_ref for outcome in measured]),
+                metrics={
+                    key: sum(outcome.metrics.get(key, 0.0) for outcome in measured) / len(measured)
+                    for key in sorted({key for outcome in measured for key in outcome.metrics})
+                },
             )
         )
 
@@ -195,12 +201,21 @@ def aggregate_split_results(
         model=results[0].model,
         passed=successes,
         total=attempts,
-        score=float(successes),
+        score=sum(
+            outcome.score
+            for result in results
+            for outcome in result.outcomes
+            if not outcome.is_apparatus
+        ),
         returncode=max(result.returncode for result in results),
         run_dir=str(run_dir),
         outcomes=tuple(aggregated),
         apparatus=apparatus_attempts,
         fingerprints=tuple(sorted({fp for result in results for fp in result.fingerprints})),
+        metrics={
+            key: sum(result.metrics.get(key, 0.0) for result in results) / len(results)
+            for key in sorted({key for result in results for key in result.metrics})
+        },
     )
 
 

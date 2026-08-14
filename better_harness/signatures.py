@@ -32,6 +32,8 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
+from better_harness.traces import trace_text
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Iterable, Sequence
 
@@ -206,6 +208,8 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
         return FailureSignature(CAUSE_NONDETERMINISTIC, UNDETERMINED, MECH_FLAKY)
 
     text = strip_scaffolding(outcome.failure_message)
+    trace = trace_text(outcome)
+    diagnostic_text = f"{text}\n{trace}" if trace else text
     # Surface-load failures are recognised from the whole message: the frame that
     # names middleware.py or tools.py is not on pytest's `E ` lines.
     raw = (outcome.failure_message or "").lower()
@@ -213,7 +217,7 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
         r"(typeerror|importerror|modulenotfounderror|syntaxerror|nameerror|attributeerror)", text
     ):
         return FailureSignature(CAUSE_HARNESS_INVALID, AGENT_CAUSED, MECH_HARNESS_INVALID)
-    cause = _match(CAUSE_RULES, text) or (UNKNOWN if text else CAUSE_NO_RESULT)
+    cause = _match(CAUSE_RULES, diagnostic_text) or (UNKNOWN if diagnostic_text else CAUSE_NO_RESULT)
     if cause == CAUSE_STEP_BUDGET:
         # The agent ran and spent its whole step budget. That is a real task
         # failure, and the mechanism is specific enough to act on — provided the
@@ -224,7 +228,7 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
         # and not the environment's: the edit is broken.
         return FailureSignature(CAUSE_HARNESS_INVALID, AGENT_CAUSED, MECH_HARNESS_INVALID)
 
-    environment = any(re.search(pattern, text) for pattern in ENVIRONMENT_RULES)
+    environment = any(re.search(pattern, diagnostic_text) for pattern in ENVIRONMENT_RULES)
     if environment:
         causal_status = ENVIRONMENT_CAUSED
     elif cause == UNKNOWN:
@@ -232,7 +236,7 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
     else:
         causal_status = AGENT_CAUSED
 
-    mechanism = _match(MECHANISM_RULES, text)
+    mechanism = _match(MECHANISM_RULES, diagnostic_text)
     if mechanism is None:
         if causal_status == ENVIRONMENT_CAUSED:
             mechanism = UNKNOWN

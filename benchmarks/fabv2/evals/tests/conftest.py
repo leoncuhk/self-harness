@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "frozen"))
 COUNTS = {"passed": 0, "failed": 0, "skipped": 0}
 TOKENS = {"total": 0}
 FINGERPRINTS: set[str] = set()
+METRICS: dict[str, float] = {}
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -34,12 +35,21 @@ def record_usage():
     return _record
 
 
+@pytest.fixture
+def record_metrics():
+    def _record(metrics: dict[str, float]) -> None:
+        METRICS.update({str(key): float(value) for key, value in metrics.items()})
+
+    return _record
+
+
 def pytest_configure(config: pytest.Config) -> None:
     del config
     for key in COUNTS:
         COUNTS[key] = 0
     TOKENS["total"] = 0
     FINGERPRINTS.clear()
+    METRICS.clear()
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
@@ -70,6 +80,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         "correctness": 0.0 if total == 0 else COUNTS["passed"] / total,
         "total_tokens": TOKENS["total"],
         "system_fingerprints": sorted(FINGERPRINTS),
+        "score": METRICS.get("partial_credit", 0.0),
+        "metrics": dict(METRICS),
     }
     path = Path(summary_file)
     path.parent.mkdir(parents=True, exist_ok=True)

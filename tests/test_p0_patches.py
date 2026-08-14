@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from better_harness.contracts import GoalContract
 from better_harness.core import (
     CaseOutcome,
     Experiment,
@@ -292,6 +294,40 @@ def test_gate_reports_rate_deltas():
     )
     assert decision.delta_in_rate == pytest.approx(0.5)
     assert decision.delta_ho_rate == pytest.approx(0.0)
+
+
+def test_objective_gate_promotes_continuous_gain_without_a_pass_flip():
+    current_train = make_split(variant="current", results={"a": False})
+    current_holdout = make_split(variant="current", results={"b": False})
+    candidate_train = replace(current_train, variant="candidate", score=0.6)
+    candidate_holdout = replace(current_holdout, variant="candidate", score=0.7)
+    decision = decide(
+        gate="objective",
+        goal=GoalContract(primary_metric="score"),
+        current_train=current_train,
+        current_holdout=current_holdout,
+        candidate_train=candidate_train,
+        candidate_holdout=candidate_holdout,
+    )
+    assert decision.accepted
+    assert decision.delta_in == decision.delta_ho == 0
+    assert decision.delta_ho_score == pytest.approx(0.7)
+
+
+def test_objective_gate_rejects_pass_regression_even_when_score_rises():
+    current_train = make_split(variant="current", results={"a": True})
+    current_holdout = make_split(variant="current", results={"b": True})
+    candidate_train = replace(current_train, variant="candidate", passed=0, score=2.0)
+    candidate_holdout = replace(current_holdout, variant="candidate", score=2.0)
+    decision = decide(
+        gate="objective",
+        goal=GoalContract(primary_metric="score", require_no_pass_regression=True),
+        current_train=current_train,
+        current_holdout=current_holdout,
+        candidate_train=candidate_train,
+        candidate_holdout=candidate_holdout,
+    )
+    assert not decision.accepted
 
 
 def test_invalid_gate_rejected():

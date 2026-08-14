@@ -194,6 +194,21 @@ class PytestRunner:
                     fingerprints.update(
                         str(item) for item in summary_payload.get("system_fingerprints", []) or []
                     )
+                raw_metrics = (
+                    summary_payload.get("metrics", {})
+                    if isinstance(summary_payload, dict)
+                    else {}
+                )
+                metrics = {
+                    str(key): float(value)
+                    for key, value in raw_metrics.items()
+                    if isinstance(value, int | float)
+                }
+                outcome_score = (
+                    float(summary_payload.get("score", case_outcome.score))
+                    if isinstance(summary_payload, dict)
+                    else case_outcome.score
+                )
 
                 trace_refs = extract_trace_refs(
                     payload=summary_payload,
@@ -206,11 +221,12 @@ class PytestRunner:
                     split=case_outcome.split,
                     stratum=case_outcome.stratum,
                     status=case_outcome.status,
-                    score=case_outcome.score,
+                    score=outcome_score,
                     duration_s=case_outcome.duration_s,
                     failure_message=case_outcome.failure_message,
                     artifacts_dir=str(case_dir),
                     trace_ref=trace_refs[0] if trace_refs else None,
+                    metrics=metrics,
                 )
                 outcomes.append(case_outcome)
 
@@ -220,6 +236,13 @@ class PytestRunner:
         apparatus = sum(1 for outcome in outcomes if outcome.is_apparatus)
         passed = sum(1 for outcome in outcomes if outcome.passed)
         total = len(outcomes) - apparatus
+        measured_outcomes = [outcome for outcome in outcomes if not outcome.is_apparatus]
+        metric_names = sorted({key for outcome in measured_outcomes for key in outcome.metrics})
+        split_metrics = {
+            key: sum(outcome.metrics.get(key, 0.0) for outcome in measured_outcomes)
+            / len(measured_outcomes)
+            for key in metric_names
+        } if measured_outcomes else {}
         summary_payload = {
             "passed": passed,
             "failed": sum(1 for outcome in outcomes if outcome.status == "failed"),
@@ -228,6 +251,8 @@ class PytestRunner:
             "total": total,
             "correctness": 0.0 if total == 0 else passed / total,
             "system_fingerprints": sorted(fingerprints),
+            "score": sum(outcome.score for outcome in measured_outcomes),
+            "metrics": split_metrics,
         }
         (split_dir / "summary.json").write_text(json.dumps(summary_payload, indent=2) + "\n")
 
@@ -237,12 +262,13 @@ class PytestRunner:
             model=experiment.model,
             passed=passed,
             total=total,
-            score=float(passed),
+            score=sum(outcome.score for outcome in measured_outcomes),
             returncode=max(returncodes) if returncodes else 0,
             run_dir=str(split_dir),
             outcomes=tuple(outcomes),
             apparatus=apparatus,
             fingerprints=tuple(sorted(fingerprints)),
+            metrics=split_metrics,
         )
         result.save(result_path)
         return result
@@ -384,6 +410,7 @@ class HarborRunner:
                     failure_message=failure_message,
                     artifacts_dir=str(case_dir),
                     trace_ref=trace_refs[0] if trace_refs else None,
+                    metrics={"score": score},
                 )
             )
 
@@ -401,6 +428,11 @@ class HarborRunner:
             run_dir=str(split_dir),
             outcomes=tuple(outcomes),
             apparatus=apparatus,
+            metrics={
+                "score": 0.0
+                if not outcomes
+                else sum(outcome.score for outcome in outcomes) / len(outcomes)
+            },
         )
         result.save(result_path)
         summary_payload = {

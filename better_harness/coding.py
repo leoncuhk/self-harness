@@ -286,6 +286,10 @@ class CodingProjectRunner:
                     failure_message=failure,
                     artifacts_dir=str(case_dir),
                     trace_ref=str(trace_path),
+                    metrics={
+                        "ci_pass_rate": score,
+                        "changed_files": float(len(changed)),
+                    },
                 )
             )
             returncodes.extend([agent_result.returncode, *(item.returncode for item in ci_results)])
@@ -305,6 +309,11 @@ class CodingProjectRunner:
             run_dir=str(split_dir),
             outcomes=tuple(outcomes),
             apparatus=apparatus,
+            metrics={
+                "ci_pass_rate": 0.0
+                if not measured
+                else sum(outcome.metrics["ci_pass_rate"] for outcome in measured) / len(measured),
+            },
         )
         result.save(result_path)
         (split_dir / "summary.json").write_text(

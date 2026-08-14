@@ -1,4 +1,6 @@
-"""FAB v2 smoke cases: run the inner finance agent on a question, judge with the
+"""FAB v2 smoke cases.
+
+Run the inner finance agent on a question, judge with the
 frozen deterministic evaluator, assert on the numeric-track partial credit.
 
 Pass rule (frozen): partial_credit >= 0.75 on the deterministic numeric track
@@ -44,7 +46,7 @@ def test_rubric_leak_guard() -> None:
 
 @pytest.mark.timeout(900)
 @pytest.mark.parametrize("qid", ["q004", "q015", "q024", "q012", "q007", "q019"])
-def test_question(qid: str, tmp_path: Path, model: str, record_usage) -> None:
+def test_question(qid: str, tmp_path: Path, model: str, record_usage, record_metrics) -> None:
     question = QUESTIONS[qid]
     out = agent_runner.run_question(
         question,
@@ -58,6 +60,14 @@ def test_question(qid: str, tmp_path: Path, model: str, record_usage) -> None:
 
     verdict = judge.score_question(qid, out["final_answer"] or "")
     (tmp_path / "judge.json").write_text(json.dumps(verdict, indent=2, ensure_ascii=False))
+    record_metrics(
+        {
+            "partial_credit": verdict["partial_credit"],
+            "numeric_recall": 0.0
+            if verdict["n_criteria"] == 0
+            else verdict["n_known"] / verdict["n_criteria"],
+        }
+    )
 
     summary = (
         f"fabv2:{qid} partial={verdict['partial_credit']:.3f} "

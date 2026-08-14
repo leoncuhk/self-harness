@@ -162,5 +162,7 @@ def test_outer_loop_improves_the_coding_harness_and_inner_product(tmp_path, monk
     assert report.final_holdout.passed == 1
     assert report.final_scorecard is not None
     assert report.final_scorecard.passed == 1
+    leaderboard = (tmp_path / "dual-loop" / "archive" / "leaderboard.md").read_text()
+    assert "iter-001-k00" in leaderboard
     seed = root / "benchmarks" / "coding" / "product" / "calculator.py"
     assert "a - b" in seed.read_text()
