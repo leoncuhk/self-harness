@@ -13,6 +13,7 @@ failure-signature machinery has real material to cluster.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -20,14 +21,21 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE = Path(os.environ.get("BETTER_HARNESS_WORKSPACE_ROOT", ROOT.parent / "workspace"))
+sys.path.insert(0, str(WORKSPACE))
 sys.path.insert(0, str(ROOT / "frozen"))
 
 import agent_runner  # noqa: E402  (workspace module)
 import judge  # noqa: E402  (frozen evaluator)
 
 QUESTIONS = json.loads((ROOT.parent / "questions.json").read_text())
-PROMPT = (ROOT.parent / "workspace" / "prompt.txt").read_text()
-CRITERIA_TEXTS = [c["text"] for q in json.loads((ROOT / "frozen" / "rubrics.json").read_text()) for c in q["criteria"]]
+PROMPT = (WORKSPACE / "prompt.txt").read_text()
+CRITERIA_TEXTS = [
+    c["text"]
+    for q in json.loads((ROOT / "frozen" / "rubrics.json").read_text())
+    for c in q["criteria"]
+]
+
 
 # evaluator-side anti-memorisation guard: the prompt surface must not share any
 # 8-word shingle with any grading criterion (semantic extension of case_id_leak)
@@ -41,7 +49,9 @@ CRITERIA_SHINGLES = set().union(*(_shingles(t) for t in CRITERIA_TEXTS))
 
 def test_rubric_leak_guard() -> None:
     overlap = _shingles(PROMPT) & CRITERIA_SHINGLES
-    assert not overlap, f"guard:rubric_leak prompt shares {len(overlap)} criteria shingles, e.g. {sorted(overlap)[:3]}"
+    assert not overlap, (
+        f"guard:rubric_leak prompt shares {len(overlap)} criteria shingles, e.g. {sorted(overlap)[:3]}"
+    )
 
 
 @pytest.mark.timeout(900)
@@ -59,7 +69,7 @@ def test_question(
         question,
         model=model,
         log_dir=artifact_dir / "trajectory",
-        prompt_file=ROOT.parent / "workspace" / "prompt.txt",
+        prompt_file=WORKSPACE / "prompt.txt",
         **agent_limits,
     )
     (artifact_dir / "answer.txt").write_text(out["final_answer"])

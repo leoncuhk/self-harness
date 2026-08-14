@@ -30,8 +30,8 @@ from better_harness.core import (
 from better_harness.patching import (
     VARIANT_ENV,
     ensure_sitecustomize,
+    materialize_workspace,
     prepend_pythonpath,
-    workspace_override_context,
 )
 
 
@@ -48,6 +48,7 @@ class PytestRunner:
         command.extend(["--collect-only"])
         command.extend(str(arg) for arg in experiment.runner_config.get("pytest_args", ["-q"]))
         env = os.environ.copy()
+        env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(experiment.workspace_root)
         runtime_dir = ensure_sitecustomize(self.repo_root / ".runtime")
         env["PYTHONPATH"] = prepend_pythonpath(
             [runtime_dir, self.repo_root, experiment.workspace_root],
@@ -65,9 +66,7 @@ class PytestRunner:
             msg = completed.stderr.strip() or completed.stdout.strip()
             raise RuntimeError(f"pytest collection failed: {msg}")
         return [
-            line.strip()
-            for line in completed.stdout.splitlines()
-            if "::" in line and line.strip()
+            line.strip() for line in completed.stdout.splitlines() if "::" in line and line.strip()
         ]
 
     def run_split(
@@ -95,10 +94,16 @@ class PytestRunner:
         split_dir.mkdir(parents=True, exist_ok=True)
         variant.save(variant_path)
         project_root = Path(str(experiment.runner_config["project_root"]))
+        run_workspace = materialize_workspace(
+            experiment.workspace_root,
+            artifacts_dir=split_dir / "workspaces",
+            overrides=variant.file_overrides(),
+        )
         env = self._build_env(
             experiment=experiment,
             variant_path=variant_path,
             runtime_dir=ensure_sitecustomize(layout.runtime_dir),
+            workspace_root=run_workspace,
         )
 
         outcomes: list[CaseOutcome] = []
@@ -107,154 +112,156 @@ class PytestRunner:
         split_stderr: list[str] = []
         fingerprints: set[str] = set()
 
-        with workspace_override_context(experiment.workspace_root, variant.file_overrides()):
-            for case in experiment.cases_for_split(split):
-                rendered = case.render(model=experiment.model)
-                case_slug = safe_slug(rendered)
-                case_dir = split_dir / "cases" / case_slug
-                case_dir.mkdir(parents=True, exist_ok=True)
-                summary_path = case_dir / "summary.json"
-                junit_path = case_dir / "junit.xml"
-                # Clear the artifact paths before invoking pytest. pytest treats
-                # every non-option argv token as a possible path and keeps the
-                # ones that *already exist* when computing rootdir
-                # (_pytest/config/findpaths.py: `if safe_exists(path)`). The
-                # values of --junitxml and --evals-report-file are such tokens,
-                # so the second run into a case directory silently lifts rootdir
-                # to the repo root and every emitted nodeid changes shape.
-                #
-                # That is the whole root cause of the sealed-split corruption:
-                # first run -> files absent -> rootdir = evals project ->
-                # classname "tests.test_agentic"; second run -> files present ->
-                # rootdir = repo root -> classname
-                # "benchmarks.agentic.evals.tests.test_agentic", which the parser
-                # could not map back to a configured case. Measured across runs/:
-                # every scorecard split is the long shape, every train/holdout is
-                # the short one — and mvp2-evolve's train has 10 long ones, from
-                # a resumed stage re-running into existing directories.
-                summary_path.unlink(missing_ok=True)
-                junit_path.unlink(missing_ok=True)
-                command = self._base_command(experiment)
-                if summary_flag := experiment.runner_config.get("summary_flag", "--evals-report-file"):
-                    command.extend([str(summary_flag), str(summary_path)])
-                command.extend(["--junitxml", str(junit_path)])
-                command.extend(str(arg) for arg in experiment.runner_config.get("pytest_args", ["-q"]))
-                command.append(rendered)
+        for case in experiment.cases_for_split(split):
+            rendered = case.render(model=experiment.model)
+            case_slug = safe_slug(rendered)
+            case_dir = split_dir / "cases" / case_slug
+            case_dir.mkdir(parents=True, exist_ok=True)
+            summary_path = case_dir / "summary.json"
+            junit_path = case_dir / "junit.xml"
+            # Clear the artifact paths before invoking pytest. pytest treats
+            # every non-option argv token as a possible path and keeps the
+            # ones that *already exist* when computing rootdir
+            # (_pytest/config/findpaths.py: `if safe_exists(path)`). The
+            # values of --junitxml and --evals-report-file are such tokens,
+            # so the second run into a case directory silently lifts rootdir
+            # to the repo root and every emitted nodeid changes shape.
+            #
+            # That is the whole root cause of the sealed-split corruption:
+            # first run -> files absent -> rootdir = evals project ->
+            # classname "tests.test_agentic"; second run -> files present ->
+            # rootdir = repo root -> classname
+            # "benchmarks.agentic.evals.tests.test_agentic", which the parser
+            # could not map back to a configured case. Measured across runs/:
+            # every scorecard split is the long shape, every train/holdout is
+            # the short one — and mvp2-evolve's train has 10 long ones, from
+            # a resumed stage re-running into existing directories.
+            summary_path.unlink(missing_ok=True)
+            junit_path.unlink(missing_ok=True)
+            command = self._base_command(experiment)
+            if summary_flag := experiment.runner_config.get("summary_flag", "--evals-report-file"):
+                command.extend([str(summary_flag), str(summary_path)])
+            command.extend(["--junitxml", str(junit_path)])
+            command.extend(str(arg) for arg in experiment.runner_config.get("pytest_args", ["-q"]))
+            command.append(rendered)
 
-                (case_dir / "command.json").write_text(
-                    json.dumps(
-                        {
-                            "argv": command,
-                            "shell": shlex.join(command),
-                            "cwd": str(project_root),
-                            "env": {
-                                VARIANT_ENV: str(variant_path),
-                                "PYTHONPATH": env["PYTHONPATH"],
-                                "LANGSMITH_TEST_SUITE": env["LANGSMITH_TEST_SUITE"],
-                            },
+            (case_dir / "command.json").write_text(
+                json.dumps(
+                    {
+                        "argv": command,
+                        "shell": shlex.join(command),
+                        "cwd": str(project_root),
+                        "env": {
+                            VARIANT_ENV: str(variant_path),
+                            "BETTER_HARNESS_WORKSPACE_ROOT": str(run_workspace),
+                            "PYTHONPATH": env["PYTHONPATH"],
+                            "LANGSMITH_TEST_SUITE": env["LANGSMITH_TEST_SUITE"],
                         },
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\n"
+                    },
+                    indent=2,
+                    sort_keys=True,
                 )
+                + "\n"
+            )
 
-                case_env = dict(env)
-                case_env["SELF_HARNESS_CASE_ARTIFACTS"] = str(case_dir)
-                try:
-                    completed = subprocess.run(
-                        command,
-                        cwd=project_root,
-                        env=case_env,
-                        capture_output=True,
-                        check=False,
-                        text=True,
-                        timeout=float(experiment.runner_config.get("case_timeout_s", 0)) or None,
-                    )
-                except subprocess.TimeoutExpired as exc:
-                    stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-                    stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-                    completed = subprocess.CompletedProcess(
-                        command,
-                        124,
-                        stdout,
-                        f"{stderr}\ncase process timed out".strip(),
-                    )
-                (case_dir / "stdout.log").write_text(completed.stdout)
-                (case_dir / "stderr.log").write_text(completed.stderr)
-                split_stdout.append(f"## {rendered}\n{completed.stdout}")
-                split_stderr.append(f"## {rendered}\n{completed.stderr}")
-                returncodes.append(completed.returncode)
-
-                if junit_path.exists():
-                    case_outcome = parse_pytest_outcomes(
-                        junit_path=junit_path,
-                        cases=[case],
-                        model=experiment.model,
-                        artifacts_dir=case_dir,
-                    )[0]
-                else:
-                    kind = "case_timeout" if completed.returncode == 124 else "junit_unreadable"
-                    case_outcome = CaseOutcome(
-                        case_id=rendered,
-                        split=case.split,
-                        stratum=case.stratum,
-                        status=STATUS_APPARATUS,
-                        score=0.0,
-                        duration_s=0.0,
-                        failure_message=f"[apparatus:{kind}] {completed.stderr}",
-                        artifacts_dir=str(case_dir),
-                    )
-
-                if summary_path.exists():
-                    summary_payload: dict[str, Any] | None = json.loads(summary_path.read_text())
-                else:
-                    summary_payload = {
-                        "passed": 1 if case_outcome.passed else 0,
-                        "total": 1,
-                        "correctness": 1.0 if case_outcome.passed else 0.0,
-                    }
-                    summary_path.write_text(json.dumps(summary_payload, indent=2) + "\n")
-
-                if isinstance(summary_payload, dict):
-                    fingerprints.update(
-                        str(item) for item in summary_payload.get("system_fingerprints", []) or []
-                    )
-                raw_metrics = (
-                    summary_payload.get("metrics", {})
-                    if isinstance(summary_payload, dict)
-                    else {}
+            case_env = dict(env)
+            case_env["SELF_HARNESS_CASE_ARTIFACTS"] = str(case_dir)
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=project_root,
+                    env=case_env,
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                    timeout=float(experiment.runner_config.get("case_timeout_s", 0)) or None,
                 )
-                metrics = {
-                    str(key): float(value)
-                    for key, value in raw_metrics.items()
-                    if isinstance(value, int | float)
-                }
-                outcome_score = (
-                    float(summary_payload.get("score", case_outcome.score))
-                    if isinstance(summary_payload, dict)
-                    else case_outcome.score
+            except subprocess.TimeoutExpired as exc:
+                stdout = (
+                    exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
                 )
+                stderr = (
+                    exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+                )
+                completed = subprocess.CompletedProcess(
+                    command,
+                    124,
+                    stdout,
+                    f"{stderr}\ncase process timed out".strip(),
+                )
+            (case_dir / "stdout.log").write_text(completed.stdout)
+            (case_dir / "stderr.log").write_text(completed.stderr)
+            split_stdout.append(f"## {rendered}\n{completed.stdout}")
+            split_stderr.append(f"## {rendered}\n{completed.stderr}")
+            returncodes.append(completed.returncode)
 
-                trace_refs = extract_trace_refs(
-                    payload=summary_payload,
-                    stdout=completed.stdout,
-                    stderr=completed.stderr,
-                )
-                write_trace_refs(case_dir, trace_refs)
+            if junit_path.exists():
+                case_outcome = parse_pytest_outcomes(
+                    junit_path=junit_path,
+                    cases=[case],
+                    model=experiment.model,
+                    artifacts_dir=case_dir,
+                )[0]
+            else:
+                kind = "case_timeout" if completed.returncode == 124 else "junit_unreadable"
                 case_outcome = CaseOutcome(
-                    case_id=case_outcome.case_id,
-                    split=case_outcome.split,
-                    stratum=case_outcome.stratum,
-                    status=case_outcome.status,
-                    score=outcome_score,
-                    duration_s=case_outcome.duration_s,
-                    failure_message=case_outcome.failure_message,
+                    case_id=rendered,
+                    split=case.split,
+                    stratum=case.stratum,
+                    status=STATUS_APPARATUS,
+                    score=0.0,
+                    duration_s=0.0,
+                    failure_message=f"[apparatus:{kind}] {completed.stderr}",
                     artifacts_dir=str(case_dir),
-                    trace_ref=trace_refs[0] if trace_refs else None,
-                    metrics=metrics,
                 )
-                outcomes.append(case_outcome)
+
+            if summary_path.exists():
+                summary_payload: dict[str, Any] | None = json.loads(summary_path.read_text())
+            else:
+                summary_payload = {
+                    "passed": 1 if case_outcome.passed else 0,
+                    "total": 1,
+                    "correctness": 1.0 if case_outcome.passed else 0.0,
+                }
+                summary_path.write_text(json.dumps(summary_payload, indent=2) + "\n")
+
+            if isinstance(summary_payload, dict):
+                fingerprints.update(
+                    str(item) for item in summary_payload.get("system_fingerprints", []) or []
+                )
+            raw_metrics = (
+                summary_payload.get("metrics", {}) if isinstance(summary_payload, dict) else {}
+            )
+            metrics = {
+                str(key): float(value)
+                for key, value in raw_metrics.items()
+                if isinstance(value, int | float)
+            }
+            outcome_score = (
+                float(summary_payload.get("score", case_outcome.score))
+                if isinstance(summary_payload, dict)
+                else case_outcome.score
+            )
+
+            trace_refs = extract_trace_refs(
+                payload=summary_payload,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+            )
+            write_trace_refs(case_dir, trace_refs)
+            case_outcome = CaseOutcome(
+                case_id=case_outcome.case_id,
+                split=case_outcome.split,
+                stratum=case_outcome.stratum,
+                status=case_outcome.status,
+                score=outcome_score,
+                duration_s=case_outcome.duration_s,
+                failure_message=case_outcome.failure_message,
+                artifacts_dir=str(case_dir),
+                trace_ref=trace_refs[0] if trace_refs else None,
+                metrics=metrics,
+            )
+            outcomes.append(case_outcome)
 
         (split_dir / "stdout.log").write_text("\n\n".join(split_stdout))
         (split_dir / "stderr.log").write_text("\n\n".join(split_stderr))
@@ -264,11 +271,15 @@ class PytestRunner:
         total = len(outcomes) - apparatus
         measured_outcomes = [outcome for outcome in outcomes if not outcome.is_apparatus]
         metric_names = sorted({key for outcome in measured_outcomes for key in outcome.metrics})
-        split_metrics = {
-            key: sum(outcome.metrics.get(key, 0.0) for outcome in measured_outcomes)
-            / len(measured_outcomes)
-            for key in metric_names
-        } if measured_outcomes else {}
+        split_metrics = (
+            {
+                key: sum(outcome.metrics.get(key, 0.0) for outcome in measured_outcomes)
+                / len(measured_outcomes)
+                for key in metric_names
+            }
+            if measured_outcomes
+            else {}
+        )
         summary_payload = {
             "passed": passed,
             "failed": sum(1 for outcome in outcomes if outcome.status == "failed"),
@@ -299,11 +310,19 @@ class PytestRunner:
         result.save(result_path)
         return result
 
-    def _build_env(self, *, experiment: Experiment, variant_path: Path, runtime_dir: Path) -> dict[str, str]:
+    def _build_env(
+        self,
+        *,
+        experiment: Experiment,
+        variant_path: Path,
+        runtime_dir: Path,
+        workspace_root: Path,
+    ) -> dict[str, str]:
         env = os.environ.copy()
         env[VARIANT_ENV] = str(variant_path)
+        env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(workspace_root)
         env["PYTHONPATH"] = prepend_pythonpath(
-            [runtime_dir, self.repo_root, experiment.workspace_root],
+            [runtime_dir, self.repo_root, workspace_root],
             env.get("PYTHONPATH"),
         )
         env.setdefault("LANGSMITH_TEST_SUITE", f"better-harness-{experiment.name}")
@@ -331,8 +350,7 @@ class HarborRunner:
         """Collect Harbor task names by scanning the tasks directory."""
         tasks_root = Path(str(experiment.runner_config["tasks_root"]))
         inventory = [
-            str(path.parent.relative_to(tasks_root))
-            for path in tasks_root.rglob("task.toml")
+            str(path.parent.relative_to(tasks_root)) for path in tasks_root.rglob("task.toml")
         ]
         return sorted(inventory)
 
@@ -376,12 +394,17 @@ class HarborRunner:
                 jobs_dir=jobs_dir,
                 job_name=case_slug,
             )
+            run_workspace = materialize_workspace(
+                experiment.workspace_root,
+                artifacts_dir=case_dir / "workspaces",
+                overrides=variant.file_overrides(),
+            )
             env = os.environ.copy()
             runtime_dir = ensure_sitecustomize(layout.runtime_dir)
             env[VARIANT_ENV] = str(variant_path)
-            env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(experiment.workspace_root)
+            env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(run_workspace)
             env["PYTHONPATH"] = prepend_pythonpath(
-                [runtime_dir, self.repo_root, experiment.workspace_root],
+                [runtime_dir, self.repo_root, run_workspace],
                 env.get("PYTHONPATH"),
             )
             (case_dir / "command.json").write_text(
@@ -389,10 +412,10 @@ class HarborRunner:
                     {
                         "argv": command,
                         "shell": shlex.join(command),
-                        "cwd": str(experiment.workspace_root),
+                        "cwd": str(run_workspace),
                         "env": {
                             VARIANT_ENV: str(variant_path),
-                            "BETTER_HARNESS_WORKSPACE_ROOT": str(experiment.workspace_root),
+                            "BETTER_HARNESS_WORKSPACE_ROOT": str(run_workspace),
                             "PYTHONPATH": env["PYTHONPATH"],
                         },
                     },
@@ -401,15 +424,14 @@ class HarborRunner:
                 )
                 + "\n"
             )
-            with workspace_override_context(experiment.workspace_root, variant.file_overrides()):
-                completed = subprocess.run(
-                    command,
-                    cwd=experiment.workspace_root,
-                    env=env,
-                    capture_output=True,
-                    check=False,
-                    text=True,
-                )
+            completed = subprocess.run(
+                command,
+                cwd=run_workspace,
+                env=env,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
             (case_dir / "stdout.log").write_text(completed.stdout)
             (case_dir / "stderr.log").write_text(completed.stderr)
             returncodes.append(completed.returncode)
@@ -424,7 +446,11 @@ class HarborRunner:
                 stderr=completed.stderr,
             )
             write_trace_refs(case_dir, trace_refs)
-            status = "passed" if score >= float(experiment.runner_config.get("pass_threshold", 1.0)) else "failed"
+            status = (
+                "passed"
+                if score >= float(experiment.runner_config.get("pass_threshold", 1.0))
+                else "failed"
+            )
             outcomes.append(
                 CaseOutcome(
                     case_id=rendered,
@@ -639,7 +665,9 @@ class UnresolvedCaseError(RuntimeError):
     needed to add the missing shape and nothing else is.
     """
 
-    def __init__(self, *, junit_path: Path, case_ids: Sequence[str], observed: Sequence[str]) -> None:
+    def __init__(
+        self, *, junit_path: Path, case_ids: Sequence[str], observed: Sequence[str]
+    ) -> None:
         seen = "; ".join(observed) if observed else "<no testcase elements>"
         super().__init__(
             f"{junit_path}: could not resolve {', '.join(case_ids)} from junit.xml. "
@@ -663,7 +691,9 @@ def _nodeid_candidates(*, file_attr: str, classname_attr: str, name_attr: str) -
         for cut in range(len(parts), 0, -1):
             module = "/".join(parts[:cut]) + ".py"
             suffix = "::".join(parts[cut:])
-            candidates.append(f"{module}::{suffix}::{name_attr}" if suffix else f"{module}::{name_attr}")
+            candidates.append(
+                f"{module}::{suffix}::{name_attr}" if suffix else f"{module}::{name_attr}"
+            )
     return candidates
 
 
@@ -675,7 +705,11 @@ def _same_nodeid(candidate: str, case_id: str) -> bool:
     ``benchmarks/agentic/evals/tests/test_agentic.py::test_task[x]`` and
     ``tests/test_agentic.py::test_task[x]`` are the same case.
     """
-    return candidate == case_id or candidate.endswith(f"/{case_id}") or case_id.endswith(f"/{candidate}")
+    return (
+        candidate == case_id
+        or candidate.endswith(f"/{case_id}")
+        or case_id.endswith(f"/{candidate}")
+    )
 
 
 def resolve_case_id(
@@ -740,7 +774,9 @@ def resolve_case_id(
     return None
 
 
-def parse_harbor_case(*, jobs_dir: Path, pass_threshold: float) -> tuple[float, dict[str, object] | None, str | None]:
+def parse_harbor_case(
+    *, jobs_dir: Path, pass_threshold: float
+) -> tuple[float, dict[str, object] | None, str | None]:
     """Parse one Harbor task result."""
     payload = None
     score = 0.0
@@ -749,7 +785,11 @@ def parse_harbor_case(*, jobs_dir: Path, pass_threshold: float) -> tuple[float, 
     if json_paths:
         payload = json.loads(json_paths[0].read_text())
         score = float(payload.get("score", payload.get("reward", 0.0)))
-        failure_message = None if score >= pass_threshold else str(payload.get("message", "score below threshold"))
+        failure_message = (
+            None
+            if score >= pass_threshold
+            else str(payload.get("message", "score below threshold"))
+        )
         return score, payload, failure_message
 
     reward_paths = sorted(jobs_dir.rglob("reward.txt"))
@@ -765,9 +805,6 @@ def parse_harbor_case(*, jobs_dir: Path, pass_threshold: float) -> tuple[float, 
 
 def safe_slug(value: str) -> str:
     """Return a filesystem-safe slug."""
-    cleaned = [
-        character if character.isalnum() else "-"
-        for character in value
-    ]
+    cleaned = [character if character.isalnum() else "-" for character in value]
     slug = "".join(cleaned).strip("-")
     return slug or "case"

@@ -22,7 +22,7 @@ from better_harness.core import (
     Variant,
     reusable_result,
 )
-from better_harness.patching import workspace_override_context
+from better_harness.patching import materialize_workspace
 
 
 @dataclass(frozen=True)
@@ -120,11 +120,7 @@ def _file_manifest(root: Path) -> dict[str, str]:
 
 
 def _changed_files(before: dict[str, str], after: dict[str, str]) -> list[str]:
-    return sorted(
-        path
-        for path in set(before) | set(after)
-        if before.get(path) != after.get(path)
-    )
+    return sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
 
 
 def _write_trace(path: Path, events: Sequence[dict[str, Any]]) -> None:
@@ -142,7 +138,9 @@ class CodingProjectRunner:
     def collect_inventory(self, experiment: Experiment) -> list[str]:
         """List task paths relative to the configured task root."""
         task_root = Path(str(experiment.runner_config["task_root"]))
-        return sorted(str(path.relative_to(task_root)) for path in task_root.rglob("*") if path.is_file())
+        return sorted(
+            str(path.relative_to(task_root)) for path in task_root.rglob("*") if path.is_file()
+        )
 
     def run_split(
         self,
@@ -175,8 +173,7 @@ class CodingProjectRunner:
         ci_timeout_s = float(experiment.runner_config.get("ci_timeout_s", 600))
         agent_template = [str(item) for item in experiment.runner_config["agent_command"]]
         ci_templates = [
-            [str(item) for item in command]
-            for command in experiment.runner_config["ci_commands"]
+            [str(item) for item in command] for command in experiment.runner_config["ci_commands"]
         ]
 
         outcomes: list[CaseOutcome] = []
@@ -186,6 +183,11 @@ class CodingProjectRunner:
             task_path = task_root / rendered
             case_dir = split_dir / "cases" / _safe_slug(rendered)
             case_dir.mkdir(parents=True, exist_ok=True)
+            harness_dir = materialize_workspace(
+                experiment.workspace_root,
+                artifacts_dir=case_dir / "harnesses",
+                overrides=variant.file_overrides(),
+            )
             product_dir = case_dir / "product"
             _copy_product(product_root, product_dir)
             before = _file_manifest(product_dir)
@@ -195,7 +197,7 @@ class CodingProjectRunner:
                 "product": str(product_dir),
                 "task": str(task_path),
                 "task_file": str(task_path),
-                "harness": str(experiment.workspace_root),
+                "harness": str(harness_dir),
                 "trace": str(trace_path),
                 "model": experiment.model,
             }
@@ -205,7 +207,7 @@ class CodingProjectRunner:
                 {
                     "SELF_HARNESS_PRODUCT": str(product_dir),
                     "SELF_HARNESS_TASK": str(task_path),
-                    "SELF_HARNESS_ROOT": str(experiment.workspace_root),
+                    "SELF_HARNESS_ROOT": str(harness_dir),
                     "SELF_HARNESS_TRACE": str(trace_path),
                     "SELF_HARNESS_MODEL": experiment.model,
                 }
@@ -213,13 +215,12 @@ class CodingProjectRunner:
             events: list[dict[str, Any]] = [
                 {"event": "inner_start", "task": rendered, "variant": variant.key}
             ]
-            with workspace_override_context(experiment.workspace_root, variant.file_overrides()):
-                agent_result = _run_command(
-                    agent_argv,
-                    cwd=product_dir,
-                    timeout_s=timeout_s,
-                    env=env,
-                )
+            agent_result = _run_command(
+                agent_argv,
+                cwd=product_dir,
+                timeout_s=timeout_s,
+                env=env,
+            )
             (case_dir / "agent.json").write_text(
                 json.dumps(agent_result.to_dict(), indent=2, sort_keys=True) + "\n"
             )
@@ -235,7 +236,9 @@ class CodingProjectRunner:
             if agent_result.returncode == 0:
                 for index, template in enumerate(ci_templates):
                     ci_argv = _render_tokens(template, values)
-                    ci_result = _run_command(ci_argv, cwd=product_dir, timeout_s=ci_timeout_s, env=env)
+                    ci_result = _run_command(
+                        ci_argv, cwd=product_dir, timeout_s=ci_timeout_s, env=env
+                    )
                     ci_results.append(ci_result)
                     events.append(
                         {
@@ -270,7 +273,11 @@ class CodingProjectRunner:
             elif not passed:
                 status = "failed"
                 failed = next((item for item in ci_results if item.returncode != 0), None)
-                failure = "CI failed" if failed is None else (failed.stderr or failed.stdout or "CI failed")
+                failure = (
+                    "CI failed"
+                    if failed is None
+                    else (failed.stderr or failed.stdout or "CI failed")
+                )
             else:
                 status = "passed"
                 failure = None

@@ -22,6 +22,7 @@ from better_harness.core import RunLayout, extract_langsmith_trace_id, write_tra
 from better_harness.patching import (
     build_baseline_variant,
     build_variant,
+    materialize_workspace,
     patch_module_attrs,
     workspace_override_context,
 )
@@ -130,11 +131,12 @@ def _write_minimal_pytest_experiment(tmp_path: Path) -> Path:
             """
             from __future__ import annotations
 
+            import os
             from pathlib import Path
 
             import demo_agent
 
-            WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+            WORKSPACE_ROOT = Path(os.environ["BETTER_HARNESS_WORKSPACE_ROOT"])
 
 
             def read_surface(path: str) -> str:
@@ -305,6 +307,40 @@ def _write_minimal_pytest_experiment(tmp_path: Path) -> Path:
     return config
 
 
+def test_materialized_workspaces_are_private_and_preserve_source(tmp_path: Path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "prompt.txt").write_text("seed\n")
+
+    first = materialize_workspace(
+        source,
+        artifacts_dir=tmp_path / "run-a",
+        overrides={"prompt.txt": "candidate-a\n"},
+    )
+    second = materialize_workspace(
+        source,
+        artifacts_dir=tmp_path / "run-b",
+        overrides={"prompt.txt": "candidate-b\n"},
+    )
+
+    assert first != second
+    assert (first / "prompt.txt").read_text() == "candidate-a\n"
+    assert (second / "prompt.txt").read_text() == "candidate-b\n"
+    assert (source / "prompt.txt").read_text() == "seed\n"
+
+
+def test_materialized_workspace_rejects_path_escape(tmp_path: Path):
+    source = tmp_path / "source"
+    source.mkdir()
+    with pytest.raises(ValueError, match="stay inside"):
+        materialize_workspace(
+            source,
+            artifacts_dir=tmp_path / "run",
+            overrides={"../evaluator.py": "tampered\n"},
+        )
+    assert not (tmp_path / "evaluator.py").exists()
+
+
 def test_load_experiment_normalizes_scorecard_aliases(tmp_path: Path):
     prompt = tmp_path / "base.txt"
     prompt.write_text("base")
@@ -367,7 +403,9 @@ def test_build_variant_tracks_changed_surfaces(tmp_path: Path):
         better_agent_system_prompt=None,
         runner_config={"project_root": str(tmp_path)},
         surfaces={
-            "prompt": Surface("prompt", "module_attr", "demo_mod:PROMPT", "base prompt", "prompt.txt"),
+            "prompt": Surface(
+                "prompt", "module_attr", "demo_mod:PROMPT", "base prompt", "prompt.txt"
+            ),
             "tools": Surface("tools", "workspace_file", "tools.py", "BASE = 1", "tools.py"),
         },
         cases=(
@@ -490,14 +528,20 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
     layout.write_manifest(experiment)
     prior_iteration_dir = layout.visible_iterations_dir / "000"
     prior_iteration_dir.mkdir(parents=True, exist_ok=True)
-    (prior_iteration_dir / "decision.json").write_text('{"iteration": 0, "decision": "accepted", "train_passed": 1, "train_total": 1}\n')
+    (prior_iteration_dir / "decision.json").write_text(
+        '{"iteration": 0, "decision": "accepted", "train_passed": 1, "train_total": 1}\n'
+    )
     prior_proposer_dir = prior_iteration_dir / "proposer_workspace"
     prior_proposer_dir.mkdir(parents=True, exist_ok=True)
-    (prior_proposer_dir / "outer_agent_result.json").write_text('{"final_message":"ok","result":{"messages":[]}}\n')
+    (prior_proposer_dir / "outer_agent_result.json").write_text(
+        '{"final_message":"ok","result":{"messages":[]}}\n'
+    )
     (prior_proposer_dir / "proposal.md").write_text("# Proposal\n")
     prior_train_dir = layout.visible_root / "train" / "baseline"
     prior_train_dir.mkdir(parents=True, exist_ok=True)
-    (prior_train_dir / "result.json").write_text('{"split":"train","variant":"baseline","model":"demo-model","passed":0,"total":1,"score":0.0,"correctness":0.0,"returncode":1,"run_dir":"run","outcomes":[]}\n')
+    (prior_train_dir / "result.json").write_text(
+        '{"split":"train","variant":"baseline","model":"demo-model","passed":0,"total":1,"score":0.0,"correctness":0.0,"returncode":1,"run_dir":"run","outcomes":[]}\n'
+    )
     proposer_workspace = build_proposer_workspace(
         experiment=experiment,
         current=baseline,
@@ -513,18 +557,39 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
     assert not (proposer_workspace.root / "train_cases" / "tests" / "test_demo.py").exists()
     withheld = (proposer_workspace.root / "train_cases" / "WITHHELD.md").read_text()
     assert "tests/test_demo.py" in withheld
-    assert (proposer_workspace.root / "history" / "prior_visible" / "iterations" / "000" / "decision.json").exists()
-    assert (proposer_workspace.root / "history" / "prior_visible" / "iterations" / "000" / "proposer_workspace" / "outer_agent_result.json").exists()
-    assert (proposer_workspace.root / "history" / "prior_visible" / "train" / "baseline" / "result.json").exists()
+    assert (
+        proposer_workspace.root
+        / "history"
+        / "prior_visible"
+        / "iterations"
+        / "000"
+        / "decision.json"
+    ).exists()
+    assert (
+        proposer_workspace.root
+        / "history"
+        / "prior_visible"
+        / "iterations"
+        / "000"
+        / "proposer_workspace"
+        / "outer_agent_result.json"
+    ).exists()
+    assert (
+        proposer_workspace.root / "history" / "prior_visible" / "train" / "baseline" / "result.json"
+    ).exists()
     assert proposer_workspace.surface_files["prompt"].read_text() == "base"
 
 
 def test_extract_langsmith_trace_id():
-    url = "https://smith.langchain.com/o/demo/projects/p/test/r/019c2754-dcf0-7971-ad86-ee82ed690b8a"
+    url = (
+        "https://smith.langchain.com/o/demo/projects/p/test/r/019c2754-dcf0-7971-ad86-ee82ed690b8a"
+    )
     assert extract_langsmith_trace_id(url) == "019c2754-dcf0-7971-ad86-ee82ed690b8a"
 
 
-def test_write_trace_payloads_fetches_langsmith_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_write_trace_payloads_fetches_langsmith_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     class _Response:
         def __enter__(self):
             return self
@@ -538,7 +603,9 @@ def test_write_trace_payloads_fetches_langsmith_json(tmp_path: Path, monkeypatch
 
     def fake_urlopen(request, timeout):
         del timeout
-        assert request.full_url.endswith("/runs/019c2754-dcf0-7971-ad86-ee82ed690b8a?include_messages=true")
+        assert request.full_url.endswith(
+            "/runs/019c2754-dcf0-7971-ad86-ee82ed690b8a?include_messages=true"
+        )
         return _Response()
 
     monkeypatch.setenv("LANGSMITH_API_KEY", "test-key")
@@ -547,7 +614,9 @@ def test_write_trace_payloads_fetches_langsmith_json(tmp_path: Path, monkeypatch
     split_dir.mkdir()
     write_trace_payloads(
         split_dir,
-        ["https://smith.langchain.com/o/demo/projects/p/test/r/019c2754-dcf0-7971-ad86-ee82ed690b8a"],
+        [
+            "https://smith.langchain.com/o/demo/projects/p/test/r/019c2754-dcf0-7971-ad86-ee82ed690b8a"
+        ],
     )
     trace_json = split_dir / "traces" / "langsmith" / "019c2754-dcf0-7971-ad86-ee82ed690b8a.json"
     assert trace_json.exists()
@@ -632,12 +701,18 @@ def test_run_end_to_end_harbor_backend(tmp_path: Path, monkeypatch: pytest.Monke
     (workspace / "tools.py").write_text('TOOLS = ["run_shell"]\n')
 
     prompt_base = tmp_path / "prompt.txt"
-    prompt_base.write_text('If the request is ambiguous, ask questions before acting.')
+    prompt_base.write_text("If the request is ambiguous, ask questions before acting.")
     tools_base = tmp_path / "tools_base.py"
     tools_base.write_text('TOOLS = ["run_shell"]\n')
 
     tasks_root = tmp_path / "tasks"
-    for task_name in ("prompt-train", "tool-train", "prompt-holdout", "tool-holdout", "scorecard-story"):
+    for task_name in (
+        "prompt-train",
+        "tool-train",
+        "prompt-holdout",
+        "tool-holdout",
+        "scorecard-story",
+    ):
         task_dir = tasks_root / task_name
         task_dir.mkdir(parents=True)
         (task_dir / "task.toml").write_text(f'name = "{task_name}"\n')

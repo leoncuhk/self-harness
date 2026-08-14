@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 import importlib
 import os
+import shutil
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -91,6 +93,45 @@ def workspace_override_context(
                 target.write_text(original)
 
 
+def materialize_workspace(
+    source: Path,
+    *,
+    artifacts_dir: Path,
+    overrides: dict[str, str],
+) -> Path:
+    """Create an immutable-input, run-local workspace snapshot.
+
+    Evaluation must never patch the configured source workspace in place. Apart
+    from making tracked files dirty, in-place patching lets concurrent variants
+    observe each other's harness values and destroys causal attribution.  Each
+    invocation therefore receives a private snapshot retained with its evidence.
+    """
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    snapshot = Path(tempfile.mkdtemp(prefix="workspace-", dir=artifacts_dir))
+    shutil.copytree(
+        source,
+        snapshot,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".venv",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.pyc",
+        ),
+    )
+    for relative_path, value in overrides.items():
+        relative = Path(relative_path)
+        if relative.is_absolute() or ".." in relative.parts:
+            msg = f"workspace surface target must stay inside the workspace: {relative_path!r}"
+            raise ValueError(msg)
+        target = snapshot / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(value)
+    return snapshot
+
+
 def prepend_pythonpath(paths: list[Path], existing: str | None) -> str:
     """Put one or more paths first on PYTHONPATH."""
     parts = [str(path) for path in paths]
@@ -104,7 +145,6 @@ def ensure_sitecustomize(runtime_dir: Path) -> Path:
     runtime_dir.mkdir(parents=True, exist_ok=True)
     sitecustomize_path = runtime_dir / "sitecustomize.py"
     sitecustomize_path.write_text(
-        "from better_harness.patching import patch_from_env\n"
-        "patch_from_env()\n"
+        "from better_harness.patching import patch_from_env\npatch_from_env()\n"
     )
     return runtime_dir

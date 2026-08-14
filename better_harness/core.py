@@ -971,6 +971,13 @@ def validate_experiment(experiment: Experiment) -> None:
         if surface.kind not in VALID_SURFACE_KINDS:
             msg = f"invalid surface kind {surface.kind!r}"
             raise ValueError(msg)
+        target = Path(surface.target)
+        if surface.kind == "workspace_file" and (target.is_absolute() or ".." in target.parts):
+            msg = (
+                f"workspace surface {surface.name!r} must target a relative path "
+                "inside workspace_root"
+            )
+            raise ValueError(msg)
 
     splits = {case.split for case in experiment.cases}
     unknown_splits = splits - set(VALID_SPLITS)
