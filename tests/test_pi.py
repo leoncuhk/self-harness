@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import self_harness.pi as pi_module
 from self_harness.agent import ProposerWorkspace, candidate_search_role
 from self_harness.core import RunLayout
 from self_harness.pi import build_atomic_context, invoke_pi_proposer, parse_atomic_proposal
@@ -47,6 +48,41 @@ def test_parallel_candidates_have_orthogonal_search_roles():
     assert candidate_search_role(1)[0] == "machine-enforced policy"
     assert "runtime_policy" in candidate_search_role(1)[1]
     assert candidate_search_role(4) == candidate_search_role(0)
+
+
+def test_outer_retries_empty_transport_failure_and_accounts_attempts(monkeypatch):
+    failed = PrimeRunResult(
+        argv=("pi",),
+        returncode=0,
+        duration_s=1,
+        events=({"type": "auto_retry_end", "success": False, "finalError": "Connection error."},),
+        stderr="",
+        final_text="",
+        usage={"total_tokens": 0},
+    )
+    succeeded = PrimeRunResult(
+        argv=("pi",),
+        returncode=0,
+        duration_s=1,
+        events=(),
+        stderr="",
+        final_text="{}",
+        usage={"total_tokens": 10},
+    )
+    queue = iter((failed, succeeded))
+    monkeypatch.setattr(pi_module, "run_pi_agent", lambda **_kwargs: next(queue))
+
+    def immediate_retry(call, **_kwargs):
+        with pytest.raises(RuntimeError, match="Connection error"):
+            call()
+        return call()
+
+    monkeypatch.setattr(pi_module, "retry_transient", immediate_retry)
+
+    result, attempts = pi_module._run_pi_transport_safe(label="test")  # noqa: SLF001
+
+    assert result is succeeded
+    assert attempts == (failed, succeeded)
 
 
 def test_parse_atomic_proposal_rejects_undeclared_surface():

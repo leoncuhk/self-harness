@@ -13,7 +13,8 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from self_harness.prime import run_pi_agent
+from self_harness.prime import PrimeRunResult, run_pi_agent
+from self_harness.retry import is_transient, retry_transient
 
 if TYPE_CHECKING:
     from self_harness.agent import ProposerWorkspace
@@ -159,6 +160,34 @@ def _combined_usage(*payloads: dict[str, int | float]) -> dict[str, int | float]
     }
 
 
+def _transport_error(result: PrimeRunResult) -> str | None:
+    """Extract only errors for which no model answer was observed."""
+    if result.final_text.strip():
+        return None
+    messages = [result.stderr]
+    messages.extend(
+        str(event.get("finalError", ""))
+        for event in result.events
+        if event.get("type") == "auto_retry_end" and event.get("success") is False
+    )
+    return next((message for message in messages if message and is_transient(message)), None)
+
+
+def _run_pi_transport_safe(*, label: str, **kwargs: Any) -> tuple[PrimeRunResult, tuple[PrimeRunResult, ...]]:
+    """Retry transport-only empty calls and retain every attempt for accounting."""
+    attempts: list[PrimeRunResult] = []
+
+    def once() -> PrimeRunResult:
+        result = run_pi_agent(**kwargs)
+        attempts.append(result)
+        if error := _transport_error(result):
+            raise RuntimeError(error)
+        return result
+
+    result = retry_transient(once, label=label)
+    return result, tuple(attempts)
+
+
 def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> str | None:
     """Generate and atomically apply one bounded Pi proposal."""
     config = experiment.better_agent_config
@@ -170,7 +199,8 @@ def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) 
         for extension in config.get("extensions", [])
         for token in ("--extension", str(extension))
     )
-    result = run_pi_agent(
+    result, proposal_attempts = _run_pi_transport_safe(
+        label="Pi outer proposal",
         command=config.get("command"),
         model=experiment.better_agent_model,
         system_prompt=(
@@ -190,6 +220,8 @@ def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) 
         max_tokens=int(config.get("max_tokens", 60000)),
     )
     result_payload = result.to_dict()
+    result_payload["transport_attempts"] = [item.to_dict() for item in proposal_attempts]
+    result_payload["usage"] = _combined_usage(*(item.usage for item in proposal_attempts))
     (workspace.root / "outer_agent_result.json").write_text(
         json.dumps(result_payload, indent=2, sort_keys=True) + "\n"
     )
@@ -204,7 +236,8 @@ def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) 
     except (TypeError, ValueError) as parse_error:
         invalid_path = workspace.root / "invalid_proposal.txt"
         invalid_path.write_text(result.final_text)
-        repair = run_pi_agent(
+        repair, repair_attempts = _run_pi_transport_safe(
+            label="Pi proposal JSON repair",
             command=config.get("command"),
             model=experiment.better_agent_model,
             system_prompt=REPAIR_SYSTEM_PROMPT,
@@ -218,11 +251,15 @@ def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) 
             max_tokens=min(int(config.get("max_tokens", 60000)), 30000),
         )
         repair_payload = repair.to_dict()
+        repair_payload["transport_attempts"] = [item.to_dict() for item in repair_attempts]
+        repair_payload["usage"] = _combined_usage(*(item.usage for item in repair_attempts))
         (workspace.root / "outer_agent_repair_result.json").write_text(
             json.dumps(repair_payload, indent=2, sort_keys=True) + "\n"
         )
         result_payload["repair"] = repair_payload
-        result_payload["usage"] = _combined_usage(result.usage, repair.usage)
+        result_payload["usage"] = _combined_usage(
+            *(item.usage for item in (*proposal_attempts, *repair_attempts))
+        )
         (workspace.root / "outer_agent_result.json").write_text(
             json.dumps(result_payload, indent=2, sort_keys=True) + "\n"
         )
