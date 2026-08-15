@@ -62,6 +62,7 @@ flips that actually happen, and a prediction that never holds is evidence the ed
 # fast, cheap retry.
 PROPOSER_REQUEST_TIMEOUT_S = 120
 PROPOSER_CLIENT_RETRIES = 2
+GRAPH_STEPS_PER_AGENT_TURN = 4
 MODEL_PROVIDERS = {
     "anthropic",
     "azure_openai",
@@ -75,6 +76,16 @@ MODEL_PROVIDERS = {
     "together",
     "xai",
 }
+
+
+def proposer_recursion_limit(max_turns: int) -> int:
+    """Translate logical agent turns to LangGraph node executions.
+
+    One tool-using turn traverses several graph nodes. Passing the user-facing
+    turn budget through unchanged therefore terminates healthy agents far earlier
+    than declared.
+    """
+    return max_turns * GRAPH_STEPS_PER_AGENT_TURN
 
 
 def build_proposer_model(model: str):
@@ -137,7 +148,9 @@ def build_proposer_workspace(  # noqa: PLR0913 - one workspace needs the whole i
             "file": str(path.relative_to(root)),
         }
 
-    (root / "surface_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    (root / "surface_manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    )
     _write_train_artifacts(
         experiment=experiment,
         train_result=train_result,
@@ -268,16 +281,10 @@ def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration c
     )
     values = load_candidate_values(current=current, workspace=workspace)
     changed_surfaces = tuple(
-        sorted(
-            name
-            for name in experiment.surfaces
-            if values[name] != current.values[name]
-        )
+        sorted(name for name in experiment.surfaces if values[name] != current.values[name])
     )
     summary = read_proposal_summary(workspace)
-    target_cluster = (
-        clusters[candidate_index % len(clusters)].signature.key if clusters else None
-    )
+    target_cluster = clusters[candidate_index % len(clusters)].signature.key if clusters else None
     proposal = Proposal(
         changed_surfaces=changed_surfaces,
         workspace_dir=str(workspace.root),
@@ -286,7 +293,11 @@ def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration c
         prediction=parse_prediction(summary, final_message),
         target_cluster=target_cluster,
     )
-    label = f"iter-{iteration:03d}" if total_candidates <= 1 else f"iter-{iteration:03d}-k{candidate_index:02d}"
+    label = (
+        f"iter-{iteration:03d}"
+        if total_candidates <= 1
+        else f"iter-{iteration:03d}-k{candidate_index:02d}"
+    )
     candidate = build_variant(
         experiment=experiment,
         label=label,
@@ -352,7 +363,9 @@ def invoke_deepagents_proposer(
                         )
                     ]
                 },
-                config={"recursion_limit": experiment.better_agent_max_turns},
+                config={
+                    "recursion_limit": proposer_recursion_limit(experiment.better_agent_max_turns)
+                },
             ),
             label="proposer (in-process)",
         )
@@ -479,7 +492,9 @@ def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
         )
     if not summaries:
         summaries.append("- No previous iterations yet.")
-    (history_dir / "visible_history.md").write_text("# Visible History\n\n" + "\n".join(summaries) + "\n")
+    (history_dir / "visible_history.md").write_text(
+        "# Visible History\n\n" + "\n".join(summaries) + "\n"
+    )
     leaderboard = layout.root / "archive" / "leaderboard.md"
     if leaderboard.exists():
         shutil.copy2(leaderboard, history_dir / "candidate_leaderboard.md")
@@ -633,9 +648,29 @@ def _write_outer_agent_result(
 ) -> None:
     payload = {
         "final_message": final_message,
+        "usage": summarize_outer_usage(result),
         "result": _jsonify(result),
     }
     (workspace_root / "outer_agent_result.json").write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def summarize_outer_usage(result: dict[str, Any]) -> dict[str, int]:
+    """Sum usage across outer-agent model messages for search-cost reporting."""
+    totals = {"model_calls": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+    for message in result.get("messages", []):
+        usage = (
+            message.get("usage_metadata")
+            if isinstance(message, dict)
+            else getattr(message, "usage_metadata", None)
+        )
+        if not usage:
+            continue
+        totals["model_calls"] += 1
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            value = usage.get(key) if isinstance(usage, dict) else getattr(usage, key, None)
+            if isinstance(value, int | float):
+                totals[key] += int(value)
+    return totals
 
 
 def _jsonify(value: Any) -> Any:  # noqa: PLR0911
@@ -676,9 +711,7 @@ def _jsonify(value: Any) -> Any:  # noqa: PLR0911
         return payload
     if hasattr(value, "__dict__"):
         return {
-            key: _jsonify(child)
-            for key, child in vars(value).items()
-            if not key.startswith("_")
+            key: _jsonify(child) for key, child in vars(value).items() if not key.startswith("_")
         }
     return repr(value)
 
@@ -748,12 +781,15 @@ def _invoke_via_uv_project_once(
     (workspace.root / "outer_agent_stdout.log").write_text(completed.stdout)
     (workspace.root / "outer_agent_stderr.log").write_text(completed.stderr)
     if completed.returncode != 0:
-        msg = completed.stderr.strip() or completed.stdout.strip() or "outer Deep Agent subprocess failed"
+        msg = (
+            completed.stderr.strip()
+            or completed.stdout.strip()
+            or "outer Deep Agent subprocess failed"
+        )
         raise RuntimeError(msg)
     payload = json.loads(result_path.read_text())
     final_message = payload.get("final_message")
     return None if final_message is None else str(final_message)
-
 
 
 def _resolve_deepagents_root(root: Path | None) -> Path | None:
@@ -820,7 +856,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             ]
         },
-        config={"recursion_limit": int(payload["max_turns"])},
+        config={"recursion_limit": proposer_recursion_limit(int(payload["max_turns"]))},
     )
     final_message = _final_ai_message_text(result)
 
@@ -829,6 +865,7 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(
             {
                 "final_message": final_message,
+                "usage": summarize_outer_usage(result),
                 "result": _jsonify(result),
             },
             indent=2,
