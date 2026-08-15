@@ -42,6 +42,8 @@ precision, and the full candidate ledger. Do not add gains from experiments with
 
 ## Current claim ceiling
 
-The deterministic coding fixture establishes V1. The live atomic Pi proposal establishes outer
-integration at V2. FAB efficacy remains below V4 until the full replicated comparator protocol is
-executed. See the [case study](fabv2-case-study.md) for exact bounded results.
+The deterministic coding fixture establishes V1. The latest live atomic Pi smoke establishes outer
+integration and correct rejection at V2: its candidate produced no train or adaptive-validation gain,
+and the strong human seed remains the best validated harness under that contract. FAB efficacy has
+not reached V3, and V4 requires the full replicated comparator protocol. See the
+[case study](fabv2-case-study.md) for exact bounded results.

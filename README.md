@@ -85,5 +85,14 @@ decisions, prediction ledger, archive, and leaderboard. Audit any cited run inde
 uv run python scripts/verify_artifacts.py runs/<run-name>
 ```
 
+Build the unofficial Public-27 community table from complete, protocol-conforming submissions:
+
+```bash
+uv run python scripts/build_fabv2_leaderboard.py submissions/*.json \
+  --output leaderboard.md
+```
+
+Numeric-24 development runs and one-case smoke runs are deliberately ineligible for that table.
+
 Process and workspace isolation are not a hostile-code sandbox. Live agents still require an OS or
 container boundary, least-privilege credentials, and an explicit network policy.

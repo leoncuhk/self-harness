@@ -7,17 +7,14 @@ the repeats detail, the ledger, and every analysis script all read
 wrote, then every number downstream is a number about the parser rather than
 about the harness.
 
-That is not hypothetical. ``rebuild_case_id`` reconstructs a pytest nodeid from
-JUnit attributes and only handles two shapes: a ``file`` attribute, or a
-``classname`` starting with ``tests.``. This suite's XML carries neither — its
-classname is ``benchmarks.agentic.evals.tests.test_agentic`` — so the
-reconstructed id matches no configured case, the real result is dropped, and the
-case is recorded as ``missing`` with score 0. Silently, and only in some runs,
-which is worse than always.
+The audit deliberately does not reconstruct pytest node ids. Each evaluated case
+has one case directory and one JUnit XML file, so the raw outcome is unambiguous.
+Evidence copied into ``proposer_workspace`` is excluded: it is context for the
+outer proposer, not another independent rollout.
 
 Usage:
 
-    uv run python scripts/verify_artifacts.py runs/mvp2-baseline
+    uv run python scripts/verify_artifacts.py runs/fabv2-evolve-smoke-v3
     uv run python scripts/verify_artifacts.py runs/*            # audit everything
 
 Exit code is non-zero when any recorded outcome disagrees with the XML, so this
@@ -127,6 +124,8 @@ def audit_run(run: Path) -> tuple[list[Discrepancy], Counter]:
     discrepancies: list[Discrepancy] = []
     counts: Counter = Counter()
     for result_path in sorted(run.rglob("result.json")):
+        if "proposer_workspace" in result_path.relative_to(run).parts:
+            continue
         split_dir = result_path.parent
         if not (split_dir / "cases").exists():
             continue

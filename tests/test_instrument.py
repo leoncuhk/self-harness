@@ -320,6 +320,30 @@ def test_verify_artifacts_catches_a_recorded_outcome_the_xml_denies(tmp_path):
     assert discrepancies[0].derived == "passed"
 
 
+def test_verify_artifacts_does_not_count_proposer_evidence_twice(tmp_path):
+    run = tmp_path / "run"
+    case_id = "tests/test_product.py::test_task[case-1]"
+    result = {"outcomes": [{"case_id": case_id, "status": "passed"}]}
+    for split_dir in (
+        run / "history" / "train" / "baseline" / "rep00",
+        run / "proposer_workspace" / "history" / "train" / "baseline" / "rep00",
+    ):
+        case_dir = split_dir / "cases" / safe_slug(case_id)
+        case_dir.mkdir(parents=True)
+        (case_dir / "junit.xml").write_text(
+            '<?xml version="1.0"?><testsuites><testsuite tests="1">'
+            '<testcase classname="tests.test_product" name="test_task[case-1]" />'
+            "</testsuite></testsuites>"
+        )
+        (split_dir / "result.json").write_text(json.dumps(result))
+
+    discrepancies, counts = audit_run(run)
+
+    assert not discrepancies
+    assert counts["recorded:passed"] == 1
+    assert counts["derived:passed"] == 1
+
+
 def test_junit_without_a_file_attribute_still_resolves_to_its_case():
     """The exact XML shape that zeroed every scorecard evaluation."""
     case_id = "tests/test_agentic.py::test_task[ex-unique-domains]"
