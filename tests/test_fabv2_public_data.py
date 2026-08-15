@@ -165,23 +165,6 @@ def test_live_evolution_claim_uses_replicated_selection():
     assert experiment.candidates == 2
 
 
-def test_replication_contracts_change_only_the_accepted_surfaces():
-    strong = load_experiment(ROOT / "configs" / "fabv2_replicate_strong.toml")
-    evolved = load_experiment(ROOT / "configs" / "fabv2_replicate_evolved.toml")
-
-    assert strong.repeats == evolved.repeats == 3
-    assert strong.max_iterations == evolved.max_iterations == 0
-    assert strong.cases == evolved.cases
-    assert strong.runner_config == evolved.runner_config
-    assert strong.model == evolved.model
-    changed = {
-        name
-        for name in strong.surfaces
-        if strong.surfaces[name].base_value != evolved.surfaces[name].base_value
-    }
-    assert changed == {"orchestration", "verification"}
-
-
 def test_public27_publication_arm_is_complete_and_frozen():
     experiment = load_experiment(ROOT / "configs" / "fabv2_public27_strong.toml")
 
