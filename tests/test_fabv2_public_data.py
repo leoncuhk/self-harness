@@ -52,6 +52,7 @@ def test_prime_runtime_replaces_the_archived_official_harness():
     assert (workspace / "prime_runner.py").exists()
     assert (workspace / "fab_tools.py").exists()
     assert (workspace / "model_provider.ts").exists()
+    assert (workspace / "runtime_policy.ts").exists()
     assert not (workspace / "agent_runner.py").exists()
     assert not (workspace / "prompt.txt").exists()
 

@@ -131,6 +131,38 @@ def test_runtime_policy_rejects_silent_unknown_fields():
         )
 
 
+def test_runtime_policy_accepts_bounded_machine_tool_output():
+    policy = parse_fab_policy(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "tool_output": {
+                    "enabled": True,
+                    "max_chars": 12_000,
+                    "tail_chars": 2_000,
+                    "tools": ["ipython"],
+                },
+            }
+        )
+    )
+
+    assert policy["tool_output"]["max_chars"] == 12_000
+    with pytest.raises(ValueError, match="smaller than max_chars"):
+        parse_fab_policy(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "tool_output": {
+                        "enabled": True,
+                        "max_chars": 2_000,
+                        "tail_chars": 2_000,
+                        "tools": ["ipython"],
+                    },
+                }
+            )
+        )
+
+
 def test_sec_filings_resolves_ticker_and_returns_direct_documents(tmp_path: Path, monkeypatch):
     ledger = tmp_path / "usage.json"
     monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
@@ -297,6 +329,10 @@ if not is_compiler:
     assert out["tokens"] == 60
     trace = tmp_path / "artifacts" / "prime_workspace" / "research_trace.json"
     assert "CRWD CAGR" in trace.read_text()
+    research = json.loads((tmp_path / "artifacts" / "research_result.json").read_text())
+    token_flag = research["argv"].index("--autonomous-max-tokens")
+    assert research["argv"][token_flag + 1] == "650"
+    assert any(item.endswith("/runtime_policy.ts") for item in research["argv"])
 
 
 def test_prime_runtime_keeps_compiler_text_at_hard_token_boundary(tmp_path: Path, monkeypatch):

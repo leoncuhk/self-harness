@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_ROOT_KEYS = {"schema_version", "filing_index", "search_page"}
+_ROOT_KEYS = {"schema_version", "filing_index", "search_page", "tool_output"}
 _FILING_KEYS = {
     "enabled",
     "forms",
@@ -18,7 +18,9 @@ _FILING_KEYS = {
     "max_tickers",
 }
 _SEARCH_KEYS = {"context_chars", "max_results_per_query", "max_calls_per_document"}
+_TOOL_OUTPUT_KEYS = {"enabled", "max_chars", "tail_chars", "tools"}
 _FORMS = {"10-K", "10-Q", "8-K"}
+_RUNTIME_TOOLS = {"bash", "ipython", "read"}
 
 
 def _exact_keys(payload: dict[str, Any], allowed: set[str], label: str) -> None:
@@ -86,6 +88,32 @@ def parse_fab_policy(text: str) -> dict[str, Any]:
         _bounded_int(search, "max_calls_per_document", 1, 20, "search_page")
         if not search:
             message = "search_page must declare at least one enforced limit"
+            raise ValueError(message)
+
+    tool_output = payload.get("tool_output")
+    if tool_output is not None:
+        if not isinstance(tool_output, dict):
+            message = "tool_output must be an object"
+            raise TypeError(message)
+        _exact_keys(tool_output, _TOOL_OUTPUT_KEYS, "tool_output")
+        if not isinstance(tool_output.get("enabled"), bool):
+            message = "tool_output.enabled must be boolean"
+            raise TypeError(message)
+        _bounded_int(tool_output, "max_chars", 1_000, 50_000, "tool_output")
+        _bounded_int(tool_output, "tail_chars", 0, 10_000, "tool_output")
+        max_chars = tool_output.get("max_chars")
+        tail_chars = tool_output.get("tail_chars", 0)
+        if isinstance(max_chars, int) and isinstance(tail_chars, int) and tail_chars >= max_chars:
+            message = "tool_output.tail_chars must be smaller than max_chars"
+            raise ValueError(message)
+        tools = tool_output.get("tools")
+        if (
+            not isinstance(tools, list)
+            or not tools
+            or any(tool not in _RUNTIME_TOOLS for tool in tools)
+            or len(set(tools)) != len(tools)
+        ):
+            message = f"tool_output.tools must be a unique non-empty subset of {sorted(_RUNTIME_TOOLS)}"
             raise ValueError(message)
     return payload
 

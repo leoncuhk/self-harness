@@ -75,6 +75,7 @@ UUID_PATTERN = re.compile(
 )
 _EVAL_SOURCE_KEYS = ("project_root", "tasks_root", "task_root", "product_root")
 _EVAL_SOURCE_EXCLUDES = {
+    ".cache",
     ".git",
     ".pytest_cache",
     ".ruff_cache",
@@ -188,6 +189,7 @@ class Experiment:
             for key in _EVAL_SOURCE_KEYS
             if key in self.runner_config
         }
+        source_digests["workspace_root"] = _source_tree_digest(self.workspace_root)
         payload = {
             "schema": 1,
             "runner": self.runner,

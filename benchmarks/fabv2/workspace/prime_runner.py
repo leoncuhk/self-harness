@@ -29,7 +29,12 @@ SURFACE_FILES = (
     "verification.md",
     "submission.md",
 )
-RUNTIME_FILES = ("runtime_policy.json", "fab_tools.py", "model_provider.ts")
+RUNTIME_FILES = (
+    "runtime_policy.json",
+    "runtime_policy.ts",
+    "fab_tools.py",
+    "model_provider.ts",
+)
 _TICKER_PATTERN = re.compile(
     r"\b(?:NASDAQ|NYSE)\s*:\s*([A-Z][A-Z0-9.-]{0,9})\b",
     re.IGNORECASE,
@@ -276,7 +281,11 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
     started = time.monotonic()
     research_socket, research_cwd = _prime_endpoint(case_root, "research")
     compiler_reserve = max(1, min(30_000, max_tokens // 4))
-    research_token_budget = max(1, max_tokens - compiler_reserve)
+    # Usage arrives only after a complete model call, so a call can cross the
+    # nominal research boundary. Reserve explicit headroom for that overshoot;
+    # otherwise a 30k compiler reserve can become 5k before the host can stop.
+    call_headroom = max(1, min(15_000, max_tokens // 10))
+    research_token_budget = max(1, max_tokens - compiler_reserve - call_headroom)
     research_turn_budget = max(1, max_turns - 2)
     command = _command()
     agent_message_skill = _builtin_agent_message_skill(command)
@@ -294,6 +303,8 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
             research_socket,
             "--extension",
             str(research_cwd / "model_provider.ts"),
+            "--extension",
+            str(research_cwd / "runtime_policy.ts"),
             *(("--skill", str(agent_message_skill)) if agent_message_skill else ()),
             "--autonomous",
             "--autonomous-gate",

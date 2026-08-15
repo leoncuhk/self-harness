@@ -12,5 +12,11 @@
     "context_chars": 5000,
     "max_results_per_query": 100,
     "max_calls_per_document": 20
+  },
+  "tool_output": {
+    "enabled": false,
+    "max_chars": 12000,
+    "tail_chars": 2000,
+    "tools": ["ipython"]
   }
 }

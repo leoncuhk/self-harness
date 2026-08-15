@@ -208,6 +208,22 @@ def test_evaluation_fingerprint_tracks_frozen_source_content(tmp_path):
     assert experiment.evaluation_fingerprint != before
 
 
+def test_evaluation_fingerprint_tracks_frozen_workspace_runtime(tmp_path):
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    before = experiment.evaluation_fingerprint
+    runtime = experiment.workspace_root / "runtime.py"
+    runtime.write_text("RUNTIME_VERSION = 2\n")
+
+    assert experiment.evaluation_fingerprint != before
+
+    cache = experiment.workspace_root / ".cache" / "response.json"
+    cache.parent.mkdir()
+    stable = experiment.evaluation_fingerprint
+    cache.write_text("generated\n")
+    assert experiment.evaluation_fingerprint == stable
+
+
 def test_evaluation_fingerprint_tracks_explicit_runner_environment(tmp_path):
     """Harness behavior switches are part of the reusable-score contract."""
     config = _write_minimal_pytest_experiment(tmp_path / "fixture")
