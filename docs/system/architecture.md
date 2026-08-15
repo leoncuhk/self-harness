@@ -9,14 +9,35 @@ goal contract and a recorded resource budget.
 The two loops are deliberately separate:
 
 ```
-inner loop: task -> coding agent -> product diff -> CI/verifier -> outcome/trace
-outer loop: traces -> diagnosis -> harness candidates -> inner-loop replay -> promotion
+inner loop: task -> coding agent -> product diff -> CI/verifier -> outcome/trace/metrics
+outer loop: evidence -> diagnosis -> harness candidates -> inner-loop replay -> promotion
 ```
 
 The inner loop changes a disposable copy of a product. The outer loop changes
 the prompt, skills, tools, memory policy, workflow, and middleware used by the
 coding agent. Neither loop may change the goal contract, evaluator, private
 cases, resource ceiling, promotion rule, or audit log.
+
+There is one optimizer kernel, not one optimizer per benchmark. Domains plug in
+through runner and surface adapters; they do not fork the control, selection, or
+evidence semantics. A future weight-training or endpoint adapter must obey the
+same immutable boundary rather than introduce a second improvement loop.
+
+## Non-negotiable loop invariants
+
+1. Every inner rollout starts from the same immutable product seed for its case;
+   product edits never become outer-loop state.
+2. Every harness candidate descends from the currently selected parent; rejected
+   candidates remain evidence and do not silently mutate the parent.
+3. The proposer sees visible training evidence only. Adaptive-validation cases
+   affect selection but not proposal content; locked-test evidence affects
+   neither.
+4. Evaluation code, task assignment, model/compute settings, gates, and budgets
+   are outside every editable surface.
+5. Promotion requires measured improvement under the frozen contract, not an
+   LLM preference, narrative judgment, or proxy metric alone.
+6. All outcomes—including rejection, apparatus failure, cost, and prediction
+   error—are append-only evidence with a reproducible fingerprint.
 
 ## Planes
 
@@ -57,7 +78,8 @@ product seed. It must:
 2. invoke the configured coding agent with only visible task material;
 3. capture the agent transcript and product diff;
 4. run the frozen CI commands outside the agent process;
-5. return structured metrics and apparatus failures separately;
+5. return structured outcome, resource, and behavior metrics while classifying
+   apparatus failures separately;
 6. discard the product workspace after preserving evidence.
 
 The adapter is command based so Codex, Claude Code, OpenCode, or a deterministic
@@ -68,7 +90,8 @@ test double can implement the same protocol.
 For each generation:
 
 1. replay the current harness on visible training tasks;
-2. normalize traces and cluster causal failure mechanisms;
+2. normalize verifier output, traces, costs, and available behavior telemetry,
+   then cluster causal failure mechanisms;
 3. produce diverse, bounded candidates with falsifiable predictions;
 4. reject invalid or policy-breaking edits statically;
 5. evaluate survivors through train then adaptive validation;

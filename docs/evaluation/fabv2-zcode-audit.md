@@ -41,7 +41,7 @@ integrated with source commit and SHA-256 provenance; answer files were not.
 | `SYSTEM_PROMPT_V2.md` | strong hand-engineered comparator | already represented by `prompt_v2.txt`; comparator, not proof of self-improvement |
 | category and rubric analysis | stratification and failure taxonomy | use for Public-27 folds and diagnostic reports |
 | `tools_local.py` | EDGAR/sec.gov/Yahoo free-tool prototype | useful implementation reference; not apparatus-equivalent to Tavily/sec-api/Tiingo |
-| `solutions/*.md`, `solutions/answers.json` | source-discovery and evaluator debugging | quarantine outside this repo; any use makes an experiment oracle/answer-aware |
+| `solutions/*.md`, `solutions/answers.json` | source-discovery and evaluator debugging | quarantined under `research/zcode/oracle/`; any use makes an experiment oracle/answer-aware |
 | `judge.py` | deterministic numeric smoke signal | concept retained, relabeled diagnostic; not an official score |
 | `scores.json`, `selftest_scores.json` | historical/debug artifacts | preserved under `research/zcode/oracle/historical/`, isolated from ranking because provenance and judge limitations prevent comparison |
 | playbook claims and proposed paper text | hypotheses and experiment ideas | require independent reproduction before citation |

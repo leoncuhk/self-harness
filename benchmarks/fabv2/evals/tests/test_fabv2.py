@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "frozen"))
 
 import agent_runner  # noqa: E402  (workspace module)
 import judge  # noqa: E402  (frozen evaluator)
+import telemetry  # noqa: E402  (frozen evaluator)
 
 QUESTIONS = json.loads((ROOT.parent / "questions.json").read_text())
 PROMPT = agent_runner.compose_harness_prompt(WORKSPACE / "prompt.txt")
@@ -78,19 +79,22 @@ def test_question(  # noqa: PLR0913 - pytest fixtures define the benchmark contr
 
     verdict = judge.score_question(qid, out["final_answer"] or "")
     (artifact_dir / "judge.json").write_text(json.dumps(verdict, indent=2, ensure_ascii=False))
-    record_metrics(
-        {
-            "partial_credit": verdict["partial_credit"],
-            "ungated_credit": verdict["ungated_credit"],
-            "numeric_criterion_recall": verdict["numeric_criterion_recall"],
-            "rubric_numeric_coverage": verdict["rubric_numeric_coverage"],
-        }
-    )
+    metrics = {
+        "partial_credit": verdict["partial_credit"],
+        "ungated_credit": verdict["ungated_credit"],
+        "numeric_criterion_recall": verdict["numeric_criterion_recall"],
+        "rubric_numeric_coverage": verdict["rubric_numeric_coverage"],
+    }
+    metrics.update(telemetry.behavior_metrics(out))
+    record_metrics(metrics)
 
+    usage = out.get("tool_usage") or {}
     summary = (
         f"fabv2:{qid} partial={verdict['partial_credit']:.3f} "
         f"(numeric {verdict['n_known']}/{verdict['n_criteria']}) "
-        f"turns={out['turns']} stop={out['stop_reason']} tokens={out['tokens']}"
+        f"turns={out['turns']} calls={out['tool_calls_count']} errors={out['error_count']} "
+        f"edgar/web/calc={usage.get('edgar_search', 0)}/{usage.get('web_search', 0)}/"
+        f"{usage.get('calculator', 0)} stop={out['stop_reason']} tokens={out['tokens']}"
     )
     fails = "; ".join(verdict["failed_numeric"][:8]) or "none"
     assert verdict["partial_credit"] >= 0.75, f"{summary} | failed criteria: {fails}"

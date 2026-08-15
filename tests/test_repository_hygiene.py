@@ -47,7 +47,11 @@ def test_experiment_configs_cannot_reference_research_archive() -> None:
 
 
 def test_local_documentation_links_resolve() -> None:
-    markdown_files = [ROOT / "README.md", *(ROOT / "docs").rglob("*.md")]
+    markdown_files = [
+        ROOT / path
+        for path in _tracked_files()
+        if path.suffix == ".md" and (not path.parts or path.parts[0] != "research")
+    ]
     missing = []
     for path in markdown_files:
         content = path.read_text(encoding="utf-8")

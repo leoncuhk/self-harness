@@ -38,11 +38,12 @@ paired significance test (analysis scripts add bootstrap CIs on top); scorecard
 access discipline is protocol, not code.
 
 One further limit, larger than any of the above and identified against the 2026
-literature: **the proposer never sees an execution trace.** Inner-agent
-trajectories are discarded after each rollout, so φ(r) is computed from pytest
-assertion text rather than from behaviour, and box ② is pattern-matching error
-strings. Every published positive result in this area feeds traces to its
-proposer. Full gap list and build order: [roadmap.md](../development/roadmap.md).
+literature: **the proposer does not receive a normalized full execution trace.**
+Adapters preserve raw trajectories, and FAB now includes tool/error/submission
+telemetry in failure evidence, but φ(r) is still computed mainly from pytest
+assertion text rather than a causal trace distillation. Every published positive
+result in this area feeds richer traces to its proposer. Full gap list and build
+order: [roadmap.md](../development/roadmap.md).
 
 ## Evaluation methodology
 

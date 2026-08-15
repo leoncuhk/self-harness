@@ -19,6 +19,11 @@ The self-harness case study exposes four real runtime surfaces:
 - `verification_policy.md` — arithmetic and completeness checks;
 - `submission_policy.md` — final artifact requirements.
 
+Each rollout also records turns, agent errors, total and per-tool call counts,
+submission success, tokens, latency, and answer metrics. Behavior telemetry is
+diagnostic evidence for the outer loop; it is not a reward proxy unless a
+separate causal ablation validates that use.
+
 `configs/fabv2_self_harness.toml` uses the official dealbreaker-gated partial
 credit as its objective while retaining binary pass rate as a non-regression constraint. Its
 bounded case study uses one calculation-heavy train case, one validation case,
@@ -33,8 +38,8 @@ the report must disclose its wide uncertainty and compare against both B0 and
 the hand-engineered B5 prompt.
 
 The executed bounded result is recorded in
-[`docs/fabv2-case-study.md`](../../docs/fabv2-case-study.md). In the first frozen
-run, the autonomous candidate was correctly rejected and no arm improved the
+[`docs/evaluation/fabv2-case-study.md`](../../docs/evaluation/fabv2-case-study.md).
+In the first frozen run, the autonomous candidate was correctly rejected and no arm improved the
 primary objective; this is evidence of integration and conservative selection,
 not evidence of FAB performance gain.
 
@@ -43,7 +48,9 @@ measured answer quality: it was rubric numeric coverage and therefore constant
 for a question. `configs/fabv2_self_harness_v2.toml` exposed ungated weighted
 credit and true numeric-criterion recall without changing the dealbreaker score,
 but its executed eight-turn calibration still produced empty answers and no
-gain. See `docs/fabv2-v2-calibration.md`; v3 is the unexecuted 14-turn successor.
+gain. See
+[`docs/evaluation/fabv2-v2-calibration.md`](../../docs/evaluation/fabv2-v2-calibration.md);
+v3 is the unexecuted 14-turn successor.
 
 Regenerate and verify the public artifacts with:
 

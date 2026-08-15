@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -32,6 +33,33 @@ def test_public27_artifacts_match_pinned_source():
     ) == 79
     assert json.loads((root / "questions.json").read_text()) == questions
     assert json.loads((root / "evals" / "frozen" / "rubrics.json").read_text()) == rubrics
+
+
+def test_seed_prompt_matches_the_archived_official_harness():
+    source = (
+        ROOT
+        / "research"
+        / "zcode"
+        / "upstream"
+        / "finance-agent-v2"
+        / "finance_agent"
+        / "prompt.py"
+    )
+    syntax = ast.parse(source.read_text())
+    official_prompt = None
+    for node in syntax.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(
+            isinstance(target, ast.Name) and target.id == "SYSTEM_PROMPT"
+            for target in node.targets
+        ):
+            official_prompt = ast.literal_eval(node.value)
+            break
+
+    assert official_prompt is not None
+    seed_prompt = (ROOT / "benchmarks" / "fabv2" / "workspace" / "prompt.txt").read_text()
+    assert seed_prompt.strip() == official_prompt.strip()
 
 
 def test_public27_has_three_questions_in_each_of_nine_categories():

@@ -594,6 +594,8 @@ def run_question(
         "stop_reason": str(result.stop_reason),
         "turns": result.total_turns,
         "tokens": tokens,
+        "error_count": result.error_count,
+        "tool_calls_count": result.tool_calls_count,
         "tool_usage": result.tool_usage,
         "duration_s": round(time.monotonic() - started, 1),
     }
