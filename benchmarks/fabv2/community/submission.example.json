@@ -1,0 +1,34 @@
+{
+  "submission_id": "example-not-a-result",
+  "protocol_id": "fabv2-public27-dev-v1",
+  "dataset_sha256": "27b48c08a6099bc076b4194cac7cefe295082b9aedcbc67f4fedfa70468b427e",
+  "track": "open-harness",
+  "model": "provider/model-version",
+  "harness": "git-commit-or-content-hash",
+  "judge": "numeric-diagnostic",
+  "apparatus": "free-reproduction-v1",
+  "contamination": "public-rubric-aware",
+  "search": {
+    "tokens": 0,
+    "cost_usd": null,
+    "wall_seconds": 0
+  },
+  "runs": [
+    {
+      "seed": 0,
+      "outcomes": [
+        {
+          "qid": "q001",
+          "status": "measured",
+          "metrics": {
+            "ungated_credit": 0.0,
+            "all_pass": false
+          },
+          "tokens": 0,
+          "cost_usd": null,
+          "latency_seconds": 0
+        }
+      ]
+    }
+  ]
+}
