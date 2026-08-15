@@ -8,6 +8,7 @@
 - `fabv2_evolve_replicated.toml`: three-repeat live evolution contract; use this for promotion claims.
 - `fabv2_public27_strong.toml`: frozen strong harness, Public-27 × three-repeat publication arm.
 - `fabv2_replicate_evolved.toml`: three-repeat replication of the accepted preflight candidate.
+- `fabv2_replicate_contender_v3.toml`: independent current-protocol replication of the v3 automatic contender.
 - `fabv2_minimal.toml`: zero-evolution minimal FAB comparator.
 - `fabv2.toml`: Public-27 Numeric-24 8/8/8 development protocol.
 

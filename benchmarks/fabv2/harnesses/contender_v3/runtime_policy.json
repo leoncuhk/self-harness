@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "filing_index": {
+    "enabled": true,
+    "forms": ["10-K", "8-K"],
+    "start_date": "2020-01-01",
+    "end_date": "2026-12-31",
+    "top_n_per_form": 10,
+    "max_tickers": 4
+  },
+  "search_page": {
+    "context_chars": 5000,
+    "max_results_per_query": 20,
+    "max_calls_per_document": 8
+  }
+}

@@ -1,0 +1,15 @@
+# Independent replication of the exact v3 automatically promoted candidate,
+# evaluated under the current compiler-reserve and runtime fingerprint protocol.
+
+extends = "fabv2_evolve_runtime.toml"
+
+[experiment]
+name = "fabv2-replicate-contender-v3"
+max_iterations = 0
+repeats = 3
+
+[surfaces.orchestration]
+base_file = "../benchmarks/fabv2/harnesses/contender_v3/orchestration.md"
+
+[surfaces.runtime_policy]
+base_file = "../benchmarks/fabv2/harnesses/contender_v3/runtime_policy.json"
