@@ -592,6 +592,11 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
         '{"final_message":"ok","result":{"messages":[]}}\n'
     )
     (prior_proposer_dir / "proposal.md").write_text("# Proposal\n")
+    copied_history = prior_proposer_dir / "history" / "prior_visible" / "iterations" / "000"
+    copied_history.mkdir(parents=True)
+    (copied_history / "decision.json").write_text(
+        '{"iteration": 0, "decision": "accepted", "train_passed": 1, "train_total": 1}\n'
+    )
     prior_train_dir = layout.visible_root / "train" / "baseline"
     prior_train_dir.mkdir(parents=True, exist_ok=True)
     (prior_train_dir / "result.json").write_text(
@@ -617,6 +622,7 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
     )
     assert prior_attempts[0]["iteration"] == 0
     assert prior_attempts[0]["train_passed"] == 1
+    assert len(prior_attempts) == 1
     assert not (proposer_workspace.root / "history" / "prior_visible").exists()
     assert proposer_workspace.surface_files["prompt"].read_text() == "base"
 

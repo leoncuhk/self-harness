@@ -337,7 +337,10 @@ def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
     history_dir.mkdir(parents=True, exist_ok=True)
     summaries: list[str] = []
     attempts: list[dict[str, object]] = []
-    for path in sorted(layout.visible_iterations_dir.rglob("decision.json")):
+    # Only authoritative iteration decisions count. Older runs may contain
+    # copied evidence beneath proposer workspaces; recursive discovery would
+    # replay those copies as additional attempts.
+    for path in sorted(layout.visible_iterations_dir.glob("*/decision.json")):
         payload = json.loads(path.read_text())
         variant = str(payload.get("candidate_variant") or f"iter-{int(payload['iteration']):03d}")
         train_path = layout.visible_root / "train" / variant / "result.json"
