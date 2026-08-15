@@ -18,6 +18,7 @@ Retention policy:
 - publish only reviewed, redacted artifacts. Never assume this directory is
   safe to commit wholesale.
 
-Historical non-FAB and failed runs are retained because the documentation uses
-them to establish instrument defects and negative results. They can be moved to
-offline storage later, but deleting them would weaken the current audit trail.
+Retain only runs cited by current documentation and verified by the independent
+artifact audit. Superseded prototypes, invalidated runs, launcher logs, and
+rebuildable runtime copies should be removed after their lessons are captured in
+tests or architecture decisions.

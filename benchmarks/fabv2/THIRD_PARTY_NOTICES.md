@@ -7,5 +7,5 @@ licensed under the MIT License, Copyright (c) 2025 Vals AI, Inc.
 
 The generated `questions.json` and `evals/frozen/rubrics.json` preserve public
 question and rubric content from that file. They are public development data,
-not a hidden test. Answer-aware material and historical result files from
-`/Users/leon/ZCodeProject/fabv2-playbook` are intentionally not vendored.
+not a hidden test. Answer-aware material and unrelated historical result files
+are intentionally not vendored.
