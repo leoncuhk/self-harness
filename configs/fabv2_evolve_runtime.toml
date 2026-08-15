@@ -1,0 +1,10 @@
+# Pre-registered replication after the frozen Prime runtime gained turn-boundary
+# compiler headroom and an evolvable machine tool-output policy.
+
+extends = "fabv2_evolve_replicated.toml"
+
+[experiment]
+name = "fabv2-evolve-runtime-v1"
+max_iterations = 3
+repeats = 3
+candidates = 2
