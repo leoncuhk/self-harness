@@ -1,0 +1,214 @@
+# Prime FAB numeric-24 adaptive-development protocol.
+# Public rubrics make this a community study, not an official blind leaderboard run.
+
+[experiment]
+name = "fabv2-prime-self-harness-v1"
+runner = "pytest"
+workspace_root = "../benchmarks/fabv2/workspace"
+model = "self-harness/deepseek-v4-flash"
+max_iterations = 3
+repeats = 1
+gate = "objective"
+candidates = 2
+fingerprint_discipline = "strict"
+
+[goal]
+primary_metric = "ungated_credit"
+direction = "maximize"
+min_delta = 0.03
+require_no_pass_regression = true
+require_holdout_improvement = true
+
+[better_agent]
+backend = "prime"
+model = "self-harness/deepseek-v4-flash"
+max_turns = 30
+max_tokens = 120000
+timeout_s = 900
+extensions = ["../benchmarks/fabv2/workspace/prime_provider.ts"]
+
+[guards]
+enabled = true
+max_growth = 3.0
+min_bloat_bytes = 4096
+
+[budget]
+enabled = true
+max_cost_growth = 1.25
+max_latency_growth = 1.25
+min_latency_s = 30.0
+
+[runner.pytest]
+project_root = "../benchmarks/fabv2/evals"
+model_flag = "--model"
+summary_flag = "--evals-report-file"
+pytest_args = ["-q", "--max-turns=14", "--max-time=300", "--max-tokens=150000"]
+case_timeout_s = 360
+
+[surfaces.system]
+kind = "workspace_file"
+target = "system.md"
+filename = "system.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/system.md"
+
+[surfaces.orchestration]
+kind = "workspace_file"
+target = "orchestration.md"
+filename = "orchestration.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/orchestration.md"
+
+[surfaces.tools]
+kind = "workspace_file"
+target = "tools.md"
+filename = "tools.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/tools.md"
+
+[surfaces.research]
+kind = "workspace_file"
+target = "research.md"
+filename = "research.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/research.md"
+
+[surfaces.evidence]
+kind = "workspace_file"
+target = "evidence.md"
+filename = "evidence.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/evidence.md"
+
+[surfaces.subagents]
+kind = "workspace_file"
+target = "subagents.md"
+filename = "subagents.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/subagents.md"
+
+[surfaces.verification]
+kind = "workspace_file"
+target = "verification.md"
+filename = "verification.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/verification.md"
+
+[surfaces.submission]
+kind = "workspace_file"
+target = "submission.md"
+filename = "submission.md"
+base_file = "../benchmarks/fabv2/harnesses/strong/submission.md"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q004]"
+split = "train"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q005]"
+split = "holdout"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q006]"
+split = "scorecard"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q007]"
+split = "train"
+stratum = "market-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q008]"
+split = "holdout"
+stratum = "market-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q009]"
+split = "scorecard"
+stratum = "market-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q010]"
+split = "train"
+stratum = "comparables"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q011]"
+split = "holdout"
+stratum = "comparables"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q012]"
+split = "scorecard"
+stratum = "comparables"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q013]"
+split = "train"
+stratum = "precedents"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q014]"
+split = "holdout"
+stratum = "precedents"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q015]"
+split = "scorecard"
+stratum = "precedents"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q016]"
+split = "train"
+stratum = "adjustments"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q017]"
+split = "holdout"
+stratum = "adjustments"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q018]"
+split = "scorecard"
+stratum = "adjustments"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q019]"
+split = "train"
+stratum = "earnings-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q020]"
+split = "holdout"
+stratum = "earnings-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q021]"
+split = "scorecard"
+stratum = "earnings-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q022]"
+split = "train"
+stratum = "disclosure-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q023]"
+split = "holdout"
+stratum = "disclosure-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q024]"
+split = "scorecard"
+stratum = "disclosure-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q025]"
+split = "train"
+stratum = "financial-modeling"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q026]"
+split = "holdout"
+stratum = "financial-modeling"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q027]"
+split = "scorecard"
+stratum = "financial-modeling"

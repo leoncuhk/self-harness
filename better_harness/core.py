@@ -850,6 +850,34 @@ def _resolve_command_tokens(config_path: Path, tokens: list[str]) -> list[str]:
     return resolved
 
 
+def _merge_config(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge TOML tables while replacing scalar and array values."""
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _load_raw_config(config_path: Path, stack: tuple[Path, ...] = ()) -> dict[str, Any]:
+    """Load one config plus an optional same-directory parent contract."""
+    if config_path in stack:
+        chain = " -> ".join(str(path) for path in (*stack, config_path))
+        msg = f"cyclic config inheritance: {chain}"
+        raise ValueError(msg)
+    raw = tomllib.loads(config_path.read_text())
+    parent = raw.pop("extends", None)
+    if parent is None:
+        return raw
+    parent_path = _resolve_path(config_path, str(parent))
+    if parent_path.parent != config_path.parent:
+        msg = "config inheritance must stay in one directory so relative paths remain unambiguous"
+        raise ValueError(msg)
+    return _merge_config(_load_raw_config(parent_path, (*stack, config_path)), raw)
+
+
 def _surface_filename(
     *,
     name: str,
@@ -869,7 +897,7 @@ def _surface_filename(
 def load_experiment(path: str | Path, *, model_override: str | None = None) -> Experiment:
     """Load one experiment config."""
     config_path = Path(path).resolve()
-    raw = tomllib.loads(config_path.read_text())
+    raw = _load_raw_config(config_path)
     experiment = raw.get("experiment", {})
 
     runner = str(experiment.get("runner", "pytest"))
@@ -1706,7 +1734,9 @@ def inventory_payload(experiment: Experiment) -> dict[str, object]:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
-    parser = argparse.ArgumentParser(description="Improve an agent harness with a Deep Agent outer loop")
+    parser = argparse.ArgumentParser(
+        description="Improve an agent harness with a frozen evaluator and bounded outer proposer"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate_parser = subparsers.add_parser("validate", help="Validate one experiment config")

@@ -22,6 +22,7 @@ require_holdout_improvement = true
 backend = "prime"
 model = "self-harness/deepseek-v4-flash"
 max_turns = 30
+max_tokens = 120000
 timeout_s = 600
 extensions = ["../benchmarks/fabv2/workspace/prime_provider.ts"]
 

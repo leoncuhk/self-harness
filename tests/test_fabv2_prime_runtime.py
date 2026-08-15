@@ -140,6 +140,52 @@ if not is_compiler:
     assert "CRWD CAGR" in trace.read_text()
 
 
+def test_prime_runtime_keeps_compiler_text_at_hard_token_boundary(tmp_path: Path, monkeypatch):
+    fake = tmp_path / "fake_budgeted_compiler.py"
+    fake.write_text(
+        """
+import json
+import sys
+
+is_compiler = '--no-tools' in sys.argv
+message = {
+    'id': 'compiler' if is_compiler else 'research',
+    'role': 'assistant',
+    'content': [{'type': 'text', 'text': 'Bounded compiled answer' if is_compiler else 'trace'}],
+    'usage': {
+        'input': 10,
+        'output': 10,
+        'totalTokens': 250 if is_compiler else 750,
+        'cost': {'total': 0.0},
+    },
+    'stopReason': 'stop',
+}
+print(json.dumps({'type': 'message_end', 'message': message}), flush=True)
+""".strip()
+        + "\n"
+    )
+    monkeypatch.setenv(
+        "PRIME_AGENT_COMMAND",
+        f"{shlex.quote(sys.executable)} {shlex.quote(str(fake))}",
+    )
+
+    out = prime_runner.run_question(
+        "Return a bounded answer",
+        model="openai/fake",
+        log_dir=tmp_path / "artifacts",
+        max_turns=6,
+        max_time=30,
+        max_tokens=1000,
+    )
+
+    compiler = json.loads((tmp_path / "artifacts" / "compiler_result.json").read_text())
+    assert compiler["returncode"] == 125
+    assert compiler["termination_reason"] == "max_tokens"
+    assert out["success"]
+    assert out["final_answer"] == "Bounded compiled answer"
+    assert out["stop_reason"] == "compiled_after_max_tokens"
+
+
 def test_strong_harness_has_all_runtime_surfaces():
     strong = ROOT / "benchmarks" / "fabv2" / "harnesses" / "strong"
     prompt = prime_runner.compose_harness_prompt(strong)

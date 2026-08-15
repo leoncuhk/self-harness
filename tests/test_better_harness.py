@@ -18,7 +18,12 @@ from better_harness import (
     run_experiment,
 )
 from better_harness.agent import build_proposer_workspace
-from better_harness.core import RunLayout, extract_langsmith_trace_id, write_trace_payloads
+from better_harness.core import (
+    RunLayout,
+    _load_raw_config,
+    extract_langsmith_trace_id,
+    write_trace_payloads,
+)
 from better_harness.patching import (
     build_baseline_variant,
     build_variant,
@@ -387,6 +392,58 @@ stratum = "tool_use"
     assert experiment.better_agent_model == "claude-sonnet-4-6"
     assert experiment.better_agent_max_turns == 9
     assert experiment.rendered_case_ids("scorecard") == ["tests/test_demo.py::test_c[demo-model]"]
+
+
+def test_config_inheritance_recursively_merges_tables(tmp_path: Path):
+    parent = tmp_path / "parent.toml"
+    parent.write_text(
+        """
+[experiment]
+name = "parent"
+repeats = 3
+
+[runner.pytest]
+pytest_args = ["-q"]
+case_timeout_s = 60
+""".strip()
+        + "\n"
+    )
+    child = tmp_path / "child.toml"
+    child.write_text(
+        """
+extends = "parent.toml"
+
+[experiment]
+name = "child"
+
+[runner.pytest]
+case_timeout_s = 90
+""".strip()
+        + "\n"
+    )
+
+    raw = _load_raw_config(child.resolve())
+    assert raw["experiment"] == {"name": "child", "repeats": 3}
+    assert raw["runner"]["pytest"] == {"pytest_args": ["-q"], "case_timeout_s": 90}
+
+
+def test_config_inheritance_rejects_cycle(tmp_path: Path):
+    (tmp_path / "a.toml").write_text('extends = "b.toml"\n')
+    (tmp_path / "b.toml").write_text('extends = "a.toml"\n')
+    with pytest.raises(ValueError, match="cyclic config inheritance"):
+        _load_raw_config((tmp_path / "a.toml").resolve())
+
+
+def test_config_inheritance_rejects_cross_directory_parent(tmp_path: Path):
+    parent_dir = tmp_path / "parent"
+    child_dir = tmp_path / "child"
+    parent_dir.mkdir()
+    child_dir.mkdir()
+    (parent_dir / "base.toml").write_text('[experiment]\nname = "base"\n')
+    child = child_dir / "child.toml"
+    child.write_text('extends = "../parent/base.toml"\n')
+    with pytest.raises(ValueError, match="must stay in one directory"):
+        _load_raw_config(child.resolve())
 
 
 def test_build_variant_tracks_changed_surfaces(tmp_path: Path):

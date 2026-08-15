@@ -107,3 +107,22 @@ def test_prime_smoke_contract_has_frozen_three_way_split():
             ).resolve()
         )
     ]
+
+
+def test_prime_full_protocol_and_minimal_comparator_are_contract_matched():
+    evolved = load_experiment(ROOT / "configs" / "fabv2_prime.toml")
+    minimal = load_experiment(ROOT / "configs" / "fabv2_prime_minimal.toml")
+
+    assert len(evolved.cases_for_split("train")) == 8
+    assert len(evolved.cases_for_split("holdout")) == 8
+    assert len(evolved.cases_for_split("scorecard")) == 8
+    assert evolved.cases == minimal.cases
+    assert evolved.runner_config == minimal.runner_config
+    assert evolved.goal == minimal.goal
+    assert evolved.model == minimal.model
+    assert evolved.better_agent_backend == minimal.better_agent_backend == "prime"
+    assert minimal.max_iterations == 0
+    assert all(
+        evolved.surfaces[name].base_value != minimal.surfaces[name].base_value
+        for name in evolved.surfaces
+    )

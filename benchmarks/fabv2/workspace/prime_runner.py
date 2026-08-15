@@ -263,7 +263,11 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
             json.dumps(compiler_result.to_dict(), indent=2, ensure_ascii=False, sort_keys=True)
             + "\n"
         )
-        if compiler_result.returncode == 0 and compiler_result.final_text.strip():
+        # Prime streams a complete assistant message before the host observes the
+        # cumulative-token boundary. Keep that auditable text even when the
+        # process is then stopped with return code 125; discarding it turns a
+        # bounded, non-empty submission into an apparatus-created zero.
+        if compiler_result.final_text.strip():
             answer = compiler_result.final_text.strip()
             answer_path.write_text(answer + "\n")
 

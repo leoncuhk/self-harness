@@ -5,6 +5,11 @@ budgets, gate, and resource ceilings.
 
 - `fabv2_prime_smoke.toml`: three-case Prime runtime integration gate. One
   repeat is never an efficacy claim.
+- `fabv2_prime.toml`: frozen 8/8/8 Prime development protocol over Public-27;
+  this is the main outer-loop experiment contract.
+- `fabv2_prime_minimal.toml`: contract-matched zero-evolution minimal-harness
+  comparator. It inherits the main protocol so only declared harness surfaces
+  differ.
 - `coding_demo.toml`: deterministic product-development dual-loop fixture.
 - `mvp2_agentic.toml`, `m2_agentic.toml`, `b5_agentic.toml`: generic agentic
   regression fixtures retained for kernel compatibility.

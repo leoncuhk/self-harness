@@ -1,0 +1,30 @@
+extends = "fabv2_prime.toml"
+
+[experiment]
+name = "fabv2-prime-minimal-v1"
+max_iterations = 0
+candidates = 1
+
+[surfaces.system]
+base_file = "../benchmarks/fabv2/harnesses/minimal/system.md"
+
+[surfaces.orchestration]
+base_file = "../benchmarks/fabv2/harnesses/minimal/orchestration.md"
+
+[surfaces.tools]
+base_file = "../benchmarks/fabv2/harnesses/minimal/tools.md"
+
+[surfaces.research]
+base_file = "../benchmarks/fabv2/harnesses/minimal/research.md"
+
+[surfaces.evidence]
+base_file = "../benchmarks/fabv2/harnesses/minimal/evidence.md"
+
+[surfaces.subagents]
+base_file = "../benchmarks/fabv2/harnesses/minimal/subagents.md"
+
+[surfaces.verification]
+base_file = "../benchmarks/fabv2/harnesses/minimal/verification.md"
+
+[surfaces.submission]
+base_file = "../benchmarks/fabv2/harnesses/minimal/submission.md"
