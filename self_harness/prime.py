@@ -11,8 +11,10 @@ import json
 import os
 import queue
 import shlex
+import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 from collections.abc import Sequence
@@ -20,6 +22,15 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+_DAEMON_SHUTDOWN_SCRIPT = """
+const { DaemonClient } = await import(process.argv[1]);
+const client = new DaemonClient(process.argv[2]);
+await client.connect();
+const response = await client.request({type: "shutdown", force: true});
+client.close();
+if (!response.success) throw new Error(response.error || "daemon shutdown failed");
+""".strip()
 
 
 @dataclass(frozen=True)
@@ -63,6 +74,51 @@ def _command_tokens(raw: object | None) -> list[str]:
         message = "better_agent.command must not be empty"
         raise ValueError(message)
     return tokens
+
+
+def _prime_daemon_client(command: object | None) -> Path | None:
+    """Locate Prime's own daemon client for a scoped, protocol-safe shutdown."""
+    tokens = _command_tokens(command)
+    executable = shutil.which(tokens[0])
+    if executable is None:
+        return None
+    resolved = Path(executable).resolve()
+    candidates = [
+        resolved.parents[2] / "dist" / "modes" / "daemon" / "daemon-client.js"
+    ] if len(resolved.parents) > 2 else []
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def _shutdown_scoped_daemon(command: object | None, socket_path: Path) -> None:
+    """Stop the exact per-invocation Prime daemon and remove its short endpoint."""
+    if not socket_path.exists():
+        return
+    client_module = _prime_daemon_client(command)
+    node = shutil.which("node")
+    if client_module is None or node is None:
+        message = f"cannot clean up scoped Prime daemon at {socket_path}"
+        raise RuntimeError(message)
+    completed = subprocess.run(
+        [
+            node,
+            "--input-type=module",
+            "-e",
+            _DAEMON_SHUTDOWN_SCRIPT,
+            client_module.as_uri(),
+            str(socket_path),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=10,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        message = f"failed to stop scoped Prime daemon at {socket_path}: {detail}"
+        raise RuntimeError(message)
+    endpoint_dir = socket_path.parent
+    if endpoint_dir.parent == Path(tempfile.gettempdir()) and endpoint_dir.name.startswith("sh-"):
+        shutil.rmtree(endpoint_dir, ignore_errors=True)
 
 
 def _assistant_messages(events: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
@@ -354,14 +410,23 @@ def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
         "--",
         user_prompt,
     ]
-    return _run_json_agent_process(
-        argv=argv,
-        cwd=cwd,
-        timeout_s=timeout_s,
-        env=env,
-        max_turns=max_turns,
-        max_tokens=max_tokens,
-    )
+    socket_path: Path | None = None
+    if "--daemon-socket" in extra_args:
+        index = tuple(extra_args).index("--daemon-socket")
+        if index + 1 < len(extra_args):
+            socket_path = Path(extra_args[index + 1])
+    try:
+        return _run_json_agent_process(
+            argv=argv,
+            cwd=cwd,
+            timeout_s=timeout_s,
+            env=env,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+        )
+    finally:
+        if socket_path is not None:
+            _shutdown_scoped_daemon(command, socket_path)
 
 
 def run_pi_agent(  # noqa: PLR0913 - explicit subprocess contract
