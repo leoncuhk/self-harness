@@ -50,6 +50,9 @@ Preserve every key, value, and intended edit. Fix syntax only: escaping, delimit
 unterminated strings. Return JSON with no markdown or explanation. Do not add, remove, summarize, or
 reinterpret proposal content."""
 
+_HARD_BUDGET_EXIT = 125
+_HARD_BUDGET_MARKER = "hard max_tokens budget"
+
 
 @dataclass(frozen=True)
 class AtomicProposal:
@@ -226,6 +229,32 @@ def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) 
         json.dumps(result_payload, indent=2, sort_keys=True) + "\n"
     )
     if result.returncode != 0:
+        if (
+            result.returncode == _HARD_BUDGET_EXIT
+            and _HARD_BUDGET_MARKER in result.stderr.lower()
+        ):
+            # A bounded search that spends its full allowance without producing
+            # an atomic edit is a rejected search branch, not an experiment-wide
+            # apparatus failure. Preserve the attempt and return a durable no-op
+            # so sibling candidates and later iterations can still run.
+            failure = {
+                "kind": "proposer_budget_exhausted",
+                "returncode": result.returncode,
+                "detail": result.stderr.strip(),
+            }
+            (workspace.root / "proposal_failure.json").write_text(
+                json.dumps(failure, indent=2, sort_keys=True) + "\n"
+            )
+            workspace.proposal_file.write_text(
+                "# Proposal\n\n"
+                "- Summary: No candidate; proposer exhausted its frozen token budget.\n"
+                "- Surfaces changed: none\n\n"
+                "## Prediction\n\n"
+                "```json\n"
+                '{"root_cause":"proposer_budget_exhausted","evidence":[],"flip_to_pass":[],"at_risk":[]}\n'
+                "```\n"
+            )
+            return None
         raise RuntimeError(f"Pi proposer exited {result.returncode}: {result.stderr or 'no stderr'}")
     accepted_text = result.final_text
     try:

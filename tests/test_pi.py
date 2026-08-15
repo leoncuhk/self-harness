@@ -156,6 +156,31 @@ def test_invalid_pi_output_cannot_partially_edit_workspace(tmp_path: Path, monke
     assert workspace.surface_files["system"].read_text() == "old\n"
 
 
+def test_pi_budget_exhaustion_is_persisted_as_noop(tmp_path: Path, monkeypatch):
+    workspace = _workspace(tmp_path)
+    result = PrimeRunResult(
+        argv=("pi",),
+        returncode=125,
+        duration_s=1.0,
+        events=(),
+        stderr="Prime Agent stopped at hard max_tokens budget",
+        final_text="",
+        usage={"model_calls": 1, "total_tokens": 60_000},
+    )
+    monkeypatch.setattr("self_harness.pi.run_pi_agent", lambda **_kwargs: result)
+    experiment = SimpleNamespace(
+        better_agent_config={},
+        better_agent_model="provider/model",
+        better_agent_system_prompt=None,
+    )
+
+    assert invoke_pi_proposer(experiment=experiment, workspace=workspace) is None
+    assert workspace.surface_files["system"].read_text() == "old\n"
+    failure = json.loads((tmp_path / "proposal_failure.json").read_text())
+    assert failure["kind"] == "proposer_budget_exhausted"
+    assert "Surfaces changed: none" in workspace.proposal_file.read_text()
+
+
 def test_invalid_json_gets_one_syntax_only_repair(tmp_path: Path, monkeypatch):
     workspace = _workspace(tmp_path)
     valid = json.dumps(
