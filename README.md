@@ -29,7 +29,8 @@ budget. It does not mean a global optimum.
 - Pytest, Harbor, and generic command-based coding-project runners.
 
 See [architecture](docs/architecture.md), [verification ladder](docs/verification.md),
-and [field synthesis](docs/overview.md) before interpreting an experiment.
+[field synthesis](docs/overview.md), and the [bounded FAB v2 result](docs/fabv2-case-study.md)
+before interpreting an experiment.
 
 ## Quick start
 

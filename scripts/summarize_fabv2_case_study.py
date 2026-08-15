@@ -129,16 +129,44 @@ def render(
             f"{arm.total_duration_s:.1f}s | {surfaces} |"
         )
 
+    lines.extend(
+        [
+            "",
+            "Optimization rollout tokens are the rejected candidate's train and validation "
+            "evaluations, separate from final-arm measurement. Outer-search tokens are provider "
+            "reported and include cache-read tokens; the proxy did not report currency cost. "
+            "B5 is a predefined baseline, so `none` means no within-arm evolution rather than "
+            "the seed prompt.",
+        ]
+    )
+
     seed, _, final = arms
-    lines.extend(["", "Diagnostic numeric recall (not the promotion objective):", ""])
+    lines.extend(
+        [
+            "",
+            "Legacy `numeric_recall` below is rubric numeric coverage, not answer recall:",
+            "",
+            "| Arm | Train | Validation | Locked test |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
     for arm in arms:
         recall = [
             float(split.get("metrics", {}).get("numeric_recall", 0.0)) for split in arm.splits
         ]
-        lines.append(
-            f"- {arm.name}: train {recall[0]:.3f}, validation {recall[1]:.3f}, "
-            f"locked test {recall[2]:.3f}."
-        )
+        lines.append(f"| {arm.name} | {recall[0]:.3f} | {recall[1]:.3f} | {recall[2]:.3f} |")
+
+    lines.extend(
+        [
+            "",
+            "This legacy metric is answer-independent for a fixed question and must not be "
+            "interpreted as finding 75% or 100% of requested values. The executed v1 objective "
+            "also collapses any failed dealbreaker to zero, producing a discontinuous all-zero "
+            "search landscape. `configs/fabv2_self_harness_v2.toml` pre-registers an ungated "
+            "severity-weighted optimization signal while retaining the official dealbreaker "
+            "score and binary pass result for reporting; v2 has not been executed.",
+        ]
+    )
 
     candidates = [
         iteration["candidate"]
@@ -152,11 +180,13 @@ def render(
         prediction = candidate.get("proposal", {}).get("prediction", {})
         lines.extend(
             [
-                f"- `{candidate['variant']}`: "
+                f"Candidate `{candidate['variant']}` was "
                 f"{'accepted' if candidate['accepted'] else 'rejected'}; "
                 f"train {_score(candidate['train'])}, validation {_score(candidate['holdout'])}.",
-                f"  - Gate: {candidate['reason']}",
-                f"  - Predicted flips: {', '.join(prediction.get('flip_to_pass', [])) or 'none'}.",
+                "",
+                f"Gate: {candidate['reason']}",
+                "",
+                f"Predicted flips: {', '.join(prediction.get('flip_to_pass', [])) or 'none'}.",
             ]
         )
     lines.extend(

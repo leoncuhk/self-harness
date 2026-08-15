@@ -2,13 +2,17 @@
 
 ## Where this repo actually stands
 
-**Implemented:** the machinery. The four-box loop (rollout → diagnose → propose →
-select) with a rigor layer bolted on: repeated evaluation, a conservative promotion
-gate, a static edit guard, a cost veto, deterministic failure clustering, K candidates,
-and a falsifiable-prediction ledger.
+**Implemented and software-verified:** the dual loop and rigor layer: isolated
+product and harness workspaces, rollout → diagnose → propose → select, repeated
+evaluation, conservative promotion, static guards, cost veto, deterministic
+failure clustering, K candidates, candidate archive, and a falsifiable-prediction
+ledger.
 
-**Not established:** that any of it improves a harness. Not one line of evidence exists
-for that yet, and nothing below L1 can produce it.
+**Established in a deterministic fixture:** an outer harness edit causes a coding
+agent to repair a disposable product and pass frozen CI while the product seed
+stays unchanged. **Not established on FAB v2:** the first bounded live run produced
+one plausible candidate, but train and validation deltas were both zero and the
+gate rejected it. See the [case-study evidence](fabv2-case-study.md).
 
 Those are different claims and it is worth keeping them apart. What has been verified is
 **software correctness**. What has not been verified is **method efficacy**. A loop that
@@ -17,12 +21,12 @@ until you compare it against a baseline.
 
 | Level | Question it answers | Status |
 | --- | --- | --- |
-| L0 | Does the code do what it says? | ✅ 112 tests, lint clean |
+| L0 | Does the code do what it says? | ✅ 149 tests, lint clean |
 | **L0.5** | **Do the recorded numbers match what was measured?** | ✅ after Phase 0 — **it did not before** ([artifact fidelity](#l05--artifact-fidelity)) |
 | L1 | Does the loop run with a **real** outer agent? | ✅ M1 2026-08-11, all 6 criteria ([results](results.md)) |
 | L2 | What is the real baseline, and how noisy is it? | ✅ measured — MVP-1 saturated (0.917, 0 flaky) and the stop rule fired |
 | L3 | Does the proposer understand what it is doing? | ⚠️ one graded prediction, **below base rate** (0.200 vs 0.286); n=1, underpowered ([results](results.md)) |
-| L4 | Does evolution beat spending the same budget on retries? | ⏳ MVP-2 — the decisive test |
+| L4 | Does evolution beat spending the same budget on retries? | ❌ not established; bounded FAB run had zero gain and did not include a retry arm |
 | L5 | Does the gain survive a locked test and transfer? | ❌ post-MVP |
 
 ---
@@ -31,7 +35,7 @@ until you compare it against a baseline.
 
 ```bash
 uv sync --extra dev
-uv run pytest -q                          # 74 passed
+uv run pytest -q                          # 149 passed
 uv run ruff check better_harness tests    # All checks passed!
 ```
 

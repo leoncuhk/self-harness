@@ -13,6 +13,38 @@ The claim "adapts to any model" is true of the mechanism and unproven for the
 outcome: the loop is model-agnostic, the harness it produces is model-specific, and
 whether adaptation *helps* is non-uniform across capability tiers.
 
+## First-principles map
+
+Autoresearch, LLM Wiki, AlphaEvolve/ShinkaEvolve, self-harness, and parts of
+recursive self-improvement share one substrate:
+
+```text
+state -> propose mutation -> execute in environment -> external evaluation
+      -> select -> retain evidence/state -> repeat
+```
+
+What distinguishes them is not the loop but the **mutable state** and the
+**source of truth**. Autoresearch mutates experiment code and hyperparameters;
+LLM Wiki mutates a synthesized knowledge artifact while source material remains
+fixed; evolutionary systems mutate programs or algorithms under task fitness;
+self-harness mutates the engineering layer around a frozen beneficiary model.
+Weight training changes the model policy itself and belongs to a stronger class.
+
+The compact equation is `improvement = search × criterion`. Proposal, execution,
+selection, and memory can often be automated. Evaluation can also be executed
+automatically, but its *validity* cannot be certified solely by the optimizer it
+judges: the loop still needs an anchor it cannot rewrite, such as formal proof,
+physical measurement, frozen tests, private data, or human governance. Evaluators
+may themselves be improved, but only against a higher-level meta-evaluation; this
+moves the external boundary rather than removing it.
+
+Recursive self-improvement is therefore related but not synonymous. A frozen
+model editing its prompt or tools is recursive artifact improvement (L3 here).
+It becomes stronger RSI only when the improved system reliably improves its own
+future improvement process and the gains compound under controlled evaluation.
+One successful edit, repeated search, or a higher benchmark score does not by
+itself demonstrate recursion or compounding.
+
 ## The loop
 
 Every self-harness method is an instance of one loop:
@@ -49,12 +81,14 @@ joint weights+harness. This project operates at L3.
   non-monotonic** (2605.30621) — frontier models have little headroom, weak models
   can't execute the harness, mid-tier gains most. Corollary learned the hard way in
   MVP-1: *tier labels track price, not capability on your task distribution*.
-- **Against equal-budget test-time scaling, evolution loses** (2607.12227, TB2.1,
-  two budget axes held equal — feedback *and* inference): without unit tests,
-  parallel sampling 72.3 vs evolution **67.4**, itself below the 68.2 baseline;
-  with unit tests, sequential refinement 91.8 vs evolution **86.2**. Held-out
-  transfer: **+0.6pp**. On a suite with deterministic verifiers — ours —
-  *sequential refinement*, not best-of-N, is the arm to beat.
+- **Equal-budget comparison is mandatory, and the evidence is mixed.** One
+  Terminal-Bench 2.1 study (2607.12227) reports evolution below parallel sampling
+  without unit tests (67.4 vs 72.3) and below sequential refinement with unit
+  tests (86.2 vs 91.8), with only +0.6pp held-out transfer. Other structural
+  evolution systems report gains over token-matched sampling. The safe conclusion
+  is not that evolution always loses or wins: on deterministic-verifier suites,
+  sequential refinement and best-of-N are required comparators, and structural
+  evolution earns its claim only when it beats them at matched total spend.
 - **What does produce gains is structural, not prose** (2604.25850): TB2 69.7→77.0,
   above human-engineered Codex-CLI, with the ablation localising the gain to
   **tools, middleware, and long-term memory — not the system prompt**; transfer
