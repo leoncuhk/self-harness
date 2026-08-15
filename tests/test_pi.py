@@ -104,6 +104,56 @@ def test_invalid_pi_output_cannot_partially_edit_workspace(tmp_path: Path, monke
     assert workspace.surface_files["system"].read_text() == "old\n"
 
 
+def test_invalid_json_gets_one_syntax_only_repair(tmp_path: Path, monkeypatch):
+    workspace = _workspace(tmp_path)
+    valid = json.dumps(
+        {
+            "summary": "fixed syntax",
+            "root_cause": "bounded cause",
+            "evidence": ["train-1"],
+            "flip_to_pass": ["train-1"],
+            "at_risk": [],
+            "edits": {"system": "repaired policy"},
+        }
+    )
+    results = iter(
+        [
+            PrimeRunResult(
+                argv=("pi",),
+                returncode=0,
+                duration_s=1.0,
+                events=(),
+                stderr="",
+                final_text='{"broken": "json}',
+                usage={"model_calls": 1, "total_tokens": 100},
+            ),
+            PrimeRunResult(
+                argv=("pi",),
+                returncode=0,
+                duration_s=1.0,
+                events=(),
+                stderr="",
+                final_text=valid,
+                usage={"model_calls": 1, "total_tokens": 40},
+            ),
+        ]
+    )
+    monkeypatch.setattr("self_harness.pi.run_pi_agent", lambda **_kwargs: next(results))
+    experiment = SimpleNamespace(
+        better_agent_config={},
+        better_agent_model="provider/model",
+        better_agent_system_prompt=None,
+    )
+
+    invoke_pi_proposer(experiment=experiment, workspace=workspace)
+
+    assert workspace.surface_files["system"].read_text() == "repaired policy\n"
+    persisted = json.loads((tmp_path / "outer_agent_result.json").read_text())
+    assert persisted["usage"]["model_calls"] == 2
+    assert persisted["usage"]["total_tokens"] == 140
+    assert "repair" in persisted
+
+
 def test_search_usage_counts_direct_proposals_but_not_copied_history(tmp_path: Path):
     layout = RunLayout(tmp_path)
     direct = layout.proposer_workspace_dir(1)

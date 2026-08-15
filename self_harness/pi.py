@@ -40,6 +40,12 @@ Schema:
 An empty edit set is valid only when the evidence does not justify a change. Never mention or infer
 private validation or scorecard content."""
 
+REPAIR_SYSTEM_PROMPT = """Repair the attached proposal into exactly one valid JSON object.
+
+Preserve every key, value, and intended edit. Fix syntax only: escaping, delimiters, commas, and
+unterminated strings. Return JSON with no markdown or explanation. Do not add, remove, summarize, or
+reinterpret proposal content."""
+
 
 @dataclass(frozen=True)
 class AtomicProposal:
@@ -135,6 +141,15 @@ def _proposal_markdown(proposal: AtomicProposal) -> str:
     )
 
 
+def _combined_usage(*payloads: dict[str, int | float]) -> dict[str, int | float]:
+    keys = set().union(*(payload.keys() for payload in payloads))
+    return {
+        key: sum(payload.get(key, 0) for payload in payloads)
+        for key in keys
+        if all(isinstance(payload.get(key, 0), int | float) for payload in payloads)
+    }
+
+
 def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> str | None:
     """Generate and atomically apply one bounded Pi proposal."""
     config = experiment.better_agent_config
@@ -165,16 +180,53 @@ def invoke_pi_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) 
         max_turns=None,
         max_tokens=int(config.get("max_tokens", 60000)),
     )
+    result_payload = result.to_dict()
     (workspace.root / "outer_agent_result.json").write_text(
-        json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n"
+        json.dumps(result_payload, indent=2, sort_keys=True) + "\n"
     )
     if result.returncode != 0:
         raise RuntimeError(f"Pi proposer exited {result.returncode}: {result.stderr or 'no stderr'}")
-    proposal = parse_atomic_proposal(
-        result.final_text,
-        allowed_surfaces=set(workspace.surface_files),
-    )
+    accepted_text = result.final_text
+    try:
+        proposal = parse_atomic_proposal(
+            result.final_text,
+            allowed_surfaces=set(workspace.surface_files),
+        )
+    except (TypeError, ValueError) as parse_error:
+        invalid_path = workspace.root / "invalid_proposal.txt"
+        invalid_path.write_text(result.final_text)
+        repair = run_pi_agent(
+            command=config.get("command"),
+            model=experiment.better_agent_model,
+            system_prompt=REPAIR_SYSTEM_PROMPT,
+            user_prompt="Repair the attached proposal JSON now.",
+            cwd=workspace.root,
+            timeout_s=float(config.get("timeout_s", 300)),
+            thinking="off",
+            extra_args=tuple(extra_args),
+            input_files=(invalid_path,),
+            max_turns=None,
+            max_tokens=min(int(config.get("max_tokens", 60000)), 30000),
+        )
+        repair_payload = repair.to_dict()
+        (workspace.root / "outer_agent_repair_result.json").write_text(
+            json.dumps(repair_payload, indent=2, sort_keys=True) + "\n"
+        )
+        result_payload["repair"] = repair_payload
+        result_payload["usage"] = _combined_usage(result.usage, repair.usage)
+        (workspace.root / "outer_agent_result.json").write_text(
+            json.dumps(result_payload, indent=2, sort_keys=True) + "\n"
+        )
+        if repair.returncode != 0:
+            raise RuntimeError(
+                f"Pi proposal repair exited {repair.returncode}: {repair.stderr or 'no stderr'}"
+            ) from parse_error
+        proposal = parse_atomic_proposal(
+            repair.final_text,
+            allowed_surfaces=set(workspace.surface_files),
+        )
+        accepted_text = repair.final_text
     for name, value in proposal.edits.items():
         workspace.surface_files[name].write_text(value)
     workspace.proposal_file.write_text(_proposal_markdown(proposal))
-    return result.final_text or None
+    return accepted_text or None
