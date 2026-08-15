@@ -62,6 +62,19 @@ flips that actually happen, and a prediction that never holds is evidence the ed
 # fast, cheap retry.
 PROPOSER_REQUEST_TIMEOUT_S = 120
 PROPOSER_CLIENT_RETRIES = 2
+MODEL_PROVIDERS = {
+    "anthropic",
+    "azure_openai",
+    "bedrock",
+    "deepseek",
+    "google_genai",
+    "groq",
+    "mistralai",
+    "openai",
+    "openrouter",
+    "together",
+    "xai",
+}
 
 
 def build_proposer_model(model: str):
@@ -72,11 +85,15 @@ def build_proposer_model(model: str):
     the inner agent had one.
     """
     init_chat_model = importlib.import_module("langchain.chat_models").init_chat_model
-    return init_chat_model(
-        model,
-        timeout=PROPOSER_REQUEST_TIMEOUT_S,
-        max_retries=PROPOSER_CLIENT_RETRIES,
-    )
+    provider, separator, provider_model = model.partition("/")
+    kwargs: dict[str, Any] = {
+        "timeout": PROPOSER_REQUEST_TIMEOUT_S,
+        "max_retries": PROPOSER_CLIENT_RETRIES,
+    }
+    if separator and provider in MODEL_PROVIDERS and provider_model:
+        model = provider_model
+        kwargs["model_provider"] = provider
+    return init_chat_model(model, **kwargs)
 
 
 @dataclass(frozen=True)
