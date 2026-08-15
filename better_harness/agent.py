@@ -34,10 +34,10 @@ Rules:
 - If a surface is a code file such as a tool or middleware file, write the real code or registration needed there, not notes or pseudocode.
 - If you change tool or middleware behavior, update both the implementation and any registration or wiring surfaces you were given.
 - Use surface_manifest.json and task.md to understand how each editable file maps back to the target harness.
-- Use the visible failures and the train case files to decide what to change.
+- Use normalized experience first; raw visible history is secondary evidence only.
 - Keep changes concise and coherent.
 - Make the smallest set of edits needed for the visible train failures in this iteration.
-- Stop as soon as /current and /proposal.md are updated.
+- Choose one causal hypothesis early, then stop as soon as /current and /proposal.md are updated.
 - When done, write a short explanation to /proposal.md.
 
 Every edit is a falsifiable claim, so /proposal.md must end with exactly one fenced JSON block:

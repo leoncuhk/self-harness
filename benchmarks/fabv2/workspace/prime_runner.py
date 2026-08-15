@@ -45,6 +45,20 @@ def _command() -> object | None:
     return raw or None
 
 
+def _builtin_agent_message_skill(command: object | None) -> Path | None:
+    """Locate Prime's trusted built-in child-to-parent messaging skill."""
+    raw = command or "prime-agent"
+    tokens = shlex.split(raw) if isinstance(raw, str) else [str(item) for item in raw]
+    if not tokens or not (executable := shutil.which(tokens[0])):
+        return None
+    resolved = Path(executable).resolve()
+    for parent in resolved.parents:
+        candidate = parent / "skills" / "agent-message"
+        if (candidate / "SKILL.md").is_file():
+            return candidate
+    return None
+
+
 def _prime_endpoint(case_root: Path, phase: str) -> tuple[str, Path]:
     """Return short socket/cwd aliases; Prime's Unix endpoints reject long paths."""
     short_root = Path(os.sep) / "tmp"
@@ -167,8 +181,10 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
     compiler_reserve = max(1, min(30_000, max_tokens // 4))
     research_token_budget = max(1, max_tokens - compiler_reserve)
     research_turn_budget = max(1, max_turns - 2)
+    command = _command()
+    agent_message_skill = _builtin_agent_message_skill(command)
     research_result = run_prime_agent(
-        command=_command(),
+        command=command,
         model=model,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
@@ -181,6 +197,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
             research_socket,
             "--extension",
             str(research_cwd / "prime_provider.ts"),
+            *(("--skill", str(agent_message_skill)) if agent_message_skill else ()),
             "--autonomous",
             "--autonomous-gate",
             gate,
@@ -232,7 +249,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
         for attempt in range(1, compiler_attempts + 1):
             compiler_socket, compiler_cwd = _prime_endpoint(case_root, "compiler")
             compiler_result = run_prime_agent(
-                command=_command(),
+                command=command,
                 model=model,
                 system_prompt=(
                     "You are the frozen answer compiler. Use only the attached task, policy, and "

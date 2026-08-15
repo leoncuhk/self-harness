@@ -147,6 +147,18 @@ def summarize_prime_events(
         usage["total_tokens"] += total_tokens
         usage["cost"] += cost
     final_text = next((text for text in reversed([_message_text(item) for item in messages]) if text), "")
+    if not final_text:
+        # A daemon worker can emit a complete streaming text_end and exit zero
+        # without the usual message_end envelope. text_end is an explicit model
+        # boundary, so it is safe to recover; raw partial deltas are not.
+        for event in reversed(events):
+            if event.get("type") != "message_update":
+                continue
+            update = event.get("assistantMessageEvent") or {}
+            if isinstance(update, dict) and update.get("type") == "text_end":
+                final_text = str(update.get("content") or "").strip()
+                if final_text:
+                    break
     return final_text, usage
 
 
@@ -282,6 +294,19 @@ def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
         stderr = f"{stderr}\nIgnored {len(malformed)} non-JSON stdout lines".strip()
     event_tuple = tuple(event_list)
     final_text, usage = summarize_prime_events(event_tuple)
+    if final_text and usage["total_tokens"] == 0 and max_tokens is not None:
+        # Missing message_end means provider usage is unavailable. Charge the
+        # full frozen phase budget rather than reporting a false zero.
+        estimated_output = min(max_tokens, max(1, (len(final_text) + 3) // 4))
+        usage.update(
+            {
+                "model_calls": 1,
+                "input_tokens": max_tokens - estimated_output,
+                "output_tokens": estimated_output,
+                "total_tokens": max_tokens,
+                "usage_estimated": 1,
+            }
+        )
     return PrimeRunResult(
         argv=tuple(argv),
         returncode=returncode,
@@ -311,14 +336,22 @@ def invoke_prime_proposer(*, experiment: Experiment, workspace: ProposerWorkspac
             (experiment.better_agent_system_prompt or "").strip()
             + "\n\n"
             + DEFAULT_SYSTEM_PROMPT
-            + "\n\nYou are running inside Prime Agent. Use the persistent IPython tool to inspect "
-            "and edit files under the current directory. Do not spawn subagents: this experiment "
+            + "\n\nYou are running inside Prime Agent. Use persistent IPython to batch-read small "
+            "files and edit the current directory. Work in this strict order: (1) read task.md, "
+            "experience/records.jsonl, failure_clusters.json, and current/*; (2) choose one causal "
+            "hypothesis by the fourth assistant turn; (3) immediately make the smallest coherent "
+            "edit and complete proposal.md; (4) use any remaining budget only to check the edit. "
+            "The normalized experience is the primary evidence. Do not recursively inspect "
+            "history/prior_visible, raw event blobs, or evaluator internals unless records.jsonl "
+            "explicitly lacks a fact required for the hypothesis. Reserve at least 25% of the "
+            "declared budget for editing and the proposal. Do not spawn subagents: this experiment "
             "accounts for one proposer root session and requires deterministic isolation."
         ).strip(),
         user_prompt=(
-            "Read task.md first. Inspect current/, visible history, and failing train evidence. "
-            "Edit only files under current/ and finish by replacing proposal.md with your "
-            "evidence, root cause, falsifiable prediction, and concise summary."
+            "Start with the four bounded sources named in the system prompt. Diagnose one general "
+            "mechanism, edit only current/, and replace proposal.md early with evidence, root cause, "
+            "a falsifiable prediction, and a concise summary. A complete small candidate is better "
+            "than exhaustive diagnosis with no candidate."
         ),
         cwd=workspace.root,
         timeout_s=float(config.get("timeout_s", 900)),

@@ -63,6 +63,24 @@ def test_summarize_events_deduplicates_messages_and_counts_child_attribution():
     }
 
 
+def test_summarize_events_recovers_explicit_stream_text_end():
+    events = (
+        {
+            "type": "message_update",
+            "assistantMessageEvent": {"type": "text_delta", "delta": "partial"},
+            "message": {"role": "assistant", "usage": {}},
+        },
+        {
+            "type": "message_update",
+            "assistantMessageEvent": {"type": "text_end", "content": "complete answer"},
+            "message": {"role": "assistant", "usage": {}},
+        },
+    )
+    text, usage = summarize_prime_events(events)
+    assert text == "complete answer"
+    assert usage["total_tokens"] == 0
+
+
 def test_run_prime_agent_builds_isolated_json_command(tmp_path: Path):
     fake = tmp_path / "fake.py"
     fake.write_text(
@@ -125,6 +143,34 @@ def test_run_prime_agent_records_timeout_as_failed_result(tmp_path: Path):
     )
     assert result.returncode == 124
     assert "timed out" in result.stderr
+
+
+def test_run_prime_agent_conservatively_charges_stream_only_completion(tmp_path: Path):
+    fake = tmp_path / "stream_only.py"
+    fake.write_text(
+        """
+import json
+event = {
+    'type': 'message_update',
+    'assistantMessageEvent': {'type': 'text_end', 'content': 'complete answer'},
+    'message': {'role': 'assistant', 'usage': {}},
+}
+print(json.dumps(event), flush=True)
+""".strip()
+        + "\n"
+    )
+    result = run_prime_agent(
+        command=[sys.executable, str(fake)],
+        model="openai/test-model",
+        system_prompt="prompt",
+        user_prompt="task",
+        cwd=tmp_path,
+        timeout_s=5,
+        max_tokens=200,
+    )
+    assert result.final_text == "complete answer"
+    assert result.usage["total_tokens"] == 200
+    assert result.usage["usage_estimated"] == 1
 
 
 def test_run_prime_agent_enforces_streaming_token_budget(tmp_path: Path):

@@ -237,3 +237,23 @@ def test_strong_harness_has_all_runtime_surfaces():
     for name in prime_runner.SURFACE_FILES:
         assert (strong / name).exists()
         assert name.removesuffix(".md").title() in prompt
+    assert "await rlm(" in (strong / "subagents.md").read_text()
+    assert "agent_message.send" in (strong / "subagents.md").read_text()
+
+
+def test_prime_runtime_locates_only_bundled_agent_message_skill(tmp_path: Path, monkeypatch):
+    package = tmp_path / "prime-agent"
+    cli = package / "dist" / "bundle" / "cli.js"
+    cli.parent.mkdir(parents=True)
+    cli.write_text("// fake cli\n")
+    cli.chmod(0o755)
+    skill = package / "skills" / "agent-message"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: agent-message\n---\n")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    executable = bin_dir / "prime-agent"
+    executable.symlink_to(cli)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+    assert prime_runner._builtin_agent_message_skill(None) == skill  # noqa: SLF001
