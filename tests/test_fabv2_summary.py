@@ -26,10 +26,11 @@ def test_fabv2_summary_reports_deltas_and_limitations():
     )
     comparator = _report(baseline_scores=(0.4, 0.5, 0.5), final_scores=(0.4, 0.5, 0.5))
 
-    output = render(evolved, comparator)
+    output = render(evolved, comparator, outer_search_tokens=1_112_474)
 
     assert "Self-Harness final" in output
     assert "research_policy" in output
     assert "Validation score delta (final - seed): +0.500" in output
     assert "Locked-test score delta (final - seed): +0.300" in output
+    assert "1,112,474" in output
     assert "n=1 per split" in output

@@ -66,7 +66,12 @@ def _score(split: dict[str, Any]) -> str:
     return f"{float(split['score']):.3f} ({split['passed']}/{split['total']})"
 
 
-def render(evolved: dict[str, Any], comparator: dict[str, Any]) -> str:
+def render(
+    evolved: dict[str, Any],
+    comparator: dict[str, Any],
+    *,
+    outer_search_tokens: int | None = None,
+) -> str:
     """Render a single evidence table without inferring statistical significance."""
     arms = (
         _arm(evolved, name="Seed", stage="baseline"),
@@ -79,15 +84,23 @@ def render(evolved: dict[str, Any], comparator: dict[str, Any]) -> str:
         "All arms use the same model, one case per split, and the same eight-turn, "
         "360-second, 5,000-output-token-per-call limits.",
         "",
-        "| Arm | Train score (pass) | Validation score (pass) | Locked-test score (pass) | Total tokens | Wall time | Changed surfaces |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+        "| Arm | Train score (pass) | Validation score (pass) | Locked-test score (pass) | Eval tokens | Search tokens | Wall time | Changed surfaces |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
-    for arm in arms:
+    for index, arm in enumerate(arms):
         tokens = "unmeasured" if arm.total_tokens is None else f"{arm.total_tokens:,}"
+        search = (
+            "unmeasured"
+            if index == 2 and outer_search_tokens is None
+            else f"{outer_search_tokens:,}"
+            if index == 2
+            else "0"
+        )
         surfaces = ", ".join(arm.changed_surfaces) or "none"
         lines.append(
             f"| {arm.name} | {_score(arm.splits[0])} | {_score(arm.splits[1])} | "
-            f"{_score(arm.splits[2])} | {tokens} | {arm.total_duration_s:.1f}s | {surfaces} |"
+            f"{_score(arm.splits[2])} | {tokens} | {search} | "
+            f"{arm.total_duration_s:.1f}s | {surfaces} |"
         )
 
     seed, _, final = arms
@@ -120,8 +133,16 @@ def main() -> int:
     args = parser.parse_args()
     evolved = json.loads((args.evolved_run / "report.json").read_text())
     comparator = json.loads((args.b5_run / "report.json").read_text())
+    search_values: list[int] = []
+    for path in (args.evolved_run / "history" / "visible" / "iterations").glob(
+        "*/proposer_workspace/outer_agent_result.json"
+    ):
+        value = json.loads(path.read_text()).get("usage", {}).get("total_tokens")
+        if isinstance(value, int):
+            search_values.append(value)
+    outer_search_tokens = sum(search_values) if search_values else None
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(render(evolved, comparator))
+    args.output.write_text(render(evolved, comparator, outer_search_tokens=outer_search_tokens))
     return 0
 
 
