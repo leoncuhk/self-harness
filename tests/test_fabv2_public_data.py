@@ -141,3 +141,14 @@ def test_prime_evolution_smoke_has_visible_and_validation_headroom_cases():
     ]
     assert experiment.better_agent_backend == "prime"
     assert experiment.max_iterations == 1
+
+
+def test_pi_outer_smoke_changes_only_proposer_backend():
+    prime = load_experiment(ROOT / "configs" / "fabv2_prime_evolve_smoke.toml")
+    pi = load_experiment(ROOT / "configs" / "fabv2_pi_evolve_smoke.toml")
+    assert pi.cases == prime.cases
+    assert pi.surfaces == prime.surfaces
+    assert pi.runner_config == prime.runner_config
+    assert pi.goal == prime.goal
+    assert prime.better_agent_backend == "prime"
+    assert pi.better_agent_backend == "pi"

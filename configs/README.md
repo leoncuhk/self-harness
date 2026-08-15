@@ -7,6 +7,8 @@ budgets, gate, and resource ceilings.
   repeat is never an efficacy claim.
 - `fabv2_prime_evolve_smoke.toml`: one-iteration outer-loop mechanism test with
   a failed visible train case and non-saturated validation case.
+- `fabv2_pi_evolve_smoke.toml`: contract-matched Pi-outer/Prime-inner proposer
+  A/B; it exists to test runtime choice, not to add a second controller.
 - `fabv2_prime.toml`: frozen 8/8/8 Prime development protocol over Public-27;
   this is the main outer-loop experiment contract.
 - `fabv2_prime_minimal.toml`: contract-matched zero-evolution minimal-harness

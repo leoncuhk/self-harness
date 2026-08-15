@@ -1077,10 +1077,10 @@ def validate_experiment(experiment: Experiment) -> None:
     if experiment.better_agent_max_turns < 1:
         msg = "better_agent.max_turns must be at least 1"
         raise ValueError(msg)
-    if experiment.better_agent_backend not in {"deepagents", "prime"}:
+    if experiment.better_agent_backend not in {"deepagents", "prime", "pi"}:
         msg = (
             f"invalid better_agent.backend {experiment.better_agent_backend!r}; "
-            "expected 'deepagents' or 'prime'"
+            "expected 'deepagents', 'prime', or 'pi'"
         )
         raise ValueError(msg)
     if experiment.repeats < 1:

@@ -162,46 +162,16 @@ def summarize_prime_events(
     return final_text, usage
 
 
-def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
+def _run_json_agent_process(  # noqa: PLR0913 - explicit subprocess contract
     *,
-    command: object | None,
-    model: str,
-    system_prompt: str,
-    user_prompt: str,
+    argv: Sequence[str],
     cwd: Path,
     timeout_s: float,
     env: dict[str, str] | None = None,
-    thinking: str = "off",
-    extra_args: Sequence[str] = (),
-    input_files: Sequence[Path] = (),
     max_turns: int | None = None,
     max_tokens: int | None = None,
 ) -> PrimeRunResult:
-    """Run one ephemeral Prime root session with host-enforced hard budgets."""
-    argv = [
-        *_command_tokens(command),
-        "--mode",
-        "json",
-        "--no-session",
-        "--no-extensions",
-        "--no-skills",
-        "--no-prompt-templates",
-        "--no-themes",
-        "--no-context-files",
-        "--offline",
-        "--cwd",
-        str(cwd),
-        "--model",
-        model,
-        "--thinking",
-        thinking,
-        "--system-prompt",
-        system_prompt,
-        *extra_args,
-        *(f"@{path}" for path in input_files),
-        "--",
-        user_prompt,
-    ]
+    """Stream one JSON agent process with host-enforced hard budgets."""
     started = time.monotonic()
     try:
         process = subprocess.Popen(
@@ -215,13 +185,13 @@ def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
         )
     except FileNotFoundError as exc:
         raise RuntimeError(
-            f"Prime Agent executable not found: {_command_tokens(command)[0]!r}; "
-            "install Prime Agent or set better_agent.command"
+            f"agent executable not found: {argv[0]!r}; install the configured runtime or set "
+            "better_agent.command"
         ) from exc
     stdout_pipe = process.stdout
     stderr_pipe = process.stderr
     if stdout_pipe is None or stderr_pipe is None:  # pragma: no cover - Popen contract
-        message = "Prime Agent pipes were not created"
+        message = "agent process pipes were not created"
         raise RuntimeError(message)
     lines: queue.Queue[tuple[str, str | None]] = queue.Queue()
 
@@ -319,11 +289,135 @@ def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
     )
 
 
-def invoke_prime_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> str | None:
-    """Ask an ephemeral Prime RLM to edit one proposer workspace."""
+def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
+    *,
+    command: object | None,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    cwd: Path,
+    timeout_s: float,
+    env: dict[str, str] | None = None,
+    thinking: str = "off",
+    extra_args: Sequence[str] = (),
+    input_files: Sequence[Path] = (),
+    max_turns: int | None = None,
+    max_tokens: int | None = None,
+) -> PrimeRunResult:
+    """Run one ephemeral Prime root session with host-enforced hard budgets."""
+    argv = [
+        *_command_tokens(command),
+        "--mode",
+        "json",
+        "--no-session",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-themes",
+        "--no-context-files",
+        "--offline",
+        "--cwd",
+        str(cwd),
+        "--model",
+        model,
+        "--thinking",
+        thinking,
+        "--system-prompt",
+        system_prompt,
+        *extra_args,
+        *(f"@{path}" for path in input_files),
+        "--",
+        user_prompt,
+    ]
+    return _run_json_agent_process(
+        argv=argv,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        env=env,
+        max_turns=max_turns,
+        max_tokens=max_tokens,
+    )
+
+
+def run_pi_agent(  # noqa: PLR0913 - explicit subprocess contract
+    *,
+    command: object | None,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    cwd: Path,
+    timeout_s: float,
+    env: dict[str, str] | None = None,
+    thinking: str = "off",
+    extra_args: Sequence[str] = (),
+    input_files: Sequence[Path] = (),
+    max_turns: int | None = None,
+    max_tokens: int | None = None,
+) -> PrimeRunResult:
+    """Run one ephemeral Pi session through the same audited process boundary."""
+    argv = [
+        *_command_tokens(command or "pi"),
+        "--mode",
+        "json",
+        "--no-session",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-themes",
+        "--no-context-files",
+        "--offline",
+        "--model",
+        model,
+        "--thinking",
+        thinking,
+        "--system-prompt",
+        system_prompt,
+        *extra_args,
+        *(f"@{path}" for path in input_files),
+        user_prompt,
+    ]
+    return _run_json_agent_process(
+        argv=argv,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        env=env,
+        max_turns=max_turns,
+        max_tokens=max_tokens,
+    )
+
+
+def build_proposer_prompts(experiment: Experiment, *, runtime_name: str) -> tuple[str, str]:
+    """Build one framework-neutral, budget-aware outer proposal request."""
     from better_harness.agent import DEFAULT_SYSTEM_PROMPT  # noqa: PLC0415 - circular
 
+    system_prompt = (
+        (experiment.better_agent_system_prompt or "").strip()
+        + "\n\n"
+        + DEFAULT_SYSTEM_PROMPT
+        + f"\n\nYou are running inside {runtime_name}. Use its file tools to batch-read small "
+        "files and edit the current directory. Work in this strict order: (1) read task.md, "
+        "experience/records.jsonl, failure_clusters.json, and current/*; (2) choose one causal "
+        "hypothesis by the fourth assistant turn; (3) immediately make the smallest coherent "
+        "edit and complete proposal.md; (4) use any remaining budget only to check the edit. "
+        "The normalized experience is the primary evidence. Do not recursively inspect "
+        "history/prior_visible, raw event blobs, or evaluator internals unless records.jsonl "
+        "explicitly lacks a fact required for the hypothesis. Reserve at least 25% of the "
+        "declared budget for editing and the proposal. Do not spawn subagents: this experiment "
+        "accounts for one proposer root session and requires deterministic isolation."
+    ).strip()
+    user_prompt = (
+        "Start with the four bounded sources named in the system prompt. Diagnose one general "
+        "mechanism, edit only current/, and replace proposal.md early with evidence, root cause, "
+        "a falsifiable prediction, and a concise summary. A complete small candidate is better "
+        "than exhaustive diagnosis with no candidate."
+    )
+    return system_prompt, user_prompt
+
+
+def invoke_prime_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> str | None:
+    """Ask an ephemeral Prime RLM to edit one proposer workspace."""
     config = experiment.better_agent_config
+    system_prompt, user_prompt = build_proposer_prompts(experiment, runtime_name="Prime Agent")
     extra_args = tuple(
         token
         for extension in config.get("extensions", [])
@@ -332,27 +426,8 @@ def invoke_prime_proposer(*, experiment: Experiment, workspace: ProposerWorkspac
     result = run_prime_agent(
         command=config.get("command"),
         model=experiment.better_agent_model,
-        system_prompt=(
-            (experiment.better_agent_system_prompt or "").strip()
-            + "\n\n"
-            + DEFAULT_SYSTEM_PROMPT
-            + "\n\nYou are running inside Prime Agent. Use persistent IPython to batch-read small "
-            "files and edit the current directory. Work in this strict order: (1) read task.md, "
-            "experience/records.jsonl, failure_clusters.json, and current/*; (2) choose one causal "
-            "hypothesis by the fourth assistant turn; (3) immediately make the smallest coherent "
-            "edit and complete proposal.md; (4) use any remaining budget only to check the edit. "
-            "The normalized experience is the primary evidence. Do not recursively inspect "
-            "history/prior_visible, raw event blobs, or evaluator internals unless records.jsonl "
-            "explicitly lacks a fact required for the hypothesis. Reserve at least 25% of the "
-            "declared budget for editing and the proposal. Do not spawn subagents: this experiment "
-            "accounts for one proposer root session and requires deterministic isolation."
-        ).strip(),
-        user_prompt=(
-            "Start with the four bounded sources named in the system prompt. Diagnose one general "
-            "mechanism, edit only current/, and replace proposal.md early with evidence, root cause, "
-            "a falsifiable prediction, and a concise summary. A complete small candidate is better "
-            "than exhaustive diagnosis with no candidate."
-        ),
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
         cwd=workspace.root,
         timeout_s=float(config.get("timeout_s", 900)),
         thinking=str(config.get("thinking", "off")),

@@ -1,0 +1,10 @@
+# Contract-matched outer-proposer A/B: Pi outer, Prime inner.
+
+extends = "fabv2_prime_evolve_smoke.toml"
+
+[experiment]
+name = "fabv2-pi-outer-evolve-smoke-v1"
+
+[better_agent]
+backend = "pi"
+command = "pi"

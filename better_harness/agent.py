@@ -324,6 +324,10 @@ def invoke_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> 
         from better_harness.prime import invoke_prime_proposer  # noqa: PLC0415 - circular
 
         return invoke_prime_proposer(experiment=experiment, workspace=workspace)
+    if experiment.better_agent_backend == "pi":
+        from better_harness.pi import invoke_pi_proposer  # noqa: PLC0415 - circular
+
+        return invoke_pi_proposer(experiment=experiment, workspace=workspace)
     raise ValueError(f"unknown proposer backend {experiment.better_agent_backend!r}")
 
 

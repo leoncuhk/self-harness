@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from better_harness.prime import _command_tokens, run_prime_agent, summarize_prime_events
+from better_harness.prime import (
+    _command_tokens,
+    run_pi_agent,
+    run_prime_agent,
+    summarize_prime_events,
+)
 
 
 def _assistant(message_id: str, text: str, *, input_tokens: int, output_tokens: int):
@@ -128,6 +133,43 @@ def test_run_prime_agent_builds_isolated_json_command(tmp_path: Path):
     assert captured["env"] == "1"
     assert result.final_text == "finished"
     assert result.usage["total_tokens"] == 17
+
+
+def test_run_pi_agent_uses_pi_cli_dialect(tmp_path: Path):
+    fake = tmp_path / "fake_pi.py"
+    fake.write_text(
+        textwrap.dedent(
+            """
+            import json
+            import sys
+            from pathlib import Path
+
+            Path('pi_argv.json').write_text(json.dumps(sys.argv[1:]))
+            message = {
+                'id': 'm1', 'role': 'assistant',
+                'content': [{'type': 'text', 'text': 'PI_OK'}],
+                'usage': {'input': 8, 'output': 2, 'totalTokens': 10},
+            }
+            print(json.dumps({'type': 'message_end', 'message': message}), flush=True)
+            """
+        ).strip()
+        + "\n"
+    )
+    result = run_pi_agent(
+        command=[sys.executable, str(fake)],
+        model="self-harness/test",
+        system_prompt="system",
+        user_prompt="do work",
+        cwd=tmp_path,
+        timeout_s=30,
+        extra_args=("--extension", "provider.ts"),
+    )
+
+    argv = json.loads((tmp_path / "pi_argv.json").read_text())
+    assert "--cwd" not in argv
+    assert "--" not in argv
+    assert argv[-1] == "do work"
+    assert result.final_text == "PI_OK"
 
 
 def test_run_prime_agent_records_timeout_as_failed_result(tmp_path: Path):
