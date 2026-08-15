@@ -30,4 +30,5 @@ base_file = "../benchmarks/fabv2/harnesses/minimal/verification.md"
 base_file = "../benchmarks/fabv2/harnesses/minimal/submission.md"
 
 [surfaces.runtime_policy]
+contract_file = "../benchmarks/fabv2/contracts/runtime_policy.md"
 base_file = "../benchmarks/fabv2/harnesses/minimal/runtime_policy.json"

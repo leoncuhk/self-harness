@@ -114,6 +114,7 @@ class Surface:
     target: str
     base_value: str
     filename: str
+    contract: str = ""
 
 
 @dataclass(frozen=True)
@@ -1039,6 +1040,14 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         else:
             base_value = str(payload["base_value"]).strip()
             base_suffix = None
+        contract = ""
+        if "contract_file" in payload and "contract" in payload:
+            msg = f"surface '{surface_name}' cannot define both 'contract_file' and 'contract'"
+            raise ValueError(msg)
+        if "contract_file" in payload:
+            contract = _resolve_path(config_path, str(payload["contract_file"])).read_text().strip()
+        elif "contract" in payload:
+            contract = str(payload["contract"]).strip()
         surfaces[surface_name] = Surface(
             name=surface_name,
             kind=kind,
@@ -1051,6 +1060,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
                 kind=kind,
                 payload=payload,
             ),
+            contract=contract,
         )
 
     cases = tuple(

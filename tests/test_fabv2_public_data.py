@@ -99,6 +99,9 @@ def test_smoke_contract_has_frozen_three_way_split():
         "runtime_policy",
     }
     assert experiment.goal.require_holdout_improvement
+    runtime_contract = experiment.surfaces["runtime_policy"].contract
+    assert "`bash`, `ipython`, `read`" in runtime_contract
+    assert "`search_page_text`" in runtime_contract
     assert experiment.better_agent_config["extensions"] == [
         str(
             (

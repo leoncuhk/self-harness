@@ -550,7 +550,14 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
         better_agent_system_prompt=None,
         runner_config={"project_root": str(project_root)},
         surfaces={
-            "prompt": Surface("prompt", "module_attr", "demo_mod:PROMPT", "base", "prompt.txt"),
+            "prompt": Surface(
+                "prompt",
+                "module_attr",
+                "demo_mod:PROMPT",
+                "base",
+                "prompt.txt",
+                "Output must contain the marker READY.",
+            ),
         },
         cases=(
             EvalCase("tests/test_demo.py::test_case[{model}]", "train", "prompt"),
@@ -625,6 +632,10 @@ def test_build_proposer_workspace_copies_train_context(tmp_path: Path):
     assert len(prior_attempts) == 1
     assert not (proposer_workspace.root / "history" / "prior_visible").exists()
     assert proposer_workspace.surface_files["prompt"].read_text() == "base"
+    task = (proposer_workspace.root / "task.md").read_text()
+    manifest = json.loads((proposer_workspace.root / "surface_manifest.json").read_text())
+    assert "Output must contain the marker READY." in task
+    assert manifest["prompt"]["contract"] == "Output must contain the marker READY."
 
 
 def test_extract_langsmith_trace_id():

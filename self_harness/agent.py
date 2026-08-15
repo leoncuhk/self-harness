@@ -84,6 +84,8 @@ def build_proposer_workspace(  # noqa: PLR0913 - one workspace needs the whole i
             "target": surface.target,
             "file": str(path.relative_to(root)),
         }
+        if surface.contract:
+            manifest[name]["contract"] = surface.contract
 
     (root / "surface_manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"
@@ -455,6 +457,13 @@ def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iterati
         f"- `{name}` -> `current/{surface.filename}` ({surface.kind}, target `{surface.target}`)"
         for name, surface in experiment.surfaces.items()
     ]
+    contract_lines: list[str] = []
+    for name, surface in experiment.surfaces.items():
+        if not surface.contract:
+            continue
+        contract_lines.extend([f"### `{name}`", surface.contract, ""])
+    if not contract_lines:
+        contract_lines.append("- No additional surface contracts declared.")
     failure_lines = [
         f"- `{outcome.case_id}` [{outcome.stratum}]: {outcome.failure_message or outcome.status}"
         for outcome in train_result.failing_outcomes()
@@ -490,6 +499,9 @@ def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iterati
                 "",
                 "Editable surfaces:",
                 *surface_lines,
+                "",
+                "Surface contracts (mandatory; candidates violating them are rejected before eval):",
+                *contract_lines,
                 "",
                 "Failure clusters (signature `cause|causal_status|mechanism`):",
                 *cluster_lines,

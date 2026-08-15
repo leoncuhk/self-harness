@@ -231,7 +231,11 @@ def check_variant(  # noqa: PLR0913 - every threshold is meant to be overridable
                 Violation(
                     kind=VIOLATION_UNPARSEABLE,
                     surface=name,
-                    detail=f"surface is not valid Python: {syntax_error}",
+                    detail=(
+                        f"surface is not valid JSON: {syntax_error}"
+                        if str(experiment.surfaces[name].target).endswith(".json")
+                        else f"surface is not valid Python: {syntax_error}"
+                    ),
                 )
             )
             continue
