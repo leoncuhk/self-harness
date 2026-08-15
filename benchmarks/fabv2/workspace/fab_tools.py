@@ -205,6 +205,46 @@ def fetch_page_text(url: str, *, max_chars: int = 250_000) -> str:
     return text[:max_chars]
 
 
+def search_page_text(
+    url: str,
+    queries: list[str],
+    *,
+    context_chars: int = 800,
+    max_matches: int = 20,
+) -> list[dict[str, Any]]:
+    """Search all visible page text and return bounded contextual windows."""
+    needles = [query.strip() for query in queries if query.strip()]
+    if not needles:
+        _record("search_page_text", failed=True)
+        message = "at least one non-empty query is required"
+        raise ValueError(message)
+    try:
+        parser = _TextExtractor()
+        parser.feed(_http(url).decode("utf-8", errors="ignore"))
+        text = "\n".join(parser.parts)
+        lowered = text.casefold()
+        radius = max(100, min(context_chars, 5_000))
+        limit = max(1, min(max_matches, 100))
+        matches: list[dict[str, Any]] = []
+        for query in needles:
+            start = 0
+            folded = query.casefold()
+            while len(matches) < limit and (offset := lowered.find(folded, start)) >= 0:
+                left = max(0, offset - radius)
+                right = min(len(text), offset + len(query) + radius)
+                matches.append(
+                    {"query": query, "offset": offset, "snippet": text[left:right]}
+                )
+                start = offset + max(1, len(folded))
+            if len(matches) >= limit:
+                break
+    except Exception:
+        _record("search_page_text", failed=True)
+        raise
+    _record("search_page_text")
+    return matches
+
+
 def price_history(ticker: str, start_date: str, end_date: str) -> list[dict[str, Any]]:
     """Return unadjusted Yahoo daily closes for a public symbol."""
     try:
@@ -255,6 +295,11 @@ def main(argv: list[str] | None = None) -> int:
     page = commands.add_parser("fetch-page")
     page.add_argument("url")
     page.add_argument("--max-chars", type=int, default=250_000)
+    search_page = commands.add_parser("search-page")
+    search_page.add_argument("url")
+    search_page.add_argument("query", nargs="+")
+    search_page.add_argument("--context-chars", type=int, default=800)
+    search_page.add_argument("--max-matches", type=int, default=20)
     price = commands.add_parser("price-history")
     price.add_argument("ticker")
     price.add_argument("start_date")
@@ -274,6 +319,15 @@ def main(argv: list[str] | None = None) -> int:
         )
     elif args.command == "fetch-page":
         print(fetch_page_text(args.url, max_chars=args.max_chars))
+    elif args.command == "search-page":
+        _print_json(
+            search_page_text(
+                args.url,
+                args.query,
+                context_chars=args.context_chars,
+                max_matches=args.max_matches,
+            )
+        )
     else:
         _print_json(price_history(args.ticker, args.start_date, args.end_date))
     return 0

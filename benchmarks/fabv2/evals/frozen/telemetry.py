@@ -8,6 +8,7 @@ from typing import Any
 TRACKED_TOOLS = (
     "edgar_search",
     "fetch_page_text",
+    "search_page_text",
     "calculator",
     "price_history",
     "ipython",

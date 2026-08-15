@@ -41,6 +41,29 @@ def test_safe_calculator_rejects_code_execution(tmp_path: Path, monkeypatch):
     assert json.loads(ledger.read_text())["errors"] == 1
 
 
+def test_full_page_search_finds_text_beyond_fetch_prefix(tmp_path: Path, monkeypatch):
+    ledger = tmp_path / "usage.json"
+    monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
+    document = b"<html><body>prefix " + (b"x" * 300_000) + b" Adjusted EBITDAR 123 </body></html>"
+    monkeypatch.setattr(fab_tools, "_http", lambda _url: document)
+
+    assert "Adjusted EBITDAR" not in fab_tools.fetch_page_text(
+        "https://example.test", max_chars=1_000
+    )
+    matches = fab_tools.search_page_text(
+        "https://example.test",
+        ["adjusted ebitdar"],
+        context_chars=100,
+    )
+
+    assert matches[0]["offset"] > 250_000
+    assert "Adjusted EBITDAR 123" in matches[0]["snippet"]
+    assert json.loads(ledger.read_text())["calls"] == {
+        "fetch_page_text": 1,
+        "search_page_text": 1,
+    }
+
+
 def test_prime_runtime_isolates_case_and_reads_submission(tmp_path: Path, monkeypatch):
     fake = tmp_path / "fake_prime.py"
     fake.write_text(

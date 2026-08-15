@@ -27,6 +27,7 @@ def test_behavior_metrics_preserve_diagnostic_signals_without_reward_shaping():
             "tool_usage": {
                 "edgar_search": 2,
                 "fetch_page_text": 1,
+                "search_page_text": 2,
                 "calculator": 4,
                 "submit_final_result": 1,
             },
@@ -38,6 +39,7 @@ def test_behavior_metrics_preserve_diagnostic_signals_without_reward_shaping():
     assert metrics["tool_call_count"] == 8
     assert metrics["edgar_search_count"] == 2
     assert metrics["fetch_page_text_count"] == 1
+    assert metrics["search_page_text_count"] == 2
     assert metrics["calculator_count"] == 4
     assert metrics["submission_rate"] == 1
     assert metrics["recovery_rate"] == 1
