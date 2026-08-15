@@ -25,6 +25,35 @@ class ProposerWorkspace:
     surface_files: dict[str, Path]
 
 
+_SEARCH_ROLES = (
+    (
+        "instruction/workflow",
+        "Change prose only when the failure is caused by ambiguous sequencing, tool guidance, "
+        "or verification instructions. Keep the edit small and testable.",
+    ),
+    (
+        "machine-enforced policy",
+        "Prefer declared config or middleware surfaces that enforce behavior at runtime. If a "
+        "`runtime_policy` surface exists, target it instead of restating an ignored prose rule.",
+    ),
+    (
+        "tool/data plane",
+        "Prefer a general tool or data-access improvement when retrieval quality is the causal "
+        "bottleneck; do not encode task answers.",
+    ),
+    (
+        "memory/verification",
+        "Prefer evidence-state, verification, or answer-compilation changes when facts are found "
+        "but lost, miscomputed, or omitted.",
+    ),
+)
+
+
+def candidate_search_role(candidate_index: int) -> tuple[str, str]:
+    """Assign deterministic orthogonal roles to parallel candidates."""
+    return _SEARCH_ROLES[candidate_index % len(_SEARCH_ROLES)]
+
+
 def build_proposer_workspace(  # noqa: PLR0913 - one workspace needs the whole iteration context
     *,
     experiment: Experiment,
@@ -413,11 +442,14 @@ def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iterati
             "- Fix this cluster's root cause. Do not try to fix every cluster at once.",
         ]
     if total_candidates > 1:
+        role_name, role_instruction = candidate_search_role(candidate_index or 0)
         focus_lines += [
             "",
             f"You are candidate {(candidate_index or 0) + 1} of {total_candidates} for this iteration.",
-            "Other candidates target other clusters. Your edit must be materially different from",
-            "a generic instruction tweak: prefer the mechanism your cluster actually exposes.",
+            f"Your orthogonal search role is: `{role_name}`.",
+            role_instruction,
+            "Other candidates explore other edit families. Stay within this role unless the declared",
+            "surfaces make it impossible; do not collapse back to a generic instruction tweak.",
         ]
     surface_lines = [
         f"- `{name}` -> `current/{surface.filename}` ({surface.kind}, target `{surface.target}`)"

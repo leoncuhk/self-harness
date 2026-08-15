@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from self_harness.agent import ProposerWorkspace
+from self_harness.agent import ProposerWorkspace, candidate_search_role
 from self_harness.core import RunLayout
 from self_harness.pi import build_atomic_context, invoke_pi_proposer, parse_atomic_proposal
 from self_harness.prime import PrimeRunResult
@@ -40,6 +40,13 @@ def test_atomic_context_contains_visible_evidence_and_surfaces(tmp_path: Path):
     assert "Iteration 1 changed tools; train 0/1" in context
     assert '"hypothesis":"output too large"' in context
     assert "## system\nold" in context
+
+
+def test_parallel_candidates_have_orthogonal_search_roles():
+    assert candidate_search_role(0)[0] == "instruction/workflow"
+    assert candidate_search_role(1)[0] == "machine-enforced policy"
+    assert "runtime_policy" in candidate_search_role(1)[1]
+    assert candidate_search_role(4) == candidate_search_role(0)
 
 
 def test_parse_atomic_proposal_rejects_undeclared_surface():
