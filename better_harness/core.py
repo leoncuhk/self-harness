@@ -73,6 +73,35 @@ URL_PATTERN = re.compile(r"https?://[^\s\"'>]+")
 UUID_PATTERN = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
 )
+_EVAL_SOURCE_KEYS = ("project_root", "tasks_root", "task_root", "product_root")
+_EVAL_SOURCE_EXCLUDES = {
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "runs",
+}
+
+
+def _source_tree_digest(root: Path) -> str | None:
+    """Hash evaluator/task source while excluding generated environments."""
+    if not root.exists():
+        return None
+    paths = [root] if root.is_file() else sorted(path for path in root.rglob("*") if path.is_file())
+    digest = hashlib.sha256()
+    for path in paths:
+        relative = path.name if root.is_file() else str(path.relative_to(root))
+        if any(part in _EVAL_SOURCE_EXCLUDES for part in Path(relative).parts):
+            continue
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            return None
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -149,6 +178,27 @@ class Experiment:
     def has_split(self, split: str) -> bool:
         """Return whether the experiment defines one split."""
         return bool(self.cases_for_split(split))
+
+    @property
+    def evaluation_fingerprint(self) -> str:
+        """Hash the frozen execution contract that makes a score reusable."""
+        source_digests = {
+            key: _source_tree_digest(Path(str(self.runner_config[key])))
+            for key in _EVAL_SOURCE_KEYS
+            if key in self.runner_config
+        }
+        payload = {
+            "schema": 1,
+            "runner": self.runner,
+            "model": self.model,
+            "runner_config": self.runner_config,
+            "repeats": self.repeats,
+            "cases": [asdict(case) for case in self.cases],
+            "source_digests": source_digests,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, default=str).encode()
+        ).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -279,6 +329,7 @@ class SplitResult:
     apparatus: int = 0
     fingerprints: tuple[str, ...] = ()
     metrics: dict[str, float] = dc_field(default_factory=dict)
+    evaluation_fingerprint: str | None = None
 
     @property
     def correctness(self) -> float:
@@ -339,6 +390,7 @@ class SplitResult:
             "measurable": self.measurable,
             "fingerprints": list(self.fingerprints),
             "metrics": self.metrics,
+            "evaluation_fingerprint": self.evaluation_fingerprint,
             "returncode": self.returncode,
             "run_dir": self.run_dir,
             "outcomes": [asdict(outcome) for outcome in self.outcomes],
@@ -367,6 +419,7 @@ class SplitResult:
             apparatus=int(payload.get("apparatus", 0)),
             fingerprints=tuple(str(item) for item in payload.get("fingerprints", ())),
             metrics={str(key): float(value) for key, value in payload.get("metrics", {}).items()},
+            evaluation_fingerprint=payload.get("evaluation_fingerprint"),
         )
 
 
@@ -727,6 +780,7 @@ def reusable_result(
     result_path: Path,
     variant: Variant,
     variant_path: Path,
+    evaluation_fingerprint: str | None = None,
 ) -> SplitResult | None:
     """Return a stored split result, but only if it measured *this* harness.
 
@@ -746,9 +800,15 @@ def reusable_result(
     if saved.fingerprint != variant.fingerprint:
         return None
     try:
-        return SplitResult.load(result_path)
+        result = SplitResult.load(result_path)
     except (OSError, ValueError, KeyError, TypeError):
         return None
+    # An apparatus-heavy result is evidence that measurement failed, not a
+    # cached observation of this harness. Resume must retry it after credentials,
+    # transport, or host resources are repaired.
+    if evaluation_fingerprint is not None and result.evaluation_fingerprint != evaluation_fingerprint:
+        return None
+    return result if result.measurable else None
 
 
 def expand_env(value: str) -> str:

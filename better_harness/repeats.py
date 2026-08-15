@@ -123,6 +123,7 @@ def aggregate_split_results(
             apparatus=first.apparatus,
             fingerprints=first.fingerprints,
             metrics=first.metrics,
+            evaluation_fingerprint=first.evaluation_fingerprint,
         )
 
     order: list[str] = []
@@ -216,6 +217,7 @@ def aggregate_split_results(
             key: sum(result.metrics.get(key, 0.0) for result in results) / len(results)
             for key in sorted({key for result in results for key in result.metrics})
         },
+        evaluation_fingerprint=results[0].evaluation_fingerprint,
     )
 
 

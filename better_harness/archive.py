@@ -109,6 +109,13 @@ class CandidateArchive:
 
 def objective_value(result: Any, name: str) -> float:
     """Read a required objective from a split result."""
+    if hasattr(result, "measurable") and not result.measurable:
+        msg = (
+            f"split {getattr(result, 'split', 'unknown')!r} is unmeasurable: "
+            f"{getattr(result, 'apparatus', 0)} apparatus failures and "
+            f"{getattr(result, 'total', 0)} measured attempts"
+        )
+        raise ValueError(msg)
     value = result.metric(name)
     if value is None:
         msg = f"split result did not measure objective {name!r}"

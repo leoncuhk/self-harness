@@ -33,7 +33,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
     from better_harness.core import SplitResult
 
-_JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+# Parse the fence boundary first, then let json.loads understand braces inside
+# quoted strings (for example the FAB tool placeholder ``{{document_key}}``).
+_JSON_FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
 @dataclass(frozen=True)

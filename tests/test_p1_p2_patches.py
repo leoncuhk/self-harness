@@ -363,6 +363,23 @@ def test_parse_prediction_takes_the_last_populated_block():
     assert parse_prediction(text).root_cause == "real one"
 
 
+def test_parse_prediction_allows_braces_inside_json_strings():
+    text = """
+    ```json
+    {
+      "root_cause": "tool prompts omitted {{document_key}}",
+      "evidence": ["retrieve failed for {{filing}}"],
+      "flip_to_pass": ["q004"],
+      "at_risk": []
+    }
+    ```
+    """
+
+    prediction = parse_prediction(text)
+    assert prediction.root_cause == "tool prompts omitted {{document_key}}"
+    assert prediction.flip_to_pass == ("q004",)
+
+
 def test_parse_prediction_missing_block_is_recorded_not_raised():
     """A proposer that skips the block is a fact to log, not a crash."""
     assert parse_prediction("no json here", None).is_empty

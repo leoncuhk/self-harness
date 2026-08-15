@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 from dataclasses import replace
@@ -87,10 +88,16 @@ class PytestRunner:
                 result_path=result_path,
                 variant=variant,
                 variant_path=variant_path,
+                evaluation_fingerprint=experiment.evaluation_fingerprint,
             )
             if reused is not None:
                 return reused
 
+        # A non-reusable directory may contain trajectories from another eval
+        # contract. Leaving them in place lets the next proposer diagnose stale
+        # evidence even though the score itself was recomputed.
+        if split_dir.exists():
+            shutil.rmtree(split_dir)
         split_dir.mkdir(parents=True, exist_ok=True)
         variant.save(variant_path)
         project_root = Path(str(experiment.runner_config["project_root"]))
@@ -306,6 +313,7 @@ class PytestRunner:
             apparatus=apparatus,
             fingerprints=tuple(sorted(fingerprints)),
             metrics=split_metrics,
+            evaluation_fingerprint=experiment.evaluation_fingerprint,
         )
         result.save(result_path)
         return result
@@ -372,10 +380,13 @@ class HarborRunner:
                 result_path=result_path,
                 variant=variant,
                 variant_path=variant_path,
+                evaluation_fingerprint=experiment.evaluation_fingerprint,
             )
             if reused is not None:
                 return reused
 
+        if split_dir.exists():
+            shutil.rmtree(split_dir)
         split_dir.mkdir(parents=True, exist_ok=True)
         variant.save(variant_path)
         cases = experiment.cases_for_split(split)
@@ -485,6 +496,7 @@ class HarborRunner:
                 if not outcomes
                 else sum(outcome.score for outcome in outcomes) / len(outcomes)
             },
+            evaluation_fingerprint=experiment.evaluation_fingerprint,
         )
         result.save(result_path)
         summary_payload = {

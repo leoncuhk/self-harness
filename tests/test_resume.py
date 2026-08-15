@@ -151,6 +151,76 @@ def test_resume_refuses_when_the_variant_record_is_missing_or_corrupt(tmp_path):
     assert reusable_result(result_path=result_path, variant=variant, variant_path=variant_path) is None
 
 
+def test_resume_retries_an_unmeasurable_apparatus_result(tmp_path):
+    """A repaired environment must not reuse a prior failure to measure."""
+    _, variant = make_variant(tmp_path, prompt="ask clarifying questions")
+    layout = RunLayout(tmp_path / "run")
+    variant_path = layout.variant_path(variant.key)
+    variant.save(variant_path)
+    result_path = layout.split_dir(variant_key=variant.key, split="train") / "result.json"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    SplitResult(
+        split="train",
+        variant=variant.key,
+        model="demo",
+        passed=0,
+        total=0,
+        score=0.0,
+        returncode=1,
+        run_dir=str(result_path.parent),
+        outcomes=(
+            CaseOutcome(
+                case_id="case",
+                split="train",
+                stratum="prompt",
+                status="apparatus",
+                score=0.0,
+                duration_s=0.1,
+                failure_message="[apparatus:provider_config] missing API key",
+            ),
+        ),
+        apparatus=1,
+    ).save(result_path)
+
+    assert reusable_result(result_path=result_path, variant=variant, variant_path=variant_path) is None
+
+
+def test_resume_refuses_a_changed_evaluation_contract(tmp_path):
+    """Same harness under a different budget or case set is a new measurement."""
+    experiment, variant = make_variant(tmp_path, prompt="ask clarifying questions")
+    layout = RunLayout(tmp_path / "run")
+    variant_path = layout.variant_path(variant.key)
+    variant.save(variant_path)
+    result_path = layout.split_dir(variant_key=variant.key, split="train") / "result.json"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result = write_result(result_path, variant_key=variant.key)
+    result = SplitResult(
+        **{
+            **result.__dict__,
+            "evaluation_fingerprint": experiment.evaluation_fingerprint,
+        }
+    )
+    result.save(result_path)
+
+    assert reusable_result(
+        result_path=result_path,
+        variant=variant,
+        variant_path=variant_path,
+        evaluation_fingerprint="different-budget-fingerprint",
+    ) is None
+
+
+def test_evaluation_fingerprint_tracks_frozen_source_content(tmp_path):
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    before = experiment.evaluation_fingerprint
+    project_root = Path(str(experiment.runner_config["project_root"]))
+    evaluator = next(project_root.rglob("test_*.py"))
+    evaluator.write_text(evaluator.read_text() + "\n# evaluator revision\n")
+
+    assert experiment.evaluation_fingerprint != before
+
+
 def test_resume_reloads_the_proposal_instead_of_paying_for_another_model_call(tmp_path, monkeypatch):
     """A resumed iteration must not re-ask the proposer."""
     config = _write_minimal_pytest_experiment(tmp_path / "fixture")

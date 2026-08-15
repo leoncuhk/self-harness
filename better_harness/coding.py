@@ -160,10 +160,13 @@ class CodingProjectRunner:
                 result_path=result_path,
                 variant=variant,
                 variant_path=variant_path,
+                evaluation_fingerprint=experiment.evaluation_fingerprint,
             )
             if reused is not None:
                 return reused
 
+        if split_dir.exists():
+            shutil.rmtree(split_dir)
         split_dir.mkdir(parents=True, exist_ok=True)
         variant.save(variant_path)
         task_root = Path(str(experiment.runner_config["task_root"]))
@@ -321,6 +324,7 @@ class CodingProjectRunner:
                 if not measured
                 else sum(outcome.metrics["ci_pass_rate"] for outcome in measured) / len(measured),
             },
+            evaluation_fingerprint=experiment.evaluation_fingerprint,
         )
         result.save(result_path)
         (split_dir / "summary.json").write_text(
