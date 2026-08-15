@@ -21,6 +21,9 @@ def test_behavior_metrics_preserve_diagnostic_signals_without_reward_shaping():
             "turns": 10,
             "error_count": 2,
             "tool_calls_count": 8,
+            "recovery_used": True,
+            "recovery_turns": 1,
+            "recovery_tokens": 1200,
             "tool_usage": {
                 "edgar_search": 2,
                 "web_search": 1,
@@ -37,6 +40,9 @@ def test_behavior_metrics_preserve_diagnostic_signals_without_reward_shaping():
     assert metrics["web_search_count"] == 1
     assert metrics["calculator_count"] == 4
     assert metrics["submission_rate"] == 1
+    assert metrics["recovery_rate"] == 1
+    assert metrics["recovery_turns"] == 1
+    assert metrics["recovery_tokens"] == 1200
 
 
 def test_behavior_metrics_fall_back_to_usage_counts_for_old_artifacts():
@@ -48,3 +54,4 @@ def test_behavior_metrics_fall_back_to_usage_counts_for_old_artifacts():
     assert metrics["tool_call_count"] == 3
     assert metrics["errors_per_turn"] == 0
     assert metrics["submission_rate"] == 0
+    assert metrics["recovery_rate"] == 0

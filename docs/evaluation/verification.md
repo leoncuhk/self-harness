@@ -10,9 +10,10 @@ ledger.
 
 **Established in a deterministic fixture:** an outer harness edit causes a coding
 agent to repair a disposable product and pass frozen CI while the product seed
-stays unchanged. **Not established on FAB v2:** the first bounded live run produced
-one plausible candidate, but train and validation deltas were both zero and the
-gate rejected it. See the [case-study evidence](fabv2-case-study.md).
+stays unchanged. **Exploratory positive on FAB v2:** V4 accepted one
+continuous-diagnostic improvement on one exposed train question, but two later
+iterations added no gain, prediction precision was 0/3, and the sole holdout
+remained zero. See the [V4 audit](fabv2-v4-audit.md).
 
 Those are different claims and it is worth keeping them apart. What has been verified is
 **software correctness**. What has not been verified is **method efficacy**. A loop that
@@ -25,8 +26,8 @@ until you compare it against a baseline.
 | **L0.5** | **Do the recorded numbers match what was measured?** | ✅ after Phase 0 — **it did not before** ([artifact fidelity](#l05--artifact-fidelity)) |
 | L1 | Does the loop run with a **real** outer agent? | ✅ M1 2026-08-11, all 6 criteria ([results](results.md)) |
 | L2 | What is the real baseline, and how noisy is it? | ✅ measured — MVP-1 saturated (0.917, 0 flaky) and the stop rule fired |
-| L3 | Does the proposer understand what it is doing? | ⚠️ one graded prediction, **below base rate** (0.200 vs 0.286); n=1, underpowered ([results](results.md)) |
-| L4 | Does evolution beat spending the same budget on retries? | ❌ not established; bounded FAB run had zero gain and did not include a retry arm |
+| L3 | Does the proposer understand what it is doing? | ⚠️ diagnosis changed behavior once, but V4 predicted pass flips missed 0/3; still unconfirmed ([V4 audit](fabv2-v4-audit.md)) |
+| L4 | Does evolution beat spending the same budget on retries? | ❌ not established; V4 recovery costs were incompletely recorded and no retry arm ran |
 | L5 | Does the gain survive a locked test and transfer? | ❌ post-MVP |
 
 ---

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -219,6 +220,39 @@ def test_evaluation_fingerprint_tracks_frozen_source_content(tmp_path):
     evaluator.write_text(evaluator.read_text() + "\n# evaluator revision\n")
 
     assert experiment.evaluation_fingerprint != before
+
+
+def test_evaluation_fingerprint_tracks_explicit_runner_environment(tmp_path):
+    """Harness behavior switches are part of the reusable-score contract."""
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    changed = replace(
+        experiment,
+        runner_config={
+            **experiment.runner_config,
+            "env": {"FABV2_RECOVERY_SUBMIT": "1"},
+        },
+    )
+
+    assert changed.evaluation_fingerprint != experiment.evaluation_fingerprint
+
+
+def test_pytest_runner_applies_explicit_environment(tmp_path):
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    experiment = replace(
+        experiment,
+        runner_config={**experiment.runner_config, "env": {"HARNESS_SWITCH": "enabled"}},
+    )
+    runner = runners_module.PytestRunner(repo_root=tmp_path)
+    env = runner._build_env(  # noqa: SLF001 - contract-level unit test
+        experiment=experiment,
+        variant_path=tmp_path / "variant.json",
+        runtime_dir=tmp_path / "runtime",
+        workspace_root=experiment.workspace_root,
+    )
+
+    assert env["HARNESS_SWITCH"] == "enabled"
 
 
 def test_resume_reloads_the_proposal_instead_of_paying_for_another_model_call(tmp_path, monkeypatch):

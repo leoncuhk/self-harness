@@ -38,6 +38,9 @@ def behavior_metrics(out: Mapping[str, Any]) -> dict[str, float]:
         "errors_per_turn": errors / max(turns, 1.0),
         "tool_call_count": total_calls,
         "submission_rate": float(tool_counts["submit_final_result"] > 0),
+        "recovery_rate": float(bool(out.get("recovery_used", False))),
+        "recovery_turns": _count(out.get("recovery_turns")),
+        "recovery_tokens": _count(out.get("recovery_tokens")),
     }
     metrics.update({f"{name}_count": count for name, count in tool_counts.items()})
     return metrics

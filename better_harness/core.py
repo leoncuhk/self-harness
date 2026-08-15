@@ -662,6 +662,12 @@ class RunLayout:
             if experiment.better_agent_deepagents_root is None
             else str(experiment.better_agent_deepagents_root),
             "goal": experiment.goal.to_dict(),
+            "repeats": experiment.repeats,
+            "candidates": experiment.candidates,
+            "runner_config": experiment.runner_config,
+            "guards": experiment.guards,
+            "budget": experiment.budget,
+            "evaluation_fingerprint": experiment.evaluation_fingerprint,
         }
         (self.root / "manifest.json").write_text(json.dumps(payload, indent=2) + "\n")
         write_split_manifest(experiment, self.root)

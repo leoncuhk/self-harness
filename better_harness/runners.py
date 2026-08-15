@@ -49,6 +49,7 @@ class PytestRunner:
         command.extend(["--collect-only"])
         command.extend(str(arg) for arg in experiment.runner_config.get("pytest_args", ["-q"]))
         env = os.environ.copy()
+        env.update(self._configured_env(experiment))
         env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(experiment.workspace_root)
         runtime_dir = ensure_sitecustomize(self.repo_root / ".runtime")
         env["PYTHONPATH"] = prepend_pythonpath(
@@ -163,6 +164,7 @@ class PytestRunner:
                             "BETTER_HARNESS_WORKSPACE_ROOT": str(run_workspace),
                             "PYTHONPATH": env["PYTHONPATH"],
                             "LANGSMITH_TEST_SUITE": env["LANGSMITH_TEST_SUITE"],
+                            **self._configured_env(experiment),
                         },
                     },
                     indent=2,
@@ -327,6 +329,7 @@ class PytestRunner:
         workspace_root: Path,
     ) -> dict[str, str]:
         env = os.environ.copy()
+        env.update(self._configured_env(experiment))
         env[VARIANT_ENV] = str(variant_path)
         env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(workspace_root)
         env["PYTHONPATH"] = prepend_pythonpath(
@@ -335,6 +338,15 @@ class PytestRunner:
         )
         env.setdefault("LANGSMITH_TEST_SUITE", f"better-harness-{experiment.name}")
         return env
+
+    @staticmethod
+    def _configured_env(experiment: Experiment) -> dict[str, str]:
+        """Return explicit, fingerprinted subprocess environment values."""
+        raw = experiment.runner_config.get("env", {})
+        if not isinstance(raw, dict):
+            msg = "runner.pytest.env must be a table"
+            raise TypeError(msg)
+        return {str(key): str(value) for key, value in raw.items()}
 
     def _base_command(self, experiment: Experiment) -> list[str]:
         project_root = Path(str(experiment.runner_config["project_root"]))

@@ -27,6 +27,7 @@ from typing import Any
 from urllib.parse import quote
 
 import requests
+from accounting import merge_tool_usage, result_tokens
 from bs4 import BeautifulSoup
 from model_library.agent import (
     Agent,
@@ -42,8 +43,6 @@ from model_library.base.input import InputItem, SystemInput, TextInput
 from model_library.exceptions import MaxContextWindowExceededError
 from model_library.registry_utils import get_registry_model
 from simpleeval import SimpleEval
-
-from better_harness.usage import total_tokens
 
 MAX_END_DATE = "2026-03-01"
 UA = {"User-Agent": "Fabv2Research harness-study@example.com"}
@@ -474,7 +473,7 @@ def _ensure_proxy_models() -> None:
     _PROXY_LOADED = True
 
 
-def get_agent(model_name: str, prompt_text: str, log_dir: Path, *, max_turns: int, max_time: int, max_tokens: int, temperature: float) -> Agent:
+def _make_llm(model_name: str, max_tokens: int, temperature: float) -> LLM:
     _ensure_proxy_models()
     if model_name == _PROXY_MODEL:
         # The OpenAI-compatible proxy only serves /chat/completions (not the
@@ -509,7 +508,11 @@ def get_agent(model_name: str, prompt_text: str, log_dir: Path, *, max_turns: in
         )
     else:
         llm = get_registry_model(model_name, LLMConfig(max_tokens=max_tokens, temperature=temperature))
-    llm = _wrap_llm_timeout(llm)
+    return _wrap_llm_timeout(llm)
+
+
+def get_agent(model_name: str, prompt_text: str, log_dir: Path, *, max_turns: int, max_time: int, max_tokens: int, temperature: float) -> Agent:
+    llm = _make_llm(model_name, max_tokens, temperature)
     tools = [
         WebSearchStub(),
         RetrieveInformationFree(llm=llm),
@@ -540,17 +543,100 @@ def get_agent(model_name: str, prompt_text: str, log_dir: Path, *, max_turns: in
     def _should_stop(turn_result: TurnResult) -> bool:
         return False
 
+    # Opt-in budget visibility (FABV2_BUDGET_MESSAGES=1). Without it the model
+    # never learns how much of its turn/time budget is left, and the observed
+    # failure mode is research that runs until censoring with no submission.
+    budget_messages = os.environ.get("FABV2_BUDGET_MESSAGES", "") == "1"
+
+    def _turn_message(turn_number: int, max_turns: int):
+        if not budget_messages:
+            return None
+        left = max_turns - turn_number
+        if left == 2:
+            return TextInput(text="Budget warning: 2 turns remain. Wrap up and call submit_final_result with your best available answer.")
+        if left == 1:
+            return TextInput(text="Budget warning: this is your LAST turn. You MUST call submit_final_result now with your best answer so far.")
+        return None
+
+    def _time_message(elapsed: float, max_seconds: float):
+        if not budget_messages:
+            return None
+        remaining = max_seconds - elapsed
+        if remaining <= 120 and remaining > 0:
+            return TextInput(text=f"Time budget warning: {int(remaining)}s remain. Call submit_final_result with your best answer now.")
+        return None
+
     return Agent(
         llm=llm,
         tools=tools,
         name="finance",
         log_dir=log_dir,
         config=AgentConfig(
-            turn_limit=TurnLimit(max_turns=max_turns) if max_turns else None,
-            time_limit=TimeLimit(max_seconds=max_time),
+            turn_limit=(
+                TurnLimit(max_turns=max_turns, turn_message=_turn_message) if max_turns else None
+            ),
+            time_limit=TimeLimit(max_seconds=max_time, time_message=_time_message),
         ),
         hooks=AgentHooks(before_query=_before_query, should_stop=_should_stop),
     )
+
+
+def _recovery_submit(  # noqa: PLR0913 - explicit execution contract
+    model_name: str,
+    result,
+    log_dir: Path,
+    *,
+    max_tokens: int,
+    temperature: float,
+    max_turns: int,
+    max_time: int,
+):
+    """Last-resort submission for censored rollouts (FABV2_RECOVERY_SUBMIT=1).
+
+    When a rollout ends at max_turns/max_time without calling submit_final_result,
+    the official semantics score it as an empty answer — zero, regardless of the
+    research completed. This runs a bounded follow-up phase over the existing
+    trajectory with submit_final_result as the only tool, converting censored
+    zeros into the model's best available partial answer. It reads no new
+    information and touches no evaluator, so it is a harness change, not an
+    evaluator change.
+    """
+    try:
+        from model_library.base.input import ToolResult  # noqa: F401  (type doc only)
+
+        history = list(result.final_history)
+        history.append(
+            TextInput(
+                text=(
+                    "SYSTEM DIRECTIVE: Your research budget is exhausted. All tools except submit_final_result "
+                    "have been DISABLED — any other tool call will fail. The ONLY permitted action now is to call "
+                    "submit_final_result with your best available answer, based ONLY on the work already completed "
+                    "above. In that answer include: every figure you have established so far, your best-supported "
+                    "conclusion stated explicitly, and the sources you used. Do this immediately."
+                )
+            )
+        )
+        recovery = Agent(
+            llm=_make_llm(model_name, max_tokens, temperature),
+            tools=[SubmitFinalResult()],
+            name="finance-recovery",
+            log_dir=log_dir,
+            config=AgentConfig(
+                turn_limit=TurnLimit(max_turns=max_turns),
+                time_limit=TimeLimit(max_seconds=max_time),
+            ),
+        )
+
+        async def _go():
+            return await recovery.run(history, question_id="q-recovery")
+
+        return asyncio.run(_go())
+    except Exception:
+        if os.environ.get("FABV2_DEBUG", "") == "1":
+            import traceback
+
+            traceback.print_exc()
+        return None
 
 
 def run_question(
@@ -583,19 +669,58 @@ def run_question(
         )
 
     result = asyncio.run(_run())
-    aggregate_tokens = total_tokens(getattr(result, "final_aggregated_metadata", None))
-    compaction_tokens = total_tokens(getattr(result, "final_compaction_metadata", None))
-    tokens = None
-    if aggregate_tokens is not None or compaction_tokens is not None:
-        tokens = (aggregate_tokens or 0) + (compaction_tokens or 0)
+    main_duration_s = time.monotonic() - started
+    final_answer = result.final_answer or ""
+    stop_reason = str(result.stop_reason)
+    recovery_result = None
+    recovery_duration_s = 0.0
+    if (
+        not final_answer
+        and os.environ.get("FABV2_RECOVERY_SUBMIT", "") == "1"
+        and stop_reason in ("max_time", "max_turns")
+    ):
+        recovery_started = time.monotonic()
+        recovery_result = _recovery_submit(
+            model,
+            result,
+            log_dir,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            max_turns=int(os.environ.get("FABV2_RECOVERY_MAX_TURNS", "3")),
+            max_time=int(os.environ.get("FABV2_RECOVERY_MAX_TIME", "120")),
+        )
+        recovery_duration_s = time.monotonic() - recovery_started
+        recovered_answer = (
+            (getattr(recovery_result, "final_answer", None) or "").strip()
+            if recovery_result is not None
+            else ""
+        )
+        if recovered_answer:
+            final_answer = recovered_answer
+            stop_reason = f"{stop_reason}+recovery_submit"
+    main_tokens = result_tokens(result)
+    recovery_tokens = result_tokens(recovery_result)
+    tokens = (
+        None
+        if main_tokens is None and recovery_tokens is None
+        else (main_tokens or 0) + (recovery_tokens or 0)
+    )
+    results = (result,) if recovery_result is None else (result, recovery_result)
     return {
-        "final_answer": result.final_answer or "",
-        "success": bool(result.success),
-        "stop_reason": str(result.stop_reason),
-        "turns": result.total_turns,
+        "final_answer": final_answer,
+        "success": bool(result.success or getattr(recovery_result, "success", False)),
+        "stop_reason": stop_reason,
+        "turns": sum(int(getattr(item, "total_turns", 0) or 0) for item in results),
         "tokens": tokens,
-        "error_count": result.error_count,
-        "tool_calls_count": result.tool_calls_count,
-        "tool_usage": result.tool_usage,
+        "error_count": sum(int(getattr(item, "error_count", 0) or 0) for item in results),
+        "tool_calls_count": sum(
+            int(getattr(item, "tool_calls_count", 0) or 0) for item in results
+        ),
+        "tool_usage": merge_tool_usage(*results),
+        "recovery_used": recovery_result is not None,
+        "recovery_tokens": recovery_tokens,
+        "recovery_turns": int(getattr(recovery_result, "total_turns", 0) or 0),
+        "recovery_duration_s": round(recovery_duration_s, 1),
+        "main_duration_s": round(main_duration_s, 1),
         "duration_s": round(time.monotonic() - started, 1),
     }

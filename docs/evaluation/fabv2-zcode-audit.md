@@ -6,12 +6,12 @@ official public evidence, and proposed work.
 
 ## Bottom line
 
-The current repository implements a real L3 Self-Harness loop, but it has **not
-demonstrated a FAB v2 improvement, much less the highest level**. Its strongest
-evidence is orchestration correctness and conservative rejection: the executed
-three-question v1 run scored 0 for the seed, B5, and final arm; the later v2
-continuous-objective calibration also scored 0 and rejected its candidate.
-Those are valid negative results, not leaderboard results.
+The current repository implements a real L3 Self-Harness loop and V4 has now
+produced its first **exploratory positive** on a real FAB development case. That
+is not yet a confirmed FAB v2 improvement, much less the highest level: it is
+one accepted continuous-diagnostic gain on one exposed train question at one
+repeat; two later iterations added no gain and the holdout stayed at zero.
+See [the V4 execution audit](fabv2-v4-audit.md).
 
 ZCodeProject is highly useful as a source of the complete public dataset,
 official scaffold semantics, category taxonomy, source-research experience, and
@@ -24,8 +24,8 @@ integrated with source commit and SHA-256 provenance; answer files were not.
 | Question | Verdict | Evidence |
 | --- | --- | --- |
 | Is Self-Harness structurally implemented? | Yes | isolated inner/outer loops, frozen evaluator/goal, editable-surface allowlist, repeated evaluation, conservative/objective gates, cost veto, traces, prediction ledger, archive, resume, artifact audit, deterministic E2E |
-| Has it improved FAB v2? | No observed gain | both bounded v1 and v2 rejected their candidate with zero selected-arm gain |
-| Is the v2 continuous objective validated live? | Yes, negatively | the loop executed, but every eight-turn rollout exhausted its budget with an empty answer and zero credit |
+| Has it improved FAB v2? | Exploratory positive, unconfirmed | V4 accepted one q004 continuous-metric gain; n=1, all predicted pass flips missed, holdout 0→0 |
+| Is the continuous objective validated live? | Yes | V2 exposed censoring; V4 restored signal and used `ungated_credit` for one accepted edit |
 | Is Public-27 available locally? | Yes | official CSV SHA-256 pinned; 27 questions, 239 criteria, 79 must-pass, nine categories |
 | Is the local score official FAB partial credit? | No | the local deterministic judge cannot decide qualitative criteria and uses free/non-identical tools |
 | Is there an auditable ranking mechanism? | Yes, locally | candidate archive plus the new Public-27 submission contract and separate official/diagnostic tables |
@@ -111,9 +111,10 @@ harness on all 27 and disclose every prior exposure.
 2. **Apparatus fidelity:** local web search is a stub and the remaining free
    services differ from the official tools. Report both apparatus profiles;
    never pool them.
-3. **Efficacy evidence:** run the preregistered v3 and later Public-27 protocols
-   across at least three repeats. The existing one-repeat, three-case results
-   only test integration and revealed eight-turn censoring.
+3. **Efficacy evidence:** repeat the V4 selected harness and later Public-27
+   protocols at least three times. V4 is the first real exploratory positive,
+   but its one-question holdout is uninformative and its historical recovery
+   costs were incompletely recorded.
 4. **Comparator strength:** fixed B0/B5, token-matched retry/best-of-N, and
    sequential refinement must precede an automated-evolution claim.
 5. **Contamination:** criterion text is public and failure messages expose
