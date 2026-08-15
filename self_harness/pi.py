@@ -38,7 +38,8 @@ Schema:
 }
 
 An empty edit set is valid only when the evidence does not justify a change. Never mention or infer
-private validation or scorecard content."""
+private validation or scorecard content. Compare prior visible attempts before proposing: do not
+repeat a semantically equivalent edit that produced no visible train gain."""
 
 REPAIR_SYSTEM_PROMPT = """Repair the attached proposal into exactly one valid JSON object.
 
@@ -65,8 +66,14 @@ def build_atomic_context(workspace: ProposerWorkspace) -> str:
         ("TASK", workspace.root / "task.md"),
         ("NORMALIZED EXPERIENCE", workspace.root / "experience" / "records.jsonl"),
         ("FAILURE CLUSTERS", workspace.root / "failure_clusters.json"),
+        ("VISIBLE ITERATION HISTORY", workspace.root / "history" / "visible_history.md"),
+        ("PRIOR VISIBLE ATTEMPTS", workspace.root / "history" / "prior_attempts.json"),
     ]
-    chunks = [f"# {title}\n{path.read_text().strip()}" for title, path in sections]
+    chunks = [
+        f"# {title}\n{path.read_text().strip()}"
+        for title, path in sections
+        if path.exists()
+    ]
     chunks.append("# CURRENT SURFACES")
     for name, path in sorted(workspace.surface_files.items()):
         chunks.append(f"## {name}\n{path.read_text().strip()}")

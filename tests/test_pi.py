@@ -21,6 +21,13 @@ def _workspace(tmp_path: Path) -> ProposerWorkspace:
     (tmp_path / "failure_clusters.json").write_text("[]\n")
     (tmp_path / "experience").mkdir()
     (tmp_path / "experience" / "records.jsonl").write_text('{"case_id":"train-1"}\n')
+    (tmp_path / "history").mkdir()
+    (tmp_path / "history" / "visible_history.md").write_text(
+        "Iteration 1 changed tools; train 0/1.\n"
+    )
+    (tmp_path / "history" / "prior_attempts.json").write_text(
+        '[{"iteration":1,"hypothesis":"output too large"}]\n'
+    )
     proposal = tmp_path / "proposal.md"
     proposal.write_text("template\n")
     return ProposerWorkspace(tmp_path, current, proposal, {"system": surface})
@@ -30,6 +37,8 @@ def test_atomic_context_contains_visible_evidence_and_surfaces(tmp_path: Path):
     context = build_atomic_context(_workspace(tmp_path))
     assert "visible task" in context
     assert '"case_id":"train-1"' in context
+    assert "Iteration 1 changed tools; train 0/1" in context
+    assert '"hypothesis":"output too large"' in context
     assert "## system\nold" in context
 
 

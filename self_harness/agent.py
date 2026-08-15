@@ -12,7 +12,7 @@ from self_harness.core import Experiment, Proposal, RunLayout, SplitResult, Vari
 from self_harness.ledger import Prediction, parse_prediction
 from self_harness.patching import build_variant
 from self_harness.signatures import FailureCluster
-from self_harness.traces import write_experience_bundle
+from self_harness.traces import normalize_outcome, write_experience_bundle
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,6 @@ def build_proposer_workspace(  # noqa: PLR0913 - one workspace needs the whole i
         root=root,
     )
     _write_visible_history(layout=layout, root=root)
-    _copy_prior_visible_artifacts(layout=layout, root=root, iteration=iteration)
     (root / "failure_clusters.json").write_text(
         json.dumps([cluster.to_dict() for cluster in clusters], indent=2) + "\n"
     )
@@ -333,60 +332,56 @@ def _write_train_artifacts(
 
 
 def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
+    """Write bounded train-only feedback from earlier candidate attempts."""
     history_dir = root / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
     summaries: list[str] = []
+    attempts: list[dict[str, object]] = []
     for path in sorted(layout.visible_iterations_dir.rglob("decision.json")):
         payload = json.loads(path.read_text())
+        variant = str(payload.get("candidate_variant") or f"iter-{int(payload['iteration']):03d}")
+        train_path = layout.visible_root / "train" / variant / "result.json"
+        failures: list[dict[str, object]] = []
+        train_metrics: dict[str, float] = {}
+        if train_path.exists():
+            try:
+                train = SplitResult.load(train_path)
+            except (OSError, ValueError, KeyError, TypeError):
+                train = None
+            if train is not None:
+                train_metrics = train.metrics
+                failures = [
+                    normalize_outcome(outcome).to_dict()
+                    for outcome in train.failing_outcomes()[:4]
+                ]
+        prediction = payload.get("prediction")
+        prediction = prediction if isinstance(prediction, dict) else {}
+        changed = [str(item) for item in payload.get("changed_surfaces", ())]
+        attempt = {
+            "iteration": int(payload["iteration"]),
+            "variant": variant,
+            "changed_surfaces": changed,
+            "train_passed": int(payload.get("train_passed", 0)),
+            "train_total": int(payload.get("train_total", 0)),
+            "train_metrics": train_metrics,
+            "hypothesis": str(prediction.get("root_cause", ""))[:4000],
+            "predicted_flips": [str(item) for item in prediction.get("flip_to_pass", ())],
+            "train_failures": failures,
+        }
+        attempts.append(attempt)
         summaries.append(
-            f"- Iteration {payload['iteration']}: {payload['decision']} "
-            f"(train {payload['train_passed']}/{payload['train_total']})"
+            f"- Iteration {payload['iteration']}: `{variant}` changed "
+            f"`{', '.join(changed) or 'none'}`; visible train "
+            f"{payload.get('train_passed', 0)}/{payload.get('train_total', 0)}."
         )
     if not summaries:
         summaries.append("- No previous iterations yet.")
     (history_dir / "visible_history.md").write_text(
         "# Visible History\n\n" + "\n".join(summaries) + "\n"
     )
-    leaderboard = layout.root / "archive" / "leaderboard.md"
-    if leaderboard.exists():
-        shutil.copy2(leaderboard, history_dir / "candidate_leaderboard.md")
-
-
-def _copy_prior_visible_artifacts(*, layout: RunLayout, root: Path, iteration: int) -> None:
-    prior_root = root / "history" / "prior_visible"
-    prior_root.mkdir(parents=True, exist_ok=True)
-
-    train_root = layout.visible_root / "train"
-    if train_root.exists():
-        shutil.copytree(train_root, prior_root / "train", dirs_exist_ok=True)
-
-    iterations_root = prior_root / "iterations"
-    iterations_root.mkdir(parents=True, exist_ok=True)
-    for decision_path in sorted(layout.visible_iterations_dir.glob("*/decision.json")):
-        if decision_path.parent.name == f"{iteration:03d}":
-            continue
-        target_dir = iterations_root / decision_path.parent.name
-        target_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(decision_path, target_dir / decision_path.name)
-        markdown_path = decision_path.with_suffix(".md")
-        if markdown_path.exists():
-            shutil.copy2(markdown_path, target_dir / markdown_path.name)
-        proposer_workspace = decision_path.parent / "proposer_workspace"
-        if proposer_workspace.exists():
-            proposer_target = target_dir / "proposer_workspace"
-            proposer_target.mkdir(parents=True, exist_ok=True)
-            for name in (
-                "outer_agent_request.json",
-                "outer_agent_result.json",
-                "outer_agent_stdout.log",
-                "outer_agent_stderr.log",
-                "proposal.md",
-                "result.json",
-                "task.md",
-            ):
-                source = proposer_workspace / name
-                if source.exists():
-                    shutil.copy2(source, proposer_target / name)
+    (history_dir / "prior_attempts.json").write_text(
+        json.dumps(attempts[-5:], indent=2, sort_keys=True, default=str) + "\n"
+    )
 
 
 def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iteration context
