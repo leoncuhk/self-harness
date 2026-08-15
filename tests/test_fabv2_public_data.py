@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+from better_harness.core import load_experiment
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -43,3 +45,26 @@ def test_public27_has_three_questions_in_each_of_nine_categories():
     )
     assert len(manifest["categories"]) == 9
     assert set(manifest["categories"].values()) == {3}
+
+
+def test_public27_experiment_is_complete_stratified_adaptive_development():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_public27_self_harness.toml")
+    folds = json.loads(
+        (
+            ROOT
+            / "benchmarks"
+            / "fabv2"
+            / "community"
+            / "development_folds.json"
+        ).read_text()
+    )
+
+    assert experiment.repeats == 3
+    assert len(experiment.cases_for_split("train")) == 18
+    assert len(experiment.cases_for_split("holdout")) == 9
+    assert not experiment.has_split("scorecard")
+    assert len(experiment.strata_for_split("train")) == 9
+    assert len(experiment.strata_for_split("holdout")) == 9
+    assert len(folds["folds"]) == 3
+    assert all(len(fold["train"]) == 18 for fold in folds["folds"])
+    assert all(len(fold["holdout"]) == 9 for fold in folds["folds"])

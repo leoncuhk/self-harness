@@ -32,6 +32,10 @@ See [architecture](docs/architecture.md), [verification ladder](docs/verificatio
 [field synthesis](docs/overview.md), and the [bounded FAB v2 result](docs/fabv2-case-study.md)
 before interpreting an experiment.
 
+The [ZCodeProject/Public-27 audit](docs/fabv2-zcode-audit.md) records what was
+integrated, what remains contaminated or unverified, and the evidence required
+for an unofficial community comparison.
+
 ## Quick start
 
 Requirements: Python 3.12+, `uv`, and credentials for the models used by a live

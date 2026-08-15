@@ -29,7 +29,7 @@ import agent_runner  # noqa: E402  (workspace module)
 import judge  # noqa: E402  (frozen evaluator)
 
 QUESTIONS = json.loads((ROOT.parent / "questions.json").read_text())
-PROMPT = (WORKSPACE / "prompt.txt").read_text()
+PROMPT = agent_runner.compose_harness_prompt(WORKSPACE / "prompt.txt")
 CRITERIA_TEXTS = [
     c["text"]
     for q in json.loads((ROOT / "frozen" / "rubrics.json").read_text())
@@ -37,8 +37,8 @@ CRITERIA_TEXTS = [
 ]
 
 
-# evaluator-side anti-memorisation guard: the prompt surface must not share any
-# 8-word shingle with any grading criterion (semantic extension of case_id_leak)
+# Evaluator-side anti-memorisation guard: the complete runtime harness (prompt
+# plus enabled policy surfaces) must not share any 8-word shingle with a rubric.
 def _shingles(text: str, n: int = 8) -> set[str]:
     words = re.sub(r"[^a-z0-9 ]", " ", text.lower()).split()
     return {" ".join(words[i : i + n]) for i in range(len(words) - n + 1)}

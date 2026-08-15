@@ -8,6 +8,9 @@ splits, proposer budget, evaluation budget, gate, and resource ceilings.
 - `fabv2_self_harness.toml`: bounded FAB v2 structural self-harness study.
 - `fabv2_self_harness_v2.toml`: pre-registered successor with an ungated
   severity-weighted search objective; it has not yet been executed.
+- `fabv2_public27_self_harness.toml`: expensive 18/9 Public-27 adaptive
+  development run with three repeats and two candidates; it has not been
+  executed and its holdout is explicitly not a locked test.
 - `fabv2_case_study_b5.toml`: equal-budget hand-engineered FAB comparator.
 - `m2_agentic.toml`, `b5_agentic.toml`, `mvp2_agentic.toml`: earlier agentic
   benchmark stages retained for reproducibility.
