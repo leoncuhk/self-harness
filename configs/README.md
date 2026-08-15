@@ -6,6 +6,8 @@ splits, proposer budget, evaluation budget, gate, and resource ceilings.
 
 - `coding_demo.toml`: deterministic product-development dual-loop fixture.
 - `fabv2_self_harness.toml`: bounded FAB v2 structural self-harness study.
+- `fabv2_self_harness_v2.toml`: pre-registered successor with an ungated
+  severity-weighted search objective; it has not yet been executed.
 - `fabv2_case_study_b5.toml`: equal-budget hand-engineered FAB comparator.
 - `m2_agentic.toml`, `b5_agentic.toml`, `mvp2_agentic.toml`: earlier agentic
   benchmark stages retained for reproducibility.

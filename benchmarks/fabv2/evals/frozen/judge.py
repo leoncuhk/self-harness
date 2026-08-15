@@ -61,9 +61,13 @@ def extract_anchors(text: str) -> list[dict]:
             neg = True
         if neg:
             value = -value
-        unit = {"%": "percent", "bps": "bps", "basis points": "bps", "x": "multiple", "": "plain"}[unit_raw]
+        unit = {"%": "percent", "bps": "bps", "basis points": "bps", "x": "multiple", "": "plain"}[
+            unit_raw
+        ]
         scale = ""
-        m_scale = re.search(r"(million|billion|thousand)", text[m.end() : m.end() + 22], re.IGNORECASE)
+        m_scale = re.search(
+            r"(million|billion|thousand)", text[m.end() : m.end() + 22], re.IGNORECASE
+        )
         if m_scale:
             scale = m_scale.group(1).lower()
         anchors.append({"value": value, "unit": unit, "scale": scale, "raw": raw.strip()})
@@ -102,20 +106,39 @@ def score_question(qid: str, answer: str) -> dict:
                 }
             )
         else:
-            crit_results.append({"text": c["text"], "severity": c["severity"], "must_pass": c["must_pass"], "passed": None})
+            crit_results.append(
+                {
+                    "text": c["text"],
+                    "severity": c["severity"],
+                    "must_pass": c["must_pass"],
+                    "passed": None,
+                }
+            )
     known = [c for c in crit_results if c["passed"] is not None]
     failed_must = [c for c in known if c["must_pass"] and not c["passed"]]
-    if failed_must or not known:
-        partial = 0.0
-    else:
-        partial = sum(c["severity"] * c["passed"] for c in known) / sum(c["severity"] for c in known)
+    ungated_credit = (
+        0.0
+        if not known
+        else sum(c["severity"] * c["passed"] for c in known) / sum(c["severity"] for c in known)
+    )
+    numeric_criterion_recall = (
+        0.0 if not known else sum(bool(c["passed"]) for c in known) / len(known)
+    )
+    partial = 0.0 if failed_must or not known else ungated_credit
     return {
         "qid": qid,
         "category": q["category"],
         "partial_credit": partial,
+        "ungated_credit": ungated_credit,
+        "numeric_criterion_recall": numeric_criterion_recall,
+        "rubric_numeric_coverage": 0.0 if not q["criteria"] else len(known) / len(q["criteria"]),
         "n_known": len(known),
         "n_criteria": len(q["criteria"]),
         "failed_must_pass": [c["text"][:100] for c in failed_must],
-        "failed_numeric": [f"{'MUST ' if c['must_pass'] else ''}({c['anchors_hit']}) {c['text'][:110]}" for c in known if not c["passed"]],
+        "failed_numeric": [
+            f"{'MUST ' if c['must_pass'] else ''}({c['anchors_hit']}) {c['text'][:110]}"
+            for c in known
+            if not c["passed"]
+        ],
         "criteria": crit_results,
     }

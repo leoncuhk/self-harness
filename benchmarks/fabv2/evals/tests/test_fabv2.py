@@ -81,9 +81,9 @@ def test_question(
     record_metrics(
         {
             "partial_credit": verdict["partial_credit"],
-            "numeric_recall": 0.0
-            if verdict["n_criteria"] == 0
-            else verdict["n_known"] / verdict["n_criteria"],
+            "ungated_credit": verdict["ungated_credit"],
+            "numeric_criterion_recall": verdict["numeric_criterion_recall"],
+            "rubric_numeric_coverage": verdict["rubric_numeric_coverage"],
         }
     )
 
