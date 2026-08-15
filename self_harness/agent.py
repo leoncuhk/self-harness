@@ -12,7 +12,7 @@ from self_harness.core import Experiment, Proposal, RunLayout, SplitResult, Vari
 from self_harness.ledger import Prediction, parse_prediction
 from self_harness.patching import build_variant
 from self_harness.signatures import FailureCluster
-from self_harness.traces import normalize_outcome, write_experience_bundle
+from self_harness.traces import compact_failure_message, normalize_outcome, write_experience_bundle
 
 
 @dataclass(frozen=True)
@@ -465,7 +465,8 @@ def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iterati
     if not contract_lines:
         contract_lines.append("- No additional surface contracts declared.")
     failure_lines = [
-        f"- `{outcome.case_id}` [{outcome.stratum}]: {outcome.failure_message or outcome.status}"
+        f"- `{outcome.case_id}` [{outcome.stratum}]: "
+        f"{compact_failure_message(outcome.failure_message) or outcome.status}"
         for outcome in train_result.failing_outcomes()
     ]
     if not failure_lines:

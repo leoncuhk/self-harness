@@ -32,7 +32,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
-from self_harness.traces import trace_text
+from self_harness.traces import compact_failure_message, trace_text
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Iterable, Sequence
@@ -265,7 +265,11 @@ def cluster_failures(outcomes: Sequence[CaseOutcome]) -> list[FailureCluster]:
             case_ids=tuple(outcome.case_id for outcome in members),
             strata=tuple(sorted({outcome.stratum for outcome in members})),
             representative_message=next(
-                (outcome.failure_message for outcome in members if outcome.failure_message),
+                (
+                    compact_failure_message(outcome.failure_message)
+                    for outcome in members
+                    if outcome.failure_message
+                ),
                 None,
             ),
         )

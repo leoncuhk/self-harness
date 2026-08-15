@@ -4,7 +4,12 @@ import json
 from pathlib import Path
 
 from self_harness.core import CaseOutcome
-from self_harness.traces import normalize_outcome, trace_text, write_experience_bundle
+from self_harness.traces import (
+    compact_failure_message,
+    normalize_outcome,
+    trace_text,
+    write_experience_bundle,
+)
 
 
 def test_normalize_outcome_reads_runner_artifacts(tmp_path: Path):
@@ -73,3 +78,17 @@ def test_experience_bundle_is_bounded_and_jsonl(tmp_path: Path):
     lines = (tmp_path / "experience" / "records.jsonl").read_text().splitlines()
     assert len(lines) == 2
     assert json.loads(lines[0])["case_id"] == "case-0"
+
+
+def test_compact_failure_message_prefers_pytest_error_lines():
+    message = """qid = 'q004'
+def test_question():
+    record_usage = <function fixture>
+E   assert 0.125 >= 1.0
+E   fabv2:q004 partial=0.125 turns=14
+"""
+
+    compact = compact_failure_message(message)
+
+    assert compact == "E   assert 0.125 >= 1.0\nE   fabv2:q004 partial=0.125 turns=14"
+    assert "record_usage" not in compact

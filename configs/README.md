@@ -9,6 +9,7 @@
 - `fabv2_public27_strong.toml`: frozen strong harness, Public-27 × three-repeat publication arm.
 - `fabv2_minimal.toml`: zero-evolution minimal FAB comparator.
 - `fabv2.toml`: Public-27 Numeric-24 8/8/8 development protocol.
+- `fabv2_context_v2.toml`: same 8/8/8 contract with aggregate proposer evidence compaction.
 
 Each TOML freezes the target, model, editable surfaces, split assignment, budgets, guards, and gate.
 Create a new versioned contract when any of these change; never rewrite a contract after reading its

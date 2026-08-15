@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
     from self_harness.core import CaseOutcome
 
-MAX_TEXT_CHARS = 6000
-MAX_RESEARCH_CHARS = 12000
+MAX_TEXT_CHARS = 2000
+MAX_RESEARCH_CHARS = 4000
 VERIFIER_KEYS = (
     "partial_credit",
     "ungated_credit",
@@ -70,6 +70,17 @@ def _read_jsonl(path: Path, *, limit: int = 200) -> tuple[dict[str, Any], ...]:
     return tuple(events)
 
 
+def compact_failure_message(message: str | None) -> str | None:
+    """Keep the verifier error, not pytest's echoed fixture implementation."""
+    if not message:
+        return None
+    lines = message.splitlines()
+    error_lines = [line.strip() for line in lines if line.lstrip().startswith("E ")]
+    selected = error_lines or lines[-40:]
+    compact = "\n".join(selected).strip()
+    return compact[-MAX_TEXT_CHARS:] or None
+
+
 def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
     """Derive one stable experience record from runner-specific artifacts."""
     artifacts = Path(outcome.artifacts_dir) if outcome.artifacts_dir else None
@@ -92,7 +103,7 @@ def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
         stratum=outcome.stratum,
         status=outcome.status,
         score=outcome.score,
-        failure_message=(outcome.failure_message or "")[:MAX_TEXT_CHARS] or None,
+        failure_message=compact_failure_message(outcome.failure_message),
         stop_reason=None if payload.get("stop_reason") is None else str(payload["stop_reason"]),
         turns=None if payload.get("turns") is None else int(payload["turns"]),
         tokens=None if payload.get("tokens") is None else int(payload["tokens"]),

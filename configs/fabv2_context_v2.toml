@@ -1,0 +1,8 @@
+# Public-24 evolution after controller-level aggregate evidence compaction.
+# All model, split, evaluator, rollout budget, guard, and gate settings remain
+# inherited from v1; the distinct name prevents mixing the two search protocols.
+
+extends = "fabv2.toml"
+
+[experiment]
+name = "fabv2-public24-context-v2"
