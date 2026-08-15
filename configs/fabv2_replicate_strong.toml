@@ -1,0 +1,8 @@
+# Three-repeat comparator for the accepted q005/q006 candidate. No evolution.
+
+extends = "fabv2_evolve_smoke.toml"
+
+[experiment]
+name = "fabv2-replicate-strong-v1"
+max_iterations = 0
+repeats = 3

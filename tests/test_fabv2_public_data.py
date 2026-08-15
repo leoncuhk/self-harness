@@ -147,3 +147,20 @@ def test_evolution_smoke_uses_atomic_single_call_proposer_budget():
     experiment = load_experiment(ROOT / "configs" / "fabv2_evolve_smoke.toml")
     assert experiment.better_agent_max_turns == 1
     assert experiment.better_agent_config["max_tokens"] == 60000
+
+
+def test_replication_contracts_change_only_the_accepted_surfaces():
+    strong = load_experiment(ROOT / "configs" / "fabv2_replicate_strong.toml")
+    evolved = load_experiment(ROOT / "configs" / "fabv2_replicate_evolved.toml")
+
+    assert strong.repeats == evolved.repeats == 3
+    assert strong.max_iterations == evolved.max_iterations == 0
+    assert strong.cases == evolved.cases
+    assert strong.runner_config == evolved.runner_config
+    assert strong.model == evolved.model
+    changed = {
+        name
+        for name in strong.surfaces
+        if strong.surfaces[name].base_value != evolved.surfaces[name].base_value
+    }
+    assert changed == {"orchestration", "verification"}
