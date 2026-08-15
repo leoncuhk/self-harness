@@ -1,6 +1,10 @@
+import json
+from pathlib import Path
+
 from self_harness.fabv2_leaderboard import (
     DATASET_SHA256,
     PROTOCOL_ID,
+    export_numeric_submission,
     render_markdown,
     summarize_submission,
 )
@@ -68,3 +72,44 @@ def test_official_and_diagnostic_evidence_render_in_separate_tables():
     assert "Local numeric diagnostic" in output
     assert output.count("`official`") == 1
     assert output.count("`diagnostic`") == 1
+
+
+def test_exporter_preserves_missing_public_cases_as_ineligible(tmp_path: Path):
+    run = tmp_path / "run"
+    (run / "variants").mkdir(parents=True)
+    (run / "manifest.json").write_text(
+        json.dumps({"model": "provider/model", "repeats": 3})
+    )
+    (run / "variants" / "baseline.json").write_text('{"key":"baseline"}')
+    for repeat in range(3):
+        case = (
+            run
+            / "history"
+            / "visible"
+            / "train"
+            / "baseline"
+            / f"rep{repeat:02d}"
+            / "cases"
+            / "tests-test-fabv2-py--test-question-q001"
+        )
+        case.mkdir(parents=True)
+        (case / "summary.json").write_text(
+            json.dumps({"score": 1.0, "metrics": {"ungated_credit": 0.5}})
+        )
+        (case / "run.json").write_text(
+            json.dumps({"tokens": 100, "cost": 0.0, "duration_s": 1.0})
+        )
+
+    payload = export_numeric_submission(
+        run,
+        submission_id="partial",
+        apparatus="fixture",
+    )
+    row = summarize_submission(payload)
+
+    assert len(payload["runs"]) == 3
+    assert len(payload["runs"][0]["outcomes"]) == 27
+    assert payload["runs"][0]["outcomes"][0]["metrics"]["ungated_credit"] == 0.5
+    assert payload["runs"][0]["outcomes"][1]["status"] == "apparatus"
+    assert not row.eligible
+    assert "apparatus failures" in row.ineligible_reason

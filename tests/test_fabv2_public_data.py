@@ -164,3 +164,14 @@ def test_replication_contracts_change_only_the_accepted_surfaces():
         if strong.surfaces[name].base_value != evolved.surfaces[name].base_value
     }
     assert changed == {"orchestration", "verification"}
+
+
+def test_public27_publication_arm_is_complete_and_frozen():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_public27_strong.toml")
+
+    assert experiment.max_iterations == 0
+    assert experiment.repeats == 3
+    assert len(experiment.cases) == 27
+    assert {case.case_id.rsplit("[", 1)[-1].removesuffix("]") for case in experiment.cases} == {
+        f"q{index:03d}" for index in range(1, 28)
+    }

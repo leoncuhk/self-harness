@@ -7,8 +7,10 @@ official Vals leaderboard or an estimate on a hidden population.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import random
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
@@ -19,6 +21,7 @@ DATASET_SHA256 = "27b48c08a6099bc076b4194cac7cefe295082b9aedcbc67f4fedfa70468b42
 VALID_TRACKS = ("reproduction", "open-harness", "oracle")
 VALID_JUDGES = ("official", "numeric-diagnostic")
 PUBLIC_QIDS = tuple(f"q{index:03d}" for index in range(1, 28))
+_QID_PATTERN = re.compile(r"test-question-(q\d{3})$")
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,123 @@ class LeaderboardRow:
     contamination: str
     eligible: bool
     ineligible_reason: str | None
+
+
+def _content_hash(path: Path) -> str:
+    """Hash the exact frozen variant rather than relying on a mutable label."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def export_numeric_submission(  # noqa: PLR0913 - explicit publication metadata
+    run_dir: Path,
+    *,
+    submission_id: str,
+    apparatus: str,
+    contamination: str = "public-rubric-aware",
+    track: str = "open-harness",
+    variant_key: str = "baseline",
+) -> dict[str, Any]:
+    """Convert a complete controller run into a Public-27 diagnostic submission.
+
+    Local artifacts can only establish the deterministic numeric diagnostic.  This
+    exporter therefore cannot label evidence as an official FAB judge result.
+    Missing outcomes are preserved as apparatus failures so the leaderboard
+    validator excludes an incomplete matrix instead of silently dropping it.
+    """
+    manifest_path = run_dir / "manifest.json"
+    variant_path = run_dir / "variants" / f"{variant_key}.json"
+    if not manifest_path.is_file() or not variant_path.is_file():
+        message = "run must contain manifest.json and the requested frozen variant"
+        raise FileNotFoundError(message)
+    manifest = json.loads(manifest_path.read_text())
+    repeat_count = int(manifest.get("repeats", 0))
+    if repeat_count < 1:
+        message = "run manifest has no repetitions"
+        raise ValueError(message)
+
+    by_repeat: dict[int, dict[str, dict[str, Any]]] = {
+        index: {} for index in range(repeat_count)
+    }
+    pattern = f"history/**/{variant_key}/rep*/cases/*"
+    for case_dir in sorted(path for path in run_dir.glob(pattern) if path.is_dir()):
+        match = _QID_PATTERN.search(case_dir.name)
+        if not match:
+            continue
+        qid = match.group(1)
+        repeat_name = case_dir.parents[1].name
+        if not repeat_name.startswith("rep") or not repeat_name[3:].isdigit():
+            continue
+        repeat = int(repeat_name[3:])
+        if repeat not in by_repeat or qid in by_repeat[repeat]:
+            raise ValueError(f"duplicate {qid} in repeat {repeat}")
+        summary_path = case_dir / "summary.json"
+        runtime_path = case_dir / "run.json"
+        if not summary_path.is_file() or not runtime_path.is_file():
+            by_repeat[repeat][qid] = {
+                "qid": qid,
+                "status": "apparatus",
+                "metrics": {},
+                "tokens": None,
+                "cost_usd": None,
+                "latency_seconds": None,
+            }
+            continue
+        summary = json.loads(summary_path.read_text())
+        runtime = json.loads(runtime_path.read_text())
+        metrics = summary.get("metrics") or {}
+        score = summary.get("score")
+        by_repeat[repeat][qid] = {
+            "qid": qid,
+            "status": "measured",
+            "metrics": {
+                "ungated_credit": metrics.get("ungated_credit"),
+                "all_pass": bool(isinstance(score, int | float) and score >= 0.75),
+            },
+            "tokens": runtime.get("tokens"),
+            "cost_usd": runtime.get("cost"),
+            "latency_seconds": runtime.get("duration_s"),
+        }
+
+    runs = []
+    for repeat, outcomes in sorted(by_repeat.items()):
+        complete = []
+        for qid in PUBLIC_QIDS:
+            complete.append(
+                outcomes.get(
+                    qid,
+                    {
+                        "qid": qid,
+                        "status": "apparatus",
+                        "metrics": {},
+                        "tokens": None,
+                        "cost_usd": None,
+                        "latency_seconds": None,
+                    },
+                )
+            )
+        runs.append({"seed": repeat, "outcomes": complete})
+
+    search_tokens = 0
+    for proposal_path in run_dir.glob("history/attempts/*/proposal.json"):
+        try:
+            proposal = json.loads(proposal_path.read_text())
+        except (OSError, ValueError):
+            continue
+        usage = proposal.get("usage") or {}
+        search_tokens += int(usage.get("total_tokens", 0) or 0)
+    return {
+        "submission_id": submission_id,
+        "protocol_id": PROTOCOL_ID,
+        "dataset_sha256": DATASET_SHA256,
+        "track": track,
+        "model": _require_string(manifest, "model"),
+        "harness": f"sha256:{_content_hash(variant_path)}",
+        "judge": "numeric-diagnostic",
+        "apparatus": apparatus,
+        "contamination": contamination,
+        "search": {"tokens": search_tokens, "cost_usd": None, "wall_seconds": None},
+        "runs": runs,
+    }
 
 
 def _require_string(payload: dict[str, Any], key: str) -> str:

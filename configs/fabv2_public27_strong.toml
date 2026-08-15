@@ -1,0 +1,142 @@
+# Publication arm: fixed strong harness, all Public-27 questions, three repeats.
+# This produces local numeric-diagnostic evidence only; it is not a Vals submission.
+
+extends = "fabv2_replicate_strong.toml"
+
+[experiment]
+name = "fabv2-public27-strong-v1"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q001]"
+split = "train"
+stratum = "business-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q002]"
+split = "holdout"
+stratum = "business-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q003]"
+split = "scorecard"
+stratum = "business-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q004]"
+split = "train"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q005]"
+split = "holdout"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q006]"
+split = "scorecard"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q007]"
+split = "train"
+stratum = "market-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q008]"
+split = "holdout"
+stratum = "market-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q009]"
+split = "scorecard"
+stratum = "market-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q010]"
+split = "train"
+stratum = "comparables"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q011]"
+split = "holdout"
+stratum = "comparables"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q012]"
+split = "scorecard"
+stratum = "comparables"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q013]"
+split = "train"
+stratum = "precedents"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q014]"
+split = "holdout"
+stratum = "precedents"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q015]"
+split = "scorecard"
+stratum = "precedents"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q016]"
+split = "train"
+stratum = "adjustments"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q017]"
+split = "holdout"
+stratum = "adjustments"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q018]"
+split = "scorecard"
+stratum = "adjustments"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q019]"
+split = "train"
+stratum = "earnings-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q020]"
+split = "holdout"
+stratum = "earnings-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q021]"
+split = "scorecard"
+stratum = "earnings-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q022]"
+split = "train"
+stratum = "disclosure-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q023]"
+split = "holdout"
+stratum = "disclosure-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q024]"
+split = "scorecard"
+stratum = "disclosure-analysis"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q025]"
+split = "train"
+stratum = "financial-modeling"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q026]"
+split = "holdout"
+stratum = "financial-modeling"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q027]"
+split = "scorecard"
+stratum = "financial-modeling"
