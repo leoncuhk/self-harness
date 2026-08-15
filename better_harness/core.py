@@ -940,6 +940,31 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     if raw_prompt := better_agent.get("system_prompt_file"):
         better_agent_system_prompt = _resolve_path(config_path, str(raw_prompt)).read_text().strip()
 
+    better_agent_config = {
+        key: value
+        for key, value in better_agent.items()
+        if key
+        not in {
+            "backend",
+            "model",
+            "max_turns",
+            "deepagents_root",
+            "system_prompt_file",
+        }
+    }
+    if "command" in better_agent_config and isinstance(better_agent_config["command"], list):
+        better_agent_config["command"] = _resolve_command_tokens(
+            config_path,
+            [str(item) for item in better_agent_config["command"]],
+        )
+    raw_extensions = better_agent_config.get("extensions", [])
+    if isinstance(raw_extensions, str):
+        raw_extensions = [raw_extensions]
+    if raw_extensions:
+        better_agent_config["extensions"] = [
+            str(_resolve_path(config_path, str(item))) for item in raw_extensions
+        ]
+
     surfaces: dict[str, Surface] = {}
     for surface_name, payload in raw.get("surfaces", {}).items():
         kind = str(payload["kind"])
@@ -997,18 +1022,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         surfaces=surfaces,
         cases=cases,
         better_agent_backend=better_agent_backend,
-        better_agent_config={
-            key: value
-            for key, value in better_agent.items()
-            if key
-            not in {
-                "backend",
-                "model",
-                "max_turns",
-                "deepagents_root",
-                "system_prompt_file",
-            }
-        },
+        better_agent_config=better_agent_config,
         repeats=repeats,
         gate=gate,
         candidates=candidates,

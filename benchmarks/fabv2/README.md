@@ -1,58 +1,35 @@
-# FAB v2 case study
+# FAB v2 public-development benchmark
 
-This directory contains all 27 questions and rubrics in the official FAB v2
-public development set, a frozen deterministic numeric diagnostic, and a
-free-tool reproduction of the competition agent interface. Source provenance,
-license, counts, and the pinned SHA-256 are recorded in `data/manifest.json` and
-`THIRD_PARTY_NOTICES.md`.
+This directory contains all 27 public questions and rubrics, a frozen numeric
+diagnostic, and a Prime-native research runtime. Provenance and hashes are in
+`data/manifest.json` and `THIRD_PARTY_NOTICES.md`.
 
-The public rubrics are development data. After using them for diagnosis or
-prompt design, none of these 27 questions is an untouched test. The local judge
-does not implement Vals' qualitative judge and the free tools are not identical
-to the paid official apparatus, so local numbers must never be presented as
-official FAB leaderboard results.
+These rubrics are development data, not an untouched test. The local judge is
+not Vals' qualitative judge and the key-free tools differ from the official
+apparatus. Local scores must never be described as official leaderboard scores.
 
-The self-harness case study exposes four real runtime surfaces:
+The evolvable runtime has eight orthogonal surfaces:
 
-- `prompt.txt` — stable identity and tool contract;
-- `research_policy.md` — planning, retrieval, and source selection;
-- `verification_policy.md` — arithmetic and completeness checks;
-- `submission_policy.md` — final artifact requirements.
+- `system.md`: identity and objective;
+- `orchestration.md`: budget-aware workflow;
+- `tools.md`: capability-use policy;
+- `research.md`: source and retrieval strategy;
+- `evidence.md`: structured computational memory;
+- `subagents.md`: bounded specialist delegation;
+- `verification.md`: arithmetic and coverage audit;
+- `submission.md`: answer compiler contract.
 
-Each rollout also records turns, agent errors, total and per-tool call counts,
-submission success, tokens, latency, and answer metrics. Behavior telemetry is
-diagnostic evidence for the outer loop; it is not a reward proxy unless a
-separate causal ablation validates that use.
+`workspace/prime_runner.py` starts a new Prime `--no-session` root per case.
+The root receives persistent IPython state, evaluator-owned finance tools,
+optional RLM specialists, and host-enforced turn/token/time limits. A reserved
+no-tool compiler consumes the bounded research trace when the root does not
+submit before cutoff. Research and compiler usage are combined.
 
-`configs/fabv2_self_harness.toml` uses the official dealbreaker-gated partial
-credit as its objective while retaining binary pass rate as a non-regression constraint. Its
-bounded case study uses one calculation-heavy train case, one validation case,
-and one locked-test case under an identical eight-turn budget. The separate B5
-config runs the hand-engineered prompt on the same cases and budget.
+`configs/fabv2_prime_smoke.toml` is only a cheap integration contract. A full
+study requires stratified train/adaptive-validation/locked-scorecard splits,
+repeated seeds, and equal-token retry comparators.
 
-The executed case study still uses three selected cases and one repeat; expanding
-the vendored data does not retroactively strengthen that evidence. Three cases
-and one repeat are not enough for a competition-wide efficacy claim.
-The experiment verifies integration and provides a falsifiable local result;
-the report must disclose its wide uncertainty and compare against both B0 and
-the hand-engineered B5 prompt.
-
-The executed bounded result is recorded in
-[`docs/evaluation/fabv2-case-study.md`](../../docs/evaluation/fabv2-case-study.md).
-In the first frozen run, the autonomous candidate was correctly rejected and no arm improved the
-primary objective; this is evidence of integration and conservative selection,
-not evidence of FAB performance gain.
-
-That run also falsified the assumption that the old `numeric_recall` diagnostic
-measured answer quality: it was rubric numeric coverage and therefore constant
-for a question. `configs/fabv2_self_harness_v2.toml` exposed ungated weighted
-credit and true numeric-criterion recall without changing the dealbreaker score,
-but its executed eight-turn calibration still produced empty answers and no
-gain. See
-[`docs/evaluation/fabv2-v2-calibration.md`](../../docs/evaluation/fabv2-v2-calibration.md);
-v3 is the unexecuted 14-turn successor.
-
-Regenerate and verify the public artifacts with:
+Regenerate and verify public artifacts with:
 
 ```bash
 python benchmarks/fabv2/tools/build_public_data.py --check

@@ -25,12 +25,12 @@ WORKSPACE = Path(os.environ.get("BETTER_HARNESS_WORKSPACE_ROOT", ROOT.parent / "
 sys.path.insert(0, str(WORKSPACE))
 sys.path.insert(0, str(ROOT / "frozen"))
 
-import agent_runner  # noqa: E402  (workspace module)
 import judge  # noqa: E402  (frozen evaluator)
+import prime_runner  # noqa: E402  (workspace module)
 import telemetry  # noqa: E402  (frozen evaluator)
 
 QUESTIONS = json.loads((ROOT.parent / "questions.json").read_text())
-PROMPT = agent_runner.compose_harness_prompt(WORKSPACE / "prompt.txt")
+PROMPT = prime_runner.compose_harness_prompt(WORKSPACE)
 CRITERIA_TEXTS = [
     c["text"]
     for q in json.loads((ROOT / "frozen" / "rubrics.json").read_text())
@@ -65,11 +65,10 @@ def test_question(  # noqa: PLR0913 - pytest fixtures define the benchmark contr
     record_metrics,
 ) -> None:
     question = QUESTIONS[qid]
-    out = agent_runner.run_question(
+    out = prime_runner.run_question(
         question,
         model=model,
         log_dir=artifact_dir / "trajectory",
-        prompt_file=WORKSPACE / "prompt.txt",
         **agent_limits,
     )
     (artifact_dir / "answer.txt").write_text(out["final_answer"])
@@ -92,7 +91,7 @@ def test_question(  # noqa: PLR0913 - pytest fixtures define the benchmark contr
         f"fabv2:{qid} partial={verdict['partial_credit']:.3f} "
         f"(numeric {verdict['n_known']}/{verdict['n_criteria']}) "
         f"turns={out['turns']} calls={out['tool_calls_count']} errors={out['error_count']} "
-        f"edgar/web/calc={usage.get('edgar_search', 0)}/{usage.get('web_search', 0)}/"
+        f"edgar/fetch/calc={usage.get('edgar_search', 0)}/{usage.get('fetch_page_text', 0)}/"
         f"{usage.get('calculator', 0)} stop={out['stop_reason']} tokens={out['tokens']}"
     )
     fails = "; ".join(verdict["failed_numeric"][:8]) or "none"

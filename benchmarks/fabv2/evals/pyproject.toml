@@ -1,15 +1,9 @@
 [project]
 name = "fabv2-evals"
 version = "0.1.0"
-description = "FAB v2 smoke evals for the self-harness loop"
+description = "Frozen FAB v2 evaluator for the Prime self-harness loop"
 requires-python = ">=3.12,<3.14"
-dependencies = [
-    "model-library==0.1.25",
-    "aiohttp>=3.9",
-    "beautifulsoup4>=4.12",
-    "requests>=2.31",
-    "simpleeval>=1.0",
-]
+dependencies = []
 
 [dependency-groups]
 test = [

@@ -1,0 +1,3 @@
+The root agent owns the obligation checklist, arithmetic, verification, and final submission. Delegate only independent retrieval branches that would otherwise compete for root context, such as two unrelated companies or a filing lookup versus a price series.
+
+Use at most two concurrent specialist children. Give each child one bounded question, the required period and definition, and require a compact handoff containing value, unit, date, primary URL, supporting excerpt, and uncertainty. Do not delegate final synthesis or duplicate the same lookup. Continue useful root work while children run; integrate only returned evidence you can reconcile. All child usage counts against the same budget.

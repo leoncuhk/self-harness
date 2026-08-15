@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -26,11 +27,11 @@ def _assistant(message_id: str, text: str, *, input_tokens: int, output_tokens: 
 
 
 def test_command_tokens_accepts_quoted_command_and_rejects_empty():
-    assert _command_tokens("uv run --project '/tmp/prime source' prime-agent") == [
+    assert _command_tokens("uv run --project '/opt/prime source' prime-agent") == [
         "uv",
         "run",
         "--project",
-        "/tmp/prime source",
+        "/opt/prime source",
         "prime-agent",
     ]
     with pytest.raises(ValueError, match="must not be empty"):
@@ -62,57 +63,100 @@ def test_summarize_events_deduplicates_messages_and_counts_child_attribution():
     }
 
 
-def test_run_prime_agent_builds_isolated_json_command(tmp_path: Path, monkeypatch):
-    message = _assistant("m1", "finished", input_tokens=8, output_tokens=2)
-    captured: dict[str, object] = {}
+def test_run_prime_agent_builds_isolated_json_command(tmp_path: Path):
+    fake = tmp_path / "fake.py"
+    fake.write_text(
+        textwrap.dedent(
+            """
+            import json
+            import os
+            import sys
+            from pathlib import Path
 
-    def fake_run(argv, **kwargs):
-        captured.update(argv=argv, **kwargs)
-        return subprocess.CompletedProcess(
-            argv,
-            0,
-            stdout=json.dumps({"type": "message_end", "message": message}) + "\n",
-            stderr="",
-        )
-
-    monkeypatch.setattr("better_harness.prime.subprocess.run", fake_run)
+            Path("captured.json").write_text(json.dumps({"argv": sys.argv[1:], "env": os.getenv("TEST_ONLY")}))
+            message = {
+                "id": "m1", "role": "assistant",
+                "content": [{"type": "text", "text": "finished"}],
+                "usage": {"input": 8, "output": 2, "cacheRead": 3, "cacheWrite": 4,
+                          "totalTokens": 17, "cost": {"total": 0.0125}},
+            }
+            print(json.dumps({"type": "message_end", "message": message}), flush=True)
+            """
+        ).strip()
+        + "\n"
+    )
     result = run_prime_agent(
-        command=["prime-agent"],
+        command=[sys.executable, str(fake)],
         model="openai/test-model",
         system_prompt="frozen prompt",
         user_prompt="do the task",
         cwd=tmp_path,
         timeout_s=30,
         env={"TEST_ONLY": "1"},
+        thinking="high",
+        extra_args=("--autonomous", "--autonomous-max-turns", "7"),
+        input_files=(tmp_path / "context.md",),
     )
 
+    captured = json.loads((tmp_path / "captured.json").read_text())
     argv = captured["argv"]
-    assert isinstance(argv, list)
-    assert argv[:3] == ["prime-agent", "--mode", "json"]
+    assert argv[:2] == ["--mode", "json"]
     assert "--no-session" in argv
     assert "--no-context-files" in argv
+    assert argv[argv.index("--thinking") + 1] == "high"
+    assert "--autonomous" in argv
+    assert f"@{tmp_path / 'context.md'}" in argv
     assert argv[-2:] == ["--", "do the task"]
-    assert captured["cwd"] == tmp_path
-    assert captured["env"] == {"TEST_ONLY": "1"}
+    assert captured["env"] == "1"
     assert result.final_text == "finished"
     assert result.usage["total_tokens"] == 17
 
 
-def test_run_prime_agent_records_timeout_as_failed_result(tmp_path: Path, monkeypatch):
-    def fake_run(*_args, **_kwargs):
-        raise subprocess.TimeoutExpired("prime-agent", 1, output=b"", stderr=b"partial")
-
-    monkeypatch.setattr("better_harness.prime.subprocess.run", fake_run)
+def test_run_prime_agent_records_timeout_as_failed_result(tmp_path: Path):
+    fake = tmp_path / "sleep.py"
+    fake.write_text("import time\ntime.sleep(10)\n")
     result = run_prime_agent(
-        command=None,
+        command=[sys.executable, str(fake)],
         model="openai/test-model",
         system_prompt="prompt",
         user_prompt="task",
         cwd=tmp_path,
-        timeout_s=1,
+        timeout_s=0.1,
     )
     assert result.returncode == 124
     assert "timed out" in result.stderr
+
+
+def test_run_prime_agent_enforces_streaming_token_budget(tmp_path: Path):
+    fake = tmp_path / "many.py"
+    fake.write_text(
+        textwrap.dedent(
+            """
+            import json
+            import time
+            for index in range(100):
+                message = {
+                    "id": f"m{index}", "role": "assistant", "content": [],
+                    "usage": {"input": 60, "output": 10, "totalTokens": 70},
+                }
+                print(json.dumps({"type": "message_end", "message": message}), flush=True)
+                time.sleep(0.02)
+            """
+        ).strip()
+        + "\n"
+    )
+    result = run_prime_agent(
+        command=[sys.executable, str(fake)],
+        model="openai/test-model",
+        system_prompt="prompt",
+        user_prompt="task",
+        cwd=tmp_path,
+        timeout_s=5,
+        max_tokens=200,
+    )
+    assert result.returncode == 125
+    assert result.termination_reason == "max_tokens"
+    assert 200 <= result.usage["total_tokens"] < 500
 
 
 def test_run_prime_agent_explains_missing_executable(tmp_path: Path):

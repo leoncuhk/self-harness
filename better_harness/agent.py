@@ -321,7 +321,7 @@ def invoke_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> 
     if experiment.better_agent_backend == "deepagents":
         return invoke_deepagents_proposer(experiment=experiment, workspace=workspace)
     if experiment.better_agent_backend == "prime":
-        from better_harness.prime import invoke_prime_proposer
+        from better_harness.prime import invoke_prime_proposer  # noqa: PLC0415 - circular
 
         return invoke_prime_proposer(experiment=experiment, workspace=workspace)
     raise ValueError(f"unknown proposer backend {experiment.better_agent_backend!r}")

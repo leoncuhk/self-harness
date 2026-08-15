@@ -1,4 +1,3 @@
-import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -35,33 +34,6 @@ def test_public27_artifacts_match_pinned_source():
     assert json.loads((root / "evals" / "frozen" / "rubrics.json").read_text()) == rubrics
 
 
-def test_seed_prompt_matches_the_archived_official_harness():
-    source = (
-        ROOT
-        / "research"
-        / "zcode"
-        / "upstream"
-        / "finance-agent-v2"
-        / "finance_agent"
-        / "prompt.py"
-    )
-    syntax = ast.parse(source.read_text())
-    official_prompt = None
-    for node in syntax.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        if any(
-            isinstance(target, ast.Name) and target.id == "SYSTEM_PROMPT"
-            for target in node.targets
-        ):
-            official_prompt = ast.literal_eval(node.value)
-            break
-
-    assert official_prompt is not None
-    seed_prompt = (ROOT / "benchmarks" / "fabv2" / "workspace" / "prompt.txt").read_text()
-    assert seed_prompt.strip() == official_prompt.strip()
-
-
 def test_public27_has_three_questions_in_each_of_nine_categories():
     manifest = json.loads(
         (ROOT / "benchmarks" / "fabv2" / "data" / "manifest.json").read_text()
@@ -75,81 +47,63 @@ def test_public27_has_three_questions_in_each_of_nine_categories():
     assert set(manifest["categories"].values()) == {3}
 
 
-def test_public27_experiment_is_complete_stratified_adaptive_development():
-    experiment = load_experiment(ROOT / "configs" / "fabv2_public27_self_harness.toml")
-    folds = json.loads(
-        (
-            ROOT
-            / "benchmarks"
-            / "fabv2"
-            / "community"
-            / "development_folds.json"
-        ).read_text()
+def test_prime_runtime_replaces_the_archived_official_harness():
+    workspace = ROOT / "benchmarks" / "fabv2" / "workspace"
+    assert (workspace / "prime_runner.py").exists()
+    assert (workspace / "fab_tools.py").exists()
+    assert (workspace / "prime_provider.ts").exists()
+    assert not (workspace / "agent_runner.py").exists()
+    assert not (workspace / "prompt.txt").exists()
+
+
+def test_minimal_and_strong_prime_harnesses_share_all_surfaces():
+    root = ROOT / "benchmarks" / "fabv2" / "harnesses"
+    expected = {
+        "system.md",
+        "orchestration.md",
+        "tools.md",
+        "research.md",
+        "evidence.md",
+        "subagents.md",
+        "verification.md",
+        "submission.md",
+    }
+    minimal = {path.name for path in (root / "minimal").iterdir()}
+    strong = {path.name for path in (root / "strong").iterdir()}
+    assert minimal == expected
+    assert strong == expected
+    assert sum((root / "strong" / name).stat().st_size for name in expected) > sum(
+        (root / "minimal" / name).stat().st_size for name in expected
     )
 
-    assert experiment.repeats == 3
-    assert len(experiment.cases_for_split("train")) == 18
-    assert len(experiment.cases_for_split("holdout")) == 9
-    assert not experiment.has_split("scorecard")
-    assert len(experiment.strata_for_split("train")) == 9
-    assert len(experiment.strata_for_split("holdout")) == 9
-    assert len(folds["folds"]) == 3
-    assert all(len(fold["train"]) == 18 for fold in folds["folds"])
-    assert all(len(fold["holdout"]) == 9 for fold in folds["folds"])
 
-
-def test_public27_fixed_comparators_share_the_execution_contract():
-    evolved = load_experiment(ROOT / "configs" / "fabv2_public27_self_harness.toml")
-    comparators = [
-        load_experiment(ROOT / "configs" / "fabv2_public27_b0.toml"),
-        load_experiment(ROOT / "configs" / "fabv2_public27_b5.toml"),
+def test_prime_smoke_contract_has_frozen_three_way_split():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_prime_smoke.toml")
+    assert experiment.better_agent_backend == "prime"
+    assert experiment.model == "self-harness/deepseek-v4-flash"
+    assert experiment.repeats == 1
+    assert len(experiment.cases_for_split("train")) == 1
+    assert len(experiment.cases_for_split("holdout")) == 1
+    assert len(experiment.cases_for_split("scorecard")) == 1
+    assert set(experiment.surfaces) == {
+        "system",
+        "orchestration",
+        "tools",
+        "research",
+        "evidence",
+        "subagents",
+        "verification",
+        "submission",
+    }
+    assert experiment.goal.require_holdout_improvement
+    assert experiment.better_agent_config["extensions"] == [
+        str(
+            (
+                ROOT
+                / "benchmarks"
+                / "fabv2"
+                / "workspace"
+                / "prime_provider.ts"
+            ).resolve()
+        )
     ]
-
-    for comparator in comparators:
-        assert comparator.max_iterations == 0
-        assert comparator.model == evolved.model
-        assert comparator.repeats == evolved.repeats
-        assert comparator.runner_config == evolved.runner_config
-        assert comparator.cases == evolved.cases
-        assert set(comparator.surfaces) == {"prompt"}
-
-
-def test_numeric24_v5_has_stratified_locked_test_and_generalization_gate():
-    evolved = load_experiment(
-        ROOT / "configs" / "fabv2_numeric24_self_harness_v5.toml"
-    )
-
-    assert evolved.repeats == 3
-    assert len(evolved.cases_for_split("train")) == 8
-    assert len(evolved.cases_for_split("holdout")) == 8
-    assert len(evolved.cases_for_split("scorecard")) == 8
-    assert len(evolved.strata_for_split("train")) == 8
-    assert len(evolved.strata_for_split("holdout")) == 8
-    assert len(evolved.strata_for_split("scorecard")) == 8
-    assert evolved.goal.require_holdout_improvement
-    assert evolved.goal.min_delta == 0.03
-    assert not evolved.goal.constraints
-    assert evolved.runner_config["env"]["FABV2_RECOVERY_SUBMIT"] == "1"
-    assert "--timeout=1050" in evolved.runner_config["pytest_args"]
-    assert evolved.runner_config["case_timeout_s"] == 1080
-
-
-def test_numeric24_v5_seed_is_official_prompt_and_b5_is_contract_matched():
-    evolved = load_experiment(
-        ROOT / "configs" / "fabv2_numeric24_self_harness_v5.toml"
-    )
-    comparator = load_experiment(ROOT / "configs" / "fabv2_numeric24_b5_v5.toml")
-
-    assert evolved.surfaces["prompt"].base_value == (
-        ROOT / "benchmarks" / "fabv2" / "workspace" / "prompt.txt"
-    ).read_text().strip()
-    assert all(
-        not evolved.surfaces[name].base_value
-        for name in ("research_policy", "verification_policy", "submission_policy")
-    )
-    assert comparator.max_iterations == 0
-    assert comparator.model == evolved.model
-    assert comparator.repeats == evolved.repeats
-    assert comparator.runner_config == evolved.runner_config
-    assert comparator.cases == evolved.cases
-    assert comparator.goal == evolved.goal

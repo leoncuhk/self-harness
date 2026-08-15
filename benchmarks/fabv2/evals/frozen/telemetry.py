@@ -6,12 +6,11 @@ from collections.abc import Mapping
 from typing import Any
 
 TRACKED_TOOLS = (
-    "web_search",
     "edgar_search",
-    "parse_html_page",
-    "retrieve_information",
+    "fetch_page_text",
     "calculator",
     "price_history",
+    "ipython",
     "submit_final_result",
 )
 

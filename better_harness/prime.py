@@ -9,9 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shlex
+import signal
 import subprocess
+import threading
 import time
+from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -32,6 +37,7 @@ class PrimeRunResult:
     stderr: str
     final_text: str
     usage: dict[str, int | float]
+    termination_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the invocation without environment variables or credentials."""
@@ -43,6 +49,7 @@ class PrimeRunResult:
             "stderr": self.stderr,
             "final_text": self.final_text,
             "usage": self.usage,
+            "termination_reason": self.termination_reason,
         }
 
 
@@ -54,9 +61,11 @@ def _command_tokens(raw: object | None) -> list[str]:
     elif isinstance(raw, list):
         tokens = [str(item) for item in raw]
     else:
-        raise TypeError("better_agent.command must be a string or list of strings")
+        message = "better_agent.command must be a string or list of strings"
+        raise TypeError(message)
     if not tokens:
-        raise ValueError("better_agent.command must not be empty")
+        message = "better_agent.command must not be empty"
+        raise ValueError(message)
     return tokens
 
 
@@ -74,7 +83,11 @@ def _assistant_messages(events: tuple[dict[str, Any], ...]) -> list[dict[str, An
         for candidate in candidates:
             if not isinstance(candidate, dict) or candidate.get("role") != "assistant":
                 continue
-            identity = str(candidate.get("id") or json.dumps(candidate, sort_keys=True))
+            identity = str(
+                candidate.get("id")
+                or candidate.get("timestamp")
+                or json.dumps(candidate, sort_keys=True)
+            )
             if identity not in seen:
                 seen.add(identity)
                 messages.append(candidate)
@@ -137,7 +150,7 @@ def summarize_prime_events(
     return final_text, usage
 
 
-def run_prime_agent(
+def run_prime_agent(  # noqa: PLR0913 - explicit subprocess contract
     *,
     command: object | None,
     model: str,
@@ -146,8 +159,13 @@ def run_prime_agent(
     cwd: Path,
     timeout_s: float,
     env: dict[str, str] | None = None,
+    thinking: str = "off",
+    extra_args: Sequence[str] = (),
+    input_files: Sequence[Path] = (),
+    max_turns: int | None = None,
+    max_tokens: int | None = None,
 ) -> PrimeRunResult:
-    """Run one ephemeral, resource-isolated Prime root session in JSON mode."""
+    """Run one ephemeral Prime root session with host-enforced hard budgets."""
     argv = [
         *_command_tokens(command),
         "--mode",
@@ -164,51 +182,105 @@ def run_prime_agent(
         "--model",
         model,
         "--thinking",
-        "off",
+        thinking,
         "--system-prompt",
         system_prompt,
+        *extra_args,
+        *(f"@{path}" for path in input_files),
         "--",
         user_prompt,
     ]
     started = time.monotonic()
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             argv,
             cwd=cwd,
             env=env or os.environ.copy(),
-            capture_output=True,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout_s,
+            start_new_session=True,
         )
-        returncode = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
     except FileNotFoundError as exc:
         raise RuntimeError(
             f"Prime Agent executable not found: {_command_tokens(command)[0]!r}; "
             "install Prime Agent or set better_agent.command"
         ) from exc
-    except subprocess.TimeoutExpired as exc:
-        returncode = 124
-        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        raw_stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        stderr = f"{raw_stderr}\nPrime Agent timed out after {timeout_s}s".strip()
+    stdout_pipe = process.stdout
+    stderr_pipe = process.stderr
+    if stdout_pipe is None or stderr_pipe is None:  # pragma: no cover - Popen contract
+        message = "Prime Agent pipes were not created"
+        raise RuntimeError(message)
+    lines: queue.Queue[tuple[str, str | None]] = queue.Queue()
 
-    events: list[dict[str, Any]] = []
+    def pump(label: str, stream: Any) -> None:
+        for line in stream:
+            lines.put((label, line))
+        lines.put((label, None))
+
+    threads = [
+        threading.Thread(target=pump, args=("stdout", stdout_pipe), daemon=True),
+        threading.Thread(target=pump, args=("stderr", stderr_pipe), daemon=True),
+    ]
+    for thread in threads:
+        thread.start()
+
+    event_list: list[dict[str, Any]] = []
     malformed: list[str] = []
-    for line in stdout.splitlines():
+    stderr_lines: list[str] = []
+    finished_streams: set[str] = set()
+    termination_reason: str | None = None
+    deadline = started + timeout_s
+    while len(finished_streams) < 2:
+        if termination_reason is None and time.monotonic() >= deadline:
+            termination_reason = "timeout"
         try:
-            payload = json.loads(line)
-        except ValueError:
-            if line.strip():
-                malformed.append(line)
+            label, line = lines.get(timeout=0.1)
+        except queue.Empty:
+            label, line = "", ""
+        if line is None:
+            finished_streams.add(label)
             continue
-        if isinstance(payload, dict):
-            events.append(payload)
+        if label == "stderr":
+            stderr_lines.append(line)
+        elif label == "stdout" and line:
+            try:
+                payload = json.loads(line)
+            except ValueError:
+                if line.strip():
+                    malformed.append(line)
+            else:
+                if isinstance(payload, dict):
+                    event_list.append(payload)
+                    _, live_usage = summarize_prime_events(tuple(event_list))
+                    if max_turns is not None and live_usage["model_calls"] >= max_turns:
+                        termination_reason = termination_reason or "max_turns"
+                    if max_tokens is not None and live_usage["total_tokens"] >= max_tokens:
+                        termination_reason = termination_reason or "max_tokens"
+        if termination_reason is not None and process.poll() is None:
+            stop_signal = signal.SIGTERM if termination_reason == "timeout" else signal.SIGINT
+            with suppress(ProcessLookupError, PermissionError):
+                os.killpg(process.pid, stop_signal)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        with suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    for thread in threads:
+        thread.join(timeout=1)
+
+    returncode = process.returncode
+    if termination_reason == "timeout":
+        returncode = 124
+        stderr_lines.append(f"Prime Agent timed out after {timeout_s}s\n")
+    elif termination_reason is not None:
+        returncode = 125
+        stderr_lines.append(f"Prime Agent stopped at hard {termination_reason} budget\n")
+    stderr = "".join(stderr_lines)
     if malformed:
         stderr = f"{stderr}\nIgnored {len(malformed)} non-JSON stdout lines".strip()
-    event_tuple = tuple(events)
+    event_tuple = tuple(event_list)
     final_text, usage = summarize_prime_events(event_tuple)
     return PrimeRunResult(
         argv=tuple(argv),
@@ -218,14 +290,20 @@ def run_prime_agent(
         stderr=stderr,
         final_text=final_text,
         usage=usage,
+        termination_reason=termination_reason,
     )
 
 
 def invoke_prime_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> str | None:
     """Ask an ephemeral Prime RLM to edit one proposer workspace."""
-    from better_harness.agent import DEFAULT_SYSTEM_PROMPT
+    from better_harness.agent import DEFAULT_SYSTEM_PROMPT  # noqa: PLC0415 - circular
 
     config = experiment.better_agent_config
+    extra_args = tuple(
+        token
+        for extension in config.get("extensions", [])
+        for token in ("--extension", str(extension))
+    )
     result = run_prime_agent(
         command=config.get("command"),
         model=experiment.better_agent_model,
@@ -244,6 +322,12 @@ def invoke_prime_proposer(*, experiment: Experiment, workspace: ProposerWorkspac
         ),
         cwd=workspace.root,
         timeout_s=float(config.get("timeout_s", 900)),
+        thinking=str(config.get("thinking", "off")),
+        extra_args=extra_args,
+        max_turns=experiment.better_agent_max_turns,
+        max_tokens=(
+            int(config["max_tokens"]) if config.get("max_tokens") is not None else None
+        ),
     )
     (workspace.root / "outer_agent_result.json").write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n"
