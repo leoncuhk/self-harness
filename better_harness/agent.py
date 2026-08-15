@@ -256,7 +256,7 @@ def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration c
     total_candidates: int = 1,
     resume: bool = False,
 ) -> tuple[Proposal, Variant]:
-    """Run the outer Deep Agent once and return its candidate variant."""
+    """Run the configured outer proposer once and return its candidate variant."""
     scoped_index = candidate_index if total_candidates > 1 else None
     if resume:
         # Check before building the workspace: building it wipes the directory.
@@ -275,7 +275,7 @@ def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration c
         clusters=clusters,
         total_candidates=total_candidates,
     )
-    final_message = invoke_deepagents_proposer(
+    final_message = invoke_proposer(
         experiment=experiment,
         workspace=workspace,
     )
@@ -314,6 +314,17 @@ def propose_variant(  # noqa: PLR0913 - one proposal needs the whole iteration c
         + "\n"
     )
     return proposal, candidate
+
+
+def invoke_proposer(*, experiment: Experiment, workspace: ProposerWorkspace) -> str | None:
+    """Dispatch to a framework adapter without moving selection into that framework."""
+    if experiment.better_agent_backend == "deepagents":
+        return invoke_deepagents_proposer(experiment=experiment, workspace=workspace)
+    if experiment.better_agent_backend == "prime":
+        from better_harness.prime import invoke_prime_proposer
+
+        return invoke_prime_proposer(experiment=experiment, workspace=workspace)
+    raise ValueError(f"unknown proposer backend {experiment.better_agent_backend!r}")
 
 
 def invoke_deepagents_proposer(

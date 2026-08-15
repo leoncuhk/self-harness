@@ -145,6 +145,8 @@ class Experiment:
     runner_config: dict[str, Any]
     surfaces: dict[str, Surface]
     cases: tuple[EvalCase, ...]
+    better_agent_backend: str = "deepagents"
+    better_agent_config: dict[str, Any] = dc_field(default_factory=dict)
     repeats: int = DEFAULT_REPEATS
     gate: str = DEFAULT_GATE
     candidates: int = DEFAULT_CANDIDATES
@@ -658,6 +660,8 @@ class RunLayout:
             "max_iterations": experiment.max_iterations,
             "better_agent_model": experiment.better_agent_model,
             "better_agent_max_turns": experiment.better_agent_max_turns,
+            "better_agent_backend": experiment.better_agent_backend,
+            "better_agent_config": experiment.better_agent_config,
             "better_agent_deepagents_root": None
             if experiment.better_agent_deepagents_root is None
             else str(experiment.better_agent_deepagents_root),
@@ -923,6 +927,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     goal = load_goal_contract(raw.get("goal"))
 
     better_agent = raw.get("better_agent", {})
+    better_agent_backend = str(better_agent.get("backend", "deepagents"))
     better_agent_model = str(better_agent.get("model", model))
     better_agent_max_turns = int(better_agent.get("max_turns", 11000))
     better_agent_deepagents_root = None
@@ -991,6 +996,19 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         runner_config=runner_config,
         surfaces=surfaces,
         cases=cases,
+        better_agent_backend=better_agent_backend,
+        better_agent_config={
+            key: value
+            for key, value in better_agent.items()
+            if key
+            not in {
+                "backend",
+                "model",
+                "max_turns",
+                "deepagents_root",
+                "system_prompt_file",
+            }
+        },
         repeats=repeats,
         gate=gate,
         candidates=candidates,
@@ -1016,6 +1034,12 @@ def validate_experiment(experiment: Experiment) -> None:
         raise ValueError(msg)
     if experiment.better_agent_max_turns < 1:
         msg = "better_agent.max_turns must be at least 1"
+        raise ValueError(msg)
+    if experiment.better_agent_backend not in {"deepagents", "prime"}:
+        msg = (
+            f"invalid better_agent.backend {experiment.better_agent_backend!r}; "
+            "expected 'deepagents' or 'prime'"
+        )
         raise ValueError(msg)
     if experiment.repeats < 1:
         msg = "repeats must be at least 1"
