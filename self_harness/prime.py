@@ -158,6 +158,33 @@ def summarize_prime_events(
     return final_text, usage
 
 
+def compact_prime_events(
+    events: tuple[dict[str, Any], ...],
+) -> tuple[dict[str, Any], ...]:
+    """Remove cumulative streaming snapshots without losing audit boundaries.
+
+    Pi/Prime ``message_update`` events repeat the complete message accumulated so
+    far. Persisting every snapshot makes a single response hundreds of megabytes.
+    A terminal ``text_end`` is retained for providers that omit ``message_end``;
+    ordinary deltas are reconstructable from the final message and are discarded.
+    ``turn_end`` and ``agent_end`` are also redundant when explicit message
+    boundaries exist.
+    """
+    has_message_end = any(event.get("type") == "message_end" for event in events)
+    compacted: list[dict[str, Any]] = []
+    for event in events:
+        event_type = event.get("type")
+        if event_type == "message_update":
+            update = event.get("assistantMessageEvent")
+            if isinstance(update, dict) and update.get("type") == "text_end":
+                compacted.append({"type": "message_update", "assistantMessageEvent": update})
+            continue
+        if has_message_end and event_type in {"turn_end", "agent_end"}:
+            continue
+        compacted.append(event)
+    return tuple(compacted)
+
+
 def _run_json_agent_process(  # noqa: PLR0913 - explicit subprocess contract
     *,
     argv: Sequence[str],
@@ -230,11 +257,12 @@ def _run_json_agent_process(  # noqa: PLR0913 - explicit subprocess contract
             else:
                 if isinstance(payload, dict):
                     event_list.append(payload)
-                    _, live_usage = summarize_prime_events(tuple(event_list))
-                    if max_turns is not None and live_usage["model_calls"] >= max_turns:
-                        termination_reason = termination_reason or "max_turns"
-                    if max_tokens is not None and live_usage["total_tokens"] >= max_tokens:
-                        termination_reason = termination_reason or "max_tokens"
+                    if payload.get("type") in {"message_end", "turn_end", "agent_end"}:
+                        _, live_usage = summarize_prime_events(tuple(event_list))
+                        if max_turns is not None and live_usage["model_calls"] >= max_turns:
+                            termination_reason = termination_reason or "max_turns"
+                        if max_tokens is not None and live_usage["total_tokens"] >= max_tokens:
+                            termination_reason = termination_reason or "max_tokens"
         if termination_reason is not None and process.poll() is None:
             stop_signal = signal.SIGTERM if termination_reason == "timeout" else signal.SIGINT
             with suppress(ProcessLookupError, PermissionError):
@@ -258,8 +286,9 @@ def _run_json_agent_process(  # noqa: PLR0913 - explicit subprocess contract
     stderr = "".join(stderr_lines)
     if malformed:
         stderr = f"{stderr}\nIgnored {len(malformed)} non-JSON stdout lines".strip()
-    event_tuple = tuple(event_list)
-    final_text, usage = summarize_prime_events(event_tuple)
+    raw_events = tuple(event_list)
+    final_text, usage = summarize_prime_events(raw_events)
+    event_tuple = compact_prime_events(raw_events)
     if final_text and usage["total_tokens"] == 0 and max_tokens is not None:
         # Missing message_end means provider usage is unavailable. Charge the
         # full frozen phase budget rather than reporting a false zero.

@@ -9,6 +9,7 @@ import pytest
 
 from self_harness.prime import (
     _command_tokens,
+    compact_prime_events,
     run_pi_agent,
     run_prime_agent,
     summarize_prime_events,
@@ -84,6 +85,35 @@ def test_summarize_events_recovers_explicit_stream_text_end():
     text, usage = summarize_prime_events(events)
     assert text == "complete answer"
     assert usage["total_tokens"] == 0
+
+
+def test_compact_events_drops_cumulative_stream_snapshots():
+    final = _assistant("m1", "complete", input_tokens=10, output_tokens=2)
+    events = (
+        {
+            "type": "message_update",
+            "assistantMessageEvent": {"type": "text_delta", "delta": "part"},
+            "message": {"role": "assistant", "content": "part"},
+        },
+        {
+            "type": "message_update",
+            "assistantMessageEvent": {"type": "text_end", "content": "complete"},
+            "message": final,
+        },
+        {"type": "message_end", "message": final},
+        {"type": "turn_end", "message": final},
+        {"type": "agent_end", "messages": [final]},
+    )
+
+    compacted = compact_prime_events(events)
+
+    assert compacted == (
+        {
+            "type": "message_update",
+            "assistantMessageEvent": {"type": "text_end", "content": "complete"},
+        },
+        {"type": "message_end", "message": final},
+    )
 
 
 def test_run_prime_agent_builds_isolated_json_command(tmp_path: Path):
