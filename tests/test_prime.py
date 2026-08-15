@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from better_harness.prime import (
+from self_harness.prime import (
     _command_tokens,
     run_pi_agent,
     run_prime_agent,

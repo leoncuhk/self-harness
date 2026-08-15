@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from better_harness.usage import total_tokens
+from self_harness.usage import total_tokens
 
 
 def test_total_tokens_accepts_combined_provider_metadata():

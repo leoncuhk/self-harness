@@ -1,0 +1,22 @@
+# One-case train/validation/scorecard mechanism check: atomic Pi outer, Prime inner.
+
+extends = "fabv2_smoke.toml"
+
+[experiment]
+name = "fabv2-evolve-smoke-v2"
+max_iterations = 1
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q005]"
+split = "train"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q006]"
+split = "holdout"
+stratum = "general-quantitative"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q004]"
+split = "scorecard"
+stratum = "general-quantitative"

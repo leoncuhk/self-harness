@@ -54,7 +54,16 @@ def extract_anchors(text: str) -> list[dict]:
             continue
         if _looks_like_year(text, m):
             continue
-        if unit_raw == "" and not m.group("neg") and 0 <= value <= 9:
+        m_scale = re.search(
+            r"(million|billion|thousand)", text[m.end() : m.end() + 22], re.IGNORECASE
+        )
+        if (
+            unit_raw == ""
+            and not m.group("neg")
+            and "$" not in raw
+            and m_scale is None
+            and 0 <= value <= 9
+        ):
             continue
         neg = bool(m.group("neg")) or raw.strip().startswith("(")
         before = text[max(0, m.start() - 14) : m.start()].lower()
@@ -66,9 +75,6 @@ def extract_anchors(text: str) -> list[dict]:
             unit_raw
         ]
         scale = ""
-        m_scale = re.search(
-            r"(million|billion|thousand)", text[m.end() : m.end() + 22], re.IGNORECASE
-        )
         if m_scale:
             scale = m_scale.group(1).lower()
         anchors.append({"value": value, "unit": unit, "scale": scale, "raw": raw.strip()})

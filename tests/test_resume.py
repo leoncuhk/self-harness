@@ -14,16 +14,15 @@ invent evidence. Two failure modes are pinned here:
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from better_harness import runners as runners_module
-from better_harness.agent import load_proposal_record, propose_variant
-from better_harness.core import (
+from self_harness import runners as runners_module
+from self_harness.agent import load_proposal_record, propose_variant
+from self_harness.core import (
     CaseOutcome,
     RunLayout,
     SplitResult,
@@ -33,23 +32,9 @@ from better_harness.core import (
     run_experiment,
     validate_experiment,
 )
-from better_harness.patching import build_baseline_variant, build_variant
-from tests.test_better_harness import _write_minimal_pytest_experiment
+from self_harness.patching import build_baseline_variant, build_variant
 from tests.test_e2e_full_loop import install_proposer, write_good_surfaces
-
-
-def _load_agent_harness():
-    """Import the frozen inner-agent builder by path (it is not a package)."""
-    path = (
-        Path(__file__).resolve().parents[1]
-        / "benchmarks" / "agentic" / "workspace" / "agent_harness.py"
-    )
-    spec = importlib.util.spec_from_file_location("agent_harness_under_test", path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from tests.test_self_harness import _write_minimal_pytest_experiment
 
 
 def make_variant(tmp_path: Path, *, prompt: str):
@@ -338,7 +323,7 @@ def test_resume_reloads_the_proposal_instead_of_paying_for_another_model_call(tm
             "```\n"
         )
 
-    monkeypatch.setattr("better_harness.agent.invoke_deepagents_proposer", counting_proposer)
+    monkeypatch.setattr("self_harness.pi.invoke_pi_proposer", counting_proposer)
 
     first_proposal, first_variant = propose_variant(
         experiment=experiment,
@@ -407,22 +392,6 @@ def test_resumed_run_reaches_the_same_verdict_without_re_running_evaluations(tmp
     )
     assert second.final_train.correctness == first.final_train.correctness
     assert second.final_holdout.correctness == first.final_holdout.correctness
-
-
-@pytest.mark.parametrize(
-    ("text", "transient"),
-    [
-        ("Connection error.", True),
-        ("Server disconnected without sending a response.", True),
-        ("Error code: 502 - bad gateway", True),
-        ("Request timed out", True),
-        ("assert 'bolt   42' == 'bolt  42'", False),
-        ("KeyError: 'answer.txt'", False),
-    ],
-)
-def test_inner_agent_transient_classifier(text, transient):
-    """Only transport noise is retried; a task failure must be graded, not retried."""
-    assert _load_agent_harness().is_transient(RuntimeError(text)) is transient
 
 
 def test_stage_output_withholds_the_sealed_scorecard(tmp_path, monkeypatch, capsys):

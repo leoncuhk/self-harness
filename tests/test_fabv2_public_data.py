@@ -2,7 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 
-from better_harness.core import load_experiment
+from self_harness.core import load_experiment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,7 +51,7 @@ def test_prime_runtime_replaces_the_archived_official_harness():
     workspace = ROOT / "benchmarks" / "fabv2" / "workspace"
     assert (workspace / "prime_runner.py").exists()
     assert (workspace / "fab_tools.py").exists()
-    assert (workspace / "prime_provider.ts").exists()
+    assert (workspace / "model_provider.ts").exists()
     assert not (workspace / "agent_runner.py").exists()
     assert not (workspace / "prompt.txt").exists()
 
@@ -77,9 +77,9 @@ def test_minimal_and_strong_prime_harnesses_share_all_surfaces():
     )
 
 
-def test_prime_smoke_contract_has_frozen_three_way_split():
-    experiment = load_experiment(ROOT / "configs" / "fabv2_prime_smoke.toml")
-    assert experiment.better_agent_backend == "prime"
+def test_smoke_contract_has_frozen_three_way_split():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_smoke.toml")
+    assert experiment.better_agent_backend == "pi"
     assert experiment.model == "self-harness/deepseek-v4-flash"
     assert experiment.repeats == 1
     assert len(experiment.cases_for_split("train")) == 1
@@ -103,15 +103,15 @@ def test_prime_smoke_contract_has_frozen_three_way_split():
                 / "benchmarks"
                 / "fabv2"
                 / "workspace"
-                / "prime_provider.ts"
+                / "model_provider.ts"
             ).resolve()
         )
     ]
 
 
-def test_prime_full_protocol_and_minimal_comparator_are_contract_matched():
-    evolved = load_experiment(ROOT / "configs" / "fabv2_prime.toml")
-    minimal = load_experiment(ROOT / "configs" / "fabv2_prime_minimal.toml")
+def test_full_protocol_and_minimal_comparator_are_contract_matched():
+    evolved = load_experiment(ROOT / "configs" / "fabv2.toml")
+    minimal = load_experiment(ROOT / "configs" / "fabv2_minimal.toml")
 
     assert len(evolved.cases_for_split("train")) == 8
     assert len(evolved.cases_for_split("holdout")) == 8
@@ -120,7 +120,7 @@ def test_prime_full_protocol_and_minimal_comparator_are_contract_matched():
     assert evolved.runner_config == minimal.runner_config
     assert evolved.goal == minimal.goal
     assert evolved.model == minimal.model
-    assert evolved.better_agent_backend == minimal.better_agent_backend == "prime"
+    assert evolved.better_agent_backend == minimal.better_agent_backend == "pi"
     assert minimal.max_iterations == 0
     assert all(
         evolved.surfaces[name].base_value != minimal.surfaces[name].base_value
@@ -128,8 +128,8 @@ def test_prime_full_protocol_and_minimal_comparator_are_contract_matched():
     )
 
 
-def test_prime_evolution_smoke_has_visible_and_validation_headroom_cases():
-    experiment = load_experiment(ROOT / "configs" / "fabv2_prime_evolve_smoke.toml")
+def test_evolution_smoke_has_visible_and_validation_headroom_cases():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_evolve_smoke.toml")
     assert [case.case_id for case in experiment.cases_for_split("train")] == [
         "tests/test_fabv2.py::test_question[q005]"
     ]
@@ -139,16 +139,11 @@ def test_prime_evolution_smoke_has_visible_and_validation_headroom_cases():
     assert [case.case_id for case in experiment.cases_for_split("scorecard")] == [
         "tests/test_fabv2.py::test_question[q004]"
     ]
-    assert experiment.better_agent_backend == "prime"
+    assert experiment.better_agent_backend == "pi"
     assert experiment.max_iterations == 1
 
 
-def test_pi_outer_smoke_changes_only_proposer_backend():
-    prime = load_experiment(ROOT / "configs" / "fabv2_prime_evolve_smoke.toml")
-    pi = load_experiment(ROOT / "configs" / "fabv2_pi_evolve_smoke.toml")
-    assert pi.cases == prime.cases
-    assert pi.surfaces == prime.surfaces
-    assert pi.runner_config == prime.runner_config
-    assert pi.goal == prime.goal
-    assert prime.better_agent_backend == "prime"
-    assert pi.better_agent_backend == "pi"
+def test_evolution_smoke_uses_atomic_single_call_proposer_budget():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_evolve_smoke.toml")
+    assert experiment.better_agent_max_turns == 1
+    assert experiment.better_agent_config["max_tokens"] == 60000

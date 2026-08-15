@@ -55,7 +55,22 @@ def extract_anchors(text: str) -> list[dict[str, float | str]]:
         value = float(match.group("num").replace(",", ""))
         if _looks_like_year(text, match):
             continue
-        if unit_raw == "" and not match.group("neg") and 0 <= value <= 9:
+        scale_match = re.search(
+            r"(million|billion|thousand)",
+            text[match.end() : match.end() + 22],
+            re.IGNORECASE,
+        )
+        # Bare small integers are usually list indices or counts, but a currency
+        # amount such as "$4.06 billion" is a high-value numeric anchor. The old
+        # ordering discarded it before looking for the scale suffix and removed
+        # half of q005 from the optimization signal.
+        if (
+            unit_raw == ""
+            and not match.group("neg")
+            and "$" not in raw
+            and scale_match is None
+            and 0 <= value <= 9
+        ):
             continue
         before = text[max(0, match.start() - 14) : match.start()].lower()
         if (
@@ -71,11 +86,6 @@ def extract_anchors(text: str) -> list[dict[str, float | str]]:
             "x": "multiple",
             "": "plain",
         }[unit_raw]
-        scale_match = re.search(
-            r"(million|billion|thousand)",
-            text[match.end() : match.end() + 22],
-            re.IGNORECASE,
-        )
         anchors.append(
             {
                 "value": value,

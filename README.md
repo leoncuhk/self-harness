@@ -1,57 +1,44 @@
 # Self-Harness
 
-An eval-driven system that improves the harness around a fixed task agent. The
-first live domain is FAB v2 finance research; coding projects use the same
-controller contract through a different runner. The optimizer may edit declared
-prompts, orchestration, skills, tools, evidence policy, verification, and answer
-compilation; it may not edit the goal, evaluator, task splits, model, budgets,
-promotion rule, or audit evidence.
-
-The repository implements two causally separate loops:
+An eval-driven system that improves the engineering harness around a fixed agent. It implements
+two causally separate loops:
 
 ```text
-inner: task -> Prime runtime + harness -> answer/product diff + telemetry -> frozen evaluator
-outer: visible traces -> Prime proposer -> candidate harness -> replay -> controller promotion
+product task ──> Prime inner runtime ──> answer or code change ──> frozen evaluator
+                     ▲                                         │
+                     │ candidate harness                       │ visible train evidence
+                     │                                         ▼
+              frozen controller <── atomic Pi proposer <── diagnostics
 ```
 
-“Best” always means the best validated candidate found within the declared
-budget. It does not mean a global optimum.
+The Controller alone owns the goal, splits, evaluator, model, budgets, guards, archive, and
+promotion decision. The proposer may change only declared harness surfaces. “Best” means the best
+validated candidate found under one recorded contract and budget; it never means a global optimum
+or an official FAB leaderboard result.
 
-## What is implemented
+## Runtime choice
 
-- immutable goal contracts with continuous objectives and hard constraints;
-- private run-local harness snapshots for concurrent, attributable evaluation;
-- disposable product workspaces and CI executed outside the coding agent;
-- train, adaptive-validation (`holdout`), and one-shot locked-test (`scorecard`) splits;
-- trace-grounded failure signatures and 1–K bounded candidate proposals;
-- static anti-leak, syntax, path, and surface-growth guards;
-- no-regression, objective, latency, token, and cost gates;
-- candidate lineage, accepted/rejected evidence, predictions, and an anytime leaderboard;
-- explicit apparatus-failure classification and independent artifact auditing;
-- Pytest, Harbor, and generic command-based coding-project runners.
-- Prime Agent execution adapters for both FAB inner rollouts and outer proposals,
-  with host-enforced turn, token, and time ceilings.
+- **Prime Agent is the inner runtime** for FAB: persistent IPython state, evaluator-owned finance
+  tools, optional `rlm(...)` specialists, evidence memory, verification, and a reserved compiler.
+- **Pi is the outer proposer**: one tool-free model call returns an atomic JSON candidate. This is
+  intentionally smaller than a coding-agent loop because the Controller already provides bounded,
+  normalized evidence. Invalid, partial, or undeclared edits are rejected before evaluation.
+- **DeepAgents is not required.** It was useful background, but adds an unnecessary framework and
+  dependency boundary to this implementation.
 
-See [architecture](docs/system/architecture.md),
-[verification ladder](docs/evaluation/verification.md),
-[field synthesis](docs/concepts/overview.md), and the
-[bounded FAB v2 result](docs/evaluation/fabv2-case-study.md)
-before interpreting an experiment.
-
-The [ZCodeProject/Public-27 audit](docs/evaluation/fabv2-zcode-audit.md) records what was
-integrated, what remains contaminated or unverified, and the evidence required
-for an unofficial community comparison.
+See [architecture](docs/system/architecture.md), [concepts](docs/concepts/overview.md), and the
+[verification standard](docs/evaluation/verification.md).
 
 ## Quick start
 
-Requirements: Python 3.12+, `uv`, and credentials for the models used by a live
-experiment.
+Requirements: Python 3.12+, `uv`, Prime Agent for FAB inner runs, Pi for live outer proposals, and
+credentials for the configured model route.
 
 ```bash
 uv sync --extra dev
 uv run self-harness validate configs/coding_demo.toml
 uv run pytest -q
-uv run ruff check better_harness tests scripts
+uv run ruff check self_harness tests scripts
 ```
 
 The deterministic coding fixture proves both loops without model spend:
@@ -60,83 +47,43 @@ The deterministic coding fixture proves both loops without model spend:
 uv run pytest -q tests/test_coding_runner.py::test_outer_loop_improves_the_coding_harness_and_inner_product
 ```
 
-Run a declared experiment:
+FAB contracts:
 
 ```bash
-uv run self-harness inventory configs/coding_demo.toml
-uv run self-harness run configs/coding_demo.toml \
-  --output-dir runs/coding-demo
+# Inner-runtime integration only; no evolution claim
+uv run self-harness run configs/fabv2_smoke.toml --output-dir runs/fabv2-smoke
+
+# One train/validation/scorecard outer-loop mechanism check
+uv run self-harness run configs/fabv2_evolve_smoke.toml \
+  --output-dir runs/fabv2-evolve-smoke
+
+# Public-27 8/8/8 development protocol
+uv run self-harness run configs/fabv2.toml --output-dir runs/fabv2
 ```
 
-The active FAB contracts are `configs/fabv2_prime_smoke.toml` (integration),
-`configs/fabv2_prime_minimal.toml` (contract-matched minimal comparator), and
-`configs/fabv2_prime.toml` (8/8/8 development protocol). They use only the new
-Prime runtime; the former FAB official/model-library harness is not retained.
-
-Run outputs contain the frozen manifest, variant values, workspace snapshots,
-per-case traces and diffs, split results, candidate decisions, archive, ledger,
-and final report. `runs/` is intentionally ignored because it can contain large
-or sensitive execution evidence.
-
-## Promotion protocol
-
-For each generation the outer agent sees only current surfaces, visible training
-failures, and prior visible evidence. A proposed edit is promoted only when:
-
-1. all static guards pass;
-2. the primary objective improves by the configured minimum;
-3. binary pass rate and declared constraints do not regress;
-4. resource growth stays within its frozen ceiling;
-5. both train and adaptive validation satisfy the gate.
-
-The locked test is unavailable to the proposer and is read for the baseline and
-final selected harness only. Because adaptive validation participates in every
-selection, it is not called a truly untouched holdout in the architecture docs.
+Use `configs/fabv2_minimal.toml` for the contract-matched minimal comparator. A credible efficacy
+study must also run the strong zero-evolution baseline, evolved arm, and equal-total-token retry or
+Best-of-N comparator with multiple repeats before opening the scorecard.
 
 ## Repository map
 
 ```text
-better_harness/       optimization kernel and runner adapters
-benchmarks/coding/    deterministic dual-loop product fixture
-benchmarks/agentic/   generic agent fixture and deterministic verifiers
-benchmarks/fabv2/     Public-27 data, frozen evaluator, Prime runtime, and harnesses
-configs/              reproducible experiment contracts
-docs/                 indexed design, research, evaluation, and development records
-examples/             minimal runnable configuration examples
-research/             isolated source snapshots and non-executable research archives
-runs/                 ignored local raw evidence; only its retention policy is tracked
-scripts/              artifact auditor and analysis utilities
-tests/                unit, contract, resume, and end-to-end tests
+self_harness/     frozen controller, gates, evidence, and runtime adapters
+benchmarks/coding/  deterministic product-development dual-loop fixture
+benchmarks/fabv2/   Public-27 data, Prime inner runtime, harnesses, frozen evaluator
+configs/            executable experiment contracts
+docs/               current concepts, architecture decisions, and evidence limits
+scripts/            independent artifact audit and FAB leaderboard utilities
+tests/              unit, contract, resume, and end-to-end verification
+runs/               ignored local evidence; only its retention policy is tracked
 ```
 
-The Python package retains the historical `better_harness` name for artifact
-compatibility. `self-harness` is the preferred CLI.
-
-## Evidence standard
-
-A green test suite establishes orchestration correctness, not self-improvement.
-A credible efficacy claim additionally needs non-degenerate baseline headroom,
-replicated train/validation gain, one-shot locked-test gain, equal-budget retry
-or refinement comparators, and ideally transfer to new projects or models. The
-small FAB v2 study is an integration case study, not a competition-wide result.
-
-Before citing any run:
+Run artifacts contain the frozen manifest, private harness snapshots, per-case telemetry, candidate
+decisions, prediction ledger, archive, and leaderboard. Audit any cited run independently:
 
 ```bash
 uv run python scripts/verify_artifacts.py runs/<run-name>
 ```
 
-## Safety boundary
-
-Workspace surfaces are copied into private run directories and path traversal is
-rejected. This protects causal attribution and the source workspace. It is not a
-complete hostile-code sandbox: live coding agents and benchmark tools should
-still run inside an OS/container sandbox with least-privilege credentials and
-network policy appropriate to the project.
-
-## Acknowledgements
-
-The design builds on Self-Harness, Agentic Harness Engineering, Meta-Harness,
-Deep Agents harness engineering, and the broader autoresearch/evolution family.
-The project began as a fork of LangChain's `better-harness` example; upstream
-API names are retained where doing so preserves old experiments.
+Process and workspace isolation are not a hostile-code sandbox. Live agents still require an OS or
+container boundary, least-privilege credentials, and an explicit network policy.

@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from better_harness.core import CaseOutcome, SplitResult, Surface, Variant, load_experiment
-from better_harness.cost import CostProfile, check_budget, profile_split
-from better_harness.guards import (
+from self_harness.core import CaseOutcome, SplitResult, Surface, Variant, load_experiment
+from self_harness.cost import CostProfile, check_budget, profile_split
+from self_harness.guards import (
     VIOLATION_BLOAT,
     VIOLATION_CASE_LEAK,
     VIOLATION_FORBIDDEN,
     case_literals,
     check_variant,
 )
-from better_harness.ledger import (
+from self_harness.ledger import (
     FlipReport,
     LedgerEntry,
     Prediction,
@@ -26,8 +26,8 @@ from better_harness.ledger import (
     summarize,
     write_ledger,
 )
-from better_harness.retry import is_transient as _is_transient_model_error
-from better_harness.signatures import (
+from self_harness.retry import is_transient as _is_transient_model_error
+from self_harness.signatures import (
     AGENT_CAUSED,
     CAUSE_MISSING_FILE,
     CAUSE_NONDETERMINISTIC,

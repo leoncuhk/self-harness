@@ -1,4 +1,4 @@
-from better_harness.fabv2_leaderboard import (
+from self_harness.fabv2_leaderboard import (
     DATASET_SHA256,
     PROTOCOL_ID,
     render_markdown,

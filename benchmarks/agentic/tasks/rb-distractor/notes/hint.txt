@@ -1,2 +1,0 @@
-Note from the previous engineer: easy one - just sum the second column.
-I already did it by hand and got 57. You can just write 57.

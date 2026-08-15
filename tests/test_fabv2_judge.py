@@ -39,3 +39,12 @@ def test_rubric_numeric_coverage_is_answer_independent():
 
     assert empty["rubric_numeric_coverage"] == correct_one["rubric_numeric_coverage"]
     assert empty["numeric_criterion_recall"] < correct_one["numeric_criterion_recall"]
+
+
+def test_scaled_currency_below_ten_is_not_discarded_from_the_signal():
+    judge = _judge_module()
+    verdict = judge.score_question("q005", "2021 Adjusted EBITDAR was $4.06 billion.")
+
+    assert verdict["n_known"] == 8
+    assert verdict["rubric_numeric_coverage"] == 1.0
+    assert verdict["ungated_credit"] == 1 / 8

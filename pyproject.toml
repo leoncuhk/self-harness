@@ -1,13 +1,10 @@
 [project]
-name = "better-harness"
+name = "self-harness"
 version = "0.1.0"
-description = "Small eval-driven harness optimizer for agent systems"
+description = "Eval-driven dual-loop optimizer for agent harnesses"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "deepagents>=0.7.5",
-    "langchain-openai>=1.4.3",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -16,23 +13,22 @@ dev = [
 ]
 
 [project.scripts]
-better-harness = "better_harness:main"
-self-harness = "better_harness:main"
+self-harness = "self_harness:main"
 
 [build-system]
 requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["better_harness_plugin"]
+py-modules = ["self_harness_plugin"]
 
 [tool.setuptools.packages.find]
-include = ["better_harness*"]
+include = ["self_harness*"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-exclude = [".runtime/**", "**/_runtime/**", "examples/**", "runs/**", "benchmarks/agentic/workspace/**"]
+exclude = [".runtime/**", "**/_runtime/**", "runs/**"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -69,7 +65,7 @@ ignore = [
     "TC002",
     "TC003",
 ]
-"better_harness/core.py" = ["PLC0415", "T201", "S101"]
+"self_harness/core.py" = ["PLC0415", "T201", "S101"]
 "scripts/**" = ["T201", "S101", "D103", "INP001", "PLC0415", "PLR2004", "C901", "PLR0912", "PLR0915", "FBT001", "FBT002", "S311"]
 "benchmarks/**" = ["INP001", "S101", "D100", "D103", "T201", "PLC0415", "DTZ007"]
 

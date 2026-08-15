@@ -1,16 +1,9 @@
 # Benchmarks
 
-Benchmarks own task data, immutable product seeds, frozen evaluators, and the
-initial harness implementation. Optimizer-writable surfaces are declared in a
-config; everything else belongs to the control or execution plane.
+- `coding/` is a deterministic proof that an outer harness edit can cause an inner coding agent to
+  repair a disposable product while product seed and CI remain frozen.
+- `fabv2/` is the real finance-research case study: Public-27 data, Prime runtime, initial harnesses,
+  evaluator-owned tools, and frozen numeric evaluator.
 
-- `coding/`: tiny deterministic fixture proving that an outer harness edit can
-  cause an inner coding agent to repair a disposable product while the seed and
-  CI remain unchanged.
-- `agentic/`: deterministic agent-harness tasks used by earlier experiment
-  stages and regression tests.
-- `fabv2/`: finance-research case study with a frozen numeric rubric evaluator.
-
-During evaluation, source harness directories are never patched. Every variant
-receives a private snapshot under its run artifacts, which permits concurrent
-experiments without cross-contamination.
+Source harnesses are never patched during evaluation. Every variant receives a private run-local
+snapshot, so concurrent candidates remain attributable and replayable.

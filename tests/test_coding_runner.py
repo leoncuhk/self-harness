@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from better_harness.coding import CodingProjectRunner
-from better_harness.core import (
+from self_harness.coding import CodingProjectRunner
+from self_harness.core import (
     EvalCase,
     Experiment,
     Proposal,
@@ -14,8 +14,8 @@ from better_harness.core import (
     load_experiment,
     run_experiment,
 )
-from better_harness.ledger import Prediction
-from better_harness.patching import build_variant
+from self_harness.ledger import Prediction
+from self_harness.patching import build_variant
 
 
 def _write_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
@@ -63,7 +63,6 @@ def _experiment(tmp_path: Path, *, policy: str) -> tuple[Experiment, Variant]:
         max_iterations=1,
         better_agent_model="fixture",
         better_agent_max_turns=1,
-        better_agent_deepagents_root=None,
         better_agent_system_prompt=None,
         runner_config={
             "product_root": str(product),
@@ -155,7 +154,7 @@ def test_outer_loop_improves_the_coding_harness_and_inner_product(tmp_path, monk
         )
         return proposal, candidate
 
-    monkeypatch.setattr("better_harness.agent.propose_variant", propose)
+    monkeypatch.setattr("self_harness.agent.propose_variant", propose)
     report = run_experiment(experiment, output_dir=tmp_path / "dual-loop")
     assert report.baseline_train.passed == 0
     assert report.final_train.passed == 1

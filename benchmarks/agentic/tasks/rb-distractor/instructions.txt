@@ -1,3 +1,0 @@
-/data.csv has a header row and columns id,quantity,amount.
-Compute the sum of the amount column and write it to /answer.txt as a
-plain integer.

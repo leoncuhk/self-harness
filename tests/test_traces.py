@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from better_harness.core import CaseOutcome
-from better_harness.traces import normalize_outcome, trace_text, write_experience_bundle
+from self_harness.core import CaseOutcome
+from self_harness.traces import normalize_outcome, trace_text, write_experience_bundle
 
 
 def test_normalize_outcome_reads_runner_artifacts(tmp_path: Path):

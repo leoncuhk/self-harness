@@ -1,1 +1,1 @@
-# Tests package for better-harness.
+# Tests package for self-harness.

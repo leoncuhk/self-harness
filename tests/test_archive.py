@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from better_harness.archive import ArchiveEntry, CandidateArchive
+from self_harness.archive import ArchiveEntry, CandidateArchive
 
 
 def entry(name: str, *, validation: float, iteration: int, promoted: bool = False) -> ArchiveEntry:

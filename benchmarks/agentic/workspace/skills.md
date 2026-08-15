@@ -1,3 +1,0 @@
-# Skills
-
-Be generally helpful.

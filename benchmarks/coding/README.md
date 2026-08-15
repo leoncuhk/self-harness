@@ -13,5 +13,5 @@ the immutable product seed remains broken.
 Run the baseline inventory with:
 
 ```bash
-uv run better-harness validate configs/coding_demo.toml
+uv run self-harness validate configs/coding_demo.toml
 ```

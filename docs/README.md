@@ -1,29 +1,13 @@
-# Documentation map
+# Documentation
 
-Read these sections by purpose rather than chronology.
+The maintained documentation is deliberately small:
 
-## Start here
+1. [Concepts](concepts/overview.md): what self-harness is and is not.
+2. [Architecture](system/architecture.md): ownership and data flow of both loops.
+3. [Verification](evaluation/verification.md): the evidence required for each claim.
+4. [FAB v2 case study](evaluation/fabv2-case-study.md): current measured status.
+5. [ADR 0001](adr/0001-dual-loop-boundary.md): product/harness separation.
+6. [ADR 0002](adr/0002-agent-runtime-selection.md): Prime inner and atomic Pi outer.
 
-1. [`concepts/overview.md`](concepts/overview.md) defines self-harness, its
-   relationship to recursive improvement, and the evidence limits.
-2. [`system/architecture.md`](system/architecture.md) specifies the frozen
-   boundary and the inner/outer loops.
-3. [`evaluation/verification.md`](evaluation/verification.md) explains what
-   each verification level can and cannot establish.
-4. [`evaluation/fabv2-case-study.md`](evaluation/fabv2-case-study.md) records
-   the bounded end-to-end case study.
-
-## Sections
-
-| Directory | Purpose |
-|---|---|
-| `concepts/` | field synthesis, literature review, and agent-stack choices |
-| `system/` | current architecture and implementation design |
-| `evaluation/` | experiment protocols, results, audits, and limitations |
-| `development/` | roadmap, MVP registrations, and engineering lessons |
-| `adr/` | durable architecture decisions |
-| `archive/` | superseded plans retained for historical context |
-| `assets/` | diagrams referenced by documentation |
-
-External material that must remain isolated from executable benchmarks lives
-under [`../research/`](../research/).
+Superseded plans, copied source repositories, oracle answers, and historical protocols are not kept
+in the active repository. Their useful conclusions are incorporated into the documents above.

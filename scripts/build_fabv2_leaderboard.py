@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from better_harness.fabv2_leaderboard import load_submissions, render_markdown
+from self_harness.fabv2_leaderboard import load_submissions, render_markdown
 
 
 def main() -> int:

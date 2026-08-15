@@ -1,9 +1,0 @@
-Ana Ruiz <ana@Foo.com>
-Ben Ito <ben@www.foo.COM>
-Cara Wu <cara@bar.org>
-Broken Line no email here
-Dev Puri <dev@baz.io>
-Eve Aho <eve@WWW.Bar.ORG>
-Also Broken <not-an-email>
-Fay Lam <fay@qux.net>
-Gil Ora <gil@foo.com>

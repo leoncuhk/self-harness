@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from better_harness.contracts import GoalContract, MetricConstraint, load_goal_contract
+from self_harness.contracts import GoalContract, MetricConstraint, load_goal_contract
 
 
 def test_goal_contract_normalizes_improvement_direction():

@@ -252,25 +252,53 @@
         "text": "2021 Adjusted EBITDAR is $4.06 billion",
         "severity": 1.0,
         "must_pass": false,
-        "numeric": []
+        "numeric": [
+          {
+            "value": 4.06,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$4.06"
+          }
+        ]
       },
       {
         "text": "2022 Adjusted EBITDAR is $4.42 billion",
         "severity": 1.0,
         "must_pass": false,
-        "numeric": []
+        "numeric": [
+          {
+            "value": 4.42,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$4.42"
+          }
+        ]
       },
       {
         "text": "2023 Adjusted EBITDAR is $5.14 billion",
         "severity": 1.0,
         "must_pass": false,
-        "numeric": []
+        "numeric": [
+          {
+            "value": 5.14,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$5.14"
+          }
+        ]
       },
       {
         "text": "2024 Adjusted EBITDAR is $4.96 billion",
         "severity": 1.0,
         "must_pass": false,
-        "numeric": []
+        "numeric": [
+          {
+            "value": 4.96,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$4.96"
+          }
+        ]
       },
       {
         "text": "YoY Adjusted EBITDAR Growth is (3.47%) in 2024",
@@ -1288,6 +1316,12 @@
         "severity": 2.0,
         "must_pass": true,
         "numeric": [
+          {
+            "value": 1.8,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$1.8"
+          },
           {
             "value": 1800.0,
             "unit": "plain",
@@ -2563,7 +2597,14 @@
         "text": "Response states AMZN FY2025 change increases depreciation expense by $1.40 billion.",
         "severity": 1.0,
         "must_pass": false,
-        "numeric": []
+        "numeric": [
+          {
+            "value": 1.4,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$1.40"
+          }
+        ]
       },
       {
         "text": "Response states AMZN Q1 FY2025 represents 15.50% of the FY2025 depreciation impact from the Q1 FY2025 change.",
@@ -2595,7 +2636,14 @@
         "text": "Response states AMZN FY2025 change reduces net income by $1.0 billion.",
         "severity": 1.0,
         "must_pass": false,
-        "numeric": []
+        "numeric": [
+          {
+            "value": 1.0,
+            "unit": "plain",
+            "scale": "billion",
+            "raw": "$1.0"
+          }
+        ]
       },
       {
         "text": "Response states AMZN Q1 FY2025 represents 16.20% of the FY2025 net income impact from the Q1 FY2025 change.",

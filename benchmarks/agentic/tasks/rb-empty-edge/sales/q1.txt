@@ -1,3 +1,0 @@
-region,amount
-north,100
-south,250

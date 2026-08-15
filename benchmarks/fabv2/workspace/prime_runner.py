@@ -13,7 +13,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from better_harness.prime import PrimeRunResult, run_prime_agent
+from self_harness.prime import PrimeRunResult, run_prime_agent
 
 WORKSPACE = Path(__file__).resolve().parent
 SURFACE_FILES = (
@@ -152,7 +152,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
     if case_root.exists():
         shutil.rmtree(case_root)
     case_root.mkdir(parents=True)
-    for name in (*SURFACE_FILES, "fab_tools.py", "prime_provider.ts"):
+    for name in (*SURFACE_FILES, "fab_tools.py", "model_provider.ts"):
         source = WORKSPACE / name
         if source.exists():
             shutil.copy2(source, case_root / name)
@@ -196,7 +196,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
             "--daemon-socket",
             research_socket,
             "--extension",
-            str(research_cwd / "prime_provider.ts"),
+            str(research_cwd / "model_provider.ts"),
             *(("--skill", str(agent_message_skill)) if agent_message_skill else ()),
             "--autonomous",
             "--autonomous-gate",
@@ -267,7 +267,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
                     "--daemon-socket",
                     compiler_socket,
                     "--extension",
-                    str(compiler_cwd / "prime_provider.ts"),
+                    str(compiler_cwd / "model_provider.ts"),
                     "--no-tools",
                 ),
                 input_files=(compiler_cwd / "compiler_input.md",),

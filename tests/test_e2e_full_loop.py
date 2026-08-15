@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from better_harness import runners as runners_module
-from better_harness.core import load_experiment, run_experiment
-from tests.test_better_harness import _write_minimal_pytest_experiment
+from self_harness import runners as runners_module
+from self_harness.core import load_experiment, run_experiment
+from tests.test_self_harness import _write_minimal_pytest_experiment
 
 GOOD_PROMPT = (
     "If the request is ambiguous, ask questions before acting.\n\n"
@@ -55,7 +55,7 @@ def install_proposer(monkeypatch: pytest.MonkeyPatch, proposal_body: str) -> Non
         write_good_surfaces(workspace)
         workspace.proposal_file.write_text(proposal_body)
 
-    monkeypatch.setattr("better_harness.agent.invoke_deepagents_proposer", fake_proposer)
+    monkeypatch.setattr("self_harness.pi.invoke_pi_proposer", fake_proposer)
 
 
 def run_demo(tmp_path: Path, *, name: str, overrides: str = "", max_iterations: int = 2):
@@ -124,7 +124,7 @@ def test_guard_rejects_a_leaky_candidate_without_spending_an_eval(tmp_path, monk
         )
         workspace.proposal_file.write_text("# Proposal\n\nHardcoded the answer.\n")
 
-    monkeypatch.setattr("better_harness.agent.invoke_deepagents_proposer", counting_proposer)
+    monkeypatch.setattr("self_harness.pi.invoke_pi_proposer", counting_proposer)
 
     real_run_split = runners_module.PytestRunner.run_split
 

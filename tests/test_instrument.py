@@ -13,10 +13,10 @@ import json
 import pytest
 from verify_artifacts import audit_run, safe_slug
 
-from better_harness import runners as runners_module
-from better_harness.agent import _private_case_sources
-from better_harness.apparatus import apparatus_kind, is_measurable
-from better_harness.core import (
+from self_harness import runners as runners_module
+from self_harness.agent import _private_case_sources
+from self_harness.apparatus import apparatus_kind, is_measurable
+from self_harness.core import (
     CaseOutcome,
     EvalCase,
     FingerprintDriftError,
@@ -25,18 +25,18 @@ from better_harness.core import (
     load_experiment,
     run_experiment,
 )
-from better_harness.gate import decide
-from better_harness.guards import VIOLATION_UNPARSEABLE, check_variant
-from better_harness.patching import build_baseline_variant, build_variant
-from better_harness.repeats import aggregate_split_results
-from better_harness.retry import retry_transient
-from better_harness.runners import (
+from self_harness.gate import decide
+from self_harness.guards import VIOLATION_UNPARSEABLE, check_variant
+from self_harness.patching import build_baseline_variant, build_variant
+from self_harness.repeats import aggregate_split_results
+from self_harness.retry import retry_transient
+from self_harness.runners import (
     UnresolvedCaseError,
     parse_pytest_outcomes,
     resolve_case_id,
 )
-from better_harness.signatures import classify
-from tests.test_better_harness import _write_minimal_pytest_experiment
+from self_harness.signatures import classify
+from tests.test_self_harness import _write_minimal_pytest_experiment
 
 
 def outcome(case_id: str, status: str, message: str | None = None) -> CaseOutcome:
@@ -381,7 +381,7 @@ def test_an_unpromoted_run_does_not_evaluate_the_sealed_split_twice(tmp_path, mo
         del experiment
         workspace.proposal_file.write_text("# Proposal\n\nNo change.\n")
 
-    monkeypatch.setattr("better_harness.agent.invoke_deepagents_proposer", noop_proposer)
+    monkeypatch.setattr("self_harness.pi.invoke_pi_proposer", noop_proposer)
 
     scorecard_runs: list[str] = []
     real_run_split = runners_module.PytestRunner.run_split

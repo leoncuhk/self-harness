@@ -1,165 +1,71 @@
-# Architecture: Prime execution inside a frozen controller
+# Architecture
 
-## System claim
+## Ownership boundary
 
-This project optimizes a coding-agent harness. It does not claim to find a
-global optimum. A run produces the best validated harness found under a frozen
-goal contract and a recorded resource budget.
-
-The implemented topology is:
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Self-Harness Controller                                      │
-│ frozen goal/splits/model/budget/evaluator → run → gate       │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ visible train evidence
+```text
+┌───────────────────────────────────────────────────────────────┐
+│ Frozen Self-Harness Controller                                │
+│ goal · splits · model · budgets · evaluator · guards · gate   │
+│ run candidates · aggregate telemetry · archive · select       │
+└──────────────────────────────┬────────────────────────────────┘
+                               │ bounded visible train evidence
                     ┌──────────▼──────────┐
-                    │ Prime Outer Proposer│
-                    │ diagnose + edit only│
-                    │ declared surfaces   │
+                    │ Atomic Pi Proposer │
+                    │ one call, no tools │
+                    │ JSON patch + claim │
                     └──────────┬──────────┘
-                               │ candidate harness
-┌──────────────────────────────▼───────────────────────────────┐
-│ Prime Evolvable Inner Runtime                                │
-│ persistent IPython state · frozen research tools · optional  │
-│ specialists · evidence memory · verification · compiler      │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ answer + full telemetry
+                               │ validated declared surfaces
+┌──────────────────────────────▼────────────────────────────────┐
+│ Evolvable Prime Inner Runtime                                 │
+│ orchestrator · persistent computation · research/data tools   │
+│ specialist RLMs · evidence memory · verification · compiler   │
+└──────────────────────────────┬────────────────────────────────┘
+                               │ answer/product diff + telemetry
                     ┌──────────▼──────────┐
-                    │ Frozen Evaluator    │
-                    └─────────────────────┘
+                    │ Frozen Evaluator   │
+                    └────────────────────┘
 ```
 
-For FAB, the inner loop researches, computes, verifies, and compiles an answer.
-For coding domains, it changes a disposable product copy and frozen CI evaluates
-the diff. The outer loop changes only declared harness surfaces. Neither Prime
-session is allowed to select its own result or change the evaluator.
+Only the Controller promotes a candidate. Neither Prime nor Pi can change the goal, task assignment,
+evaluator, model route, inference budget, resource gate, scorecard, or historical archive.
 
-There is one optimizer kernel, not one optimizer per benchmark. Domains plug in
-through runner and surface adapters; they do not fork the control, selection, or
-evidence semantics. A future weight-training or endpoint adapter must obey the
-same immutable boundary rather than introduce a second improvement loop.
+## Inner loop
 
-## Non-negotiable loop invariants
+Each rollout starts from a private harness snapshot and fresh `--no-session` agent process. FAB uses
+Prime because the task benefits from persistent IPython state and optional `rlm(...)` specialists.
+The host enforces time/token/turn ceilings, attributes child usage, persists full telemetry, and
+reserves a separate no-tool compiler so a research cutoff does not force an empty answer.
 
-1. Every inner rollout starts from the same immutable product seed for its case;
-   product edits never become outer-loop state.
-2. Every harness candidate descends from the currently selected parent; rejected
-   candidates remain evidence and do not silently mutate the parent.
-3. The proposer sees visible training evidence only. Adaptive-validation cases
-   affect selection but not proposal content; locked-test evidence affects
-   neither.
-4. Evaluation code, task assignment, model/compute settings, gates, and budgets
-   are outside every editable surface.
-5. Promotion requires measured improvement under the frozen contract, not an
-   LLM preference, narrative judgment, or proxy metric alone.
-6. All outcomes—including rejection, apparatus failure, cost, and prediction
-   error—are append-only evidence with a reproducible fingerprint.
+For coding projects, the runner creates a disposable product checkout, lets the inner agent modify
+only product files, and runs CI outside the agent. Product changes never mutate the harness source.
 
-## Planes
+## Outer loop
 
-| Plane | Contents | Writable by optimizer |
-| --- | --- | --- |
-| Control | goal, evaluator, splits, budget, gate, permissions | no |
-| Evolution | prompts, skills, tools, memory policy, workflow, middleware | yes |
-| Execution | disposable product workspaces and task artifacts | per rollout only |
-| Evidence | traces, metrics, diffs, decisions, fingerprints | append-only |
-| Archive | candidate lineage, accepted and rejected hypotheses, anytime best | append-only |
+The Controller normalizes visible failing traces, clusters failure mechanisms, and builds one bounded
+context containing only task instructions, normalized experience, failure clusters, and current
+surfaces. Pi receives that context with all tools disabled and returns one JSON object containing:
 
-Human governance lives above the control plane. Humans approve goals, evaluator
-changes, policy exceptions, and releases; deterministic promotion remains
-automatic when the frozen contract gives an unambiguous answer.
+- a root-cause claim and evidence;
+- predicted pass flips and regression risk;
+- complete replacement text for declared changed surfaces.
 
-## Goal contract
+Parsing and application are atomic. Invalid JSON, partial output, empty surface text, or undeclared
+surface names cause rejection before any rollout. This task is a constrained transformation, so an
+open-ended coding-agent file loop adds cost and failure modes without useful capability.
 
-Every experiment declares:
+## Selection
 
-- one primary objective and its direction;
-- hard constraints that cannot be traded for score;
-- train, validation, and optional locked-test evidence;
-- token, cost, latency, iteration, and surface-growth ceilings;
-- the editable surface manifest;
-- promotion and stopping policies.
+A candidate must pass static path/leak/syntax/growth guards, improve the primary train objective by
+the frozen floor, avoid pass and constraint regressions, remain inside cost/latency ceilings, and
+satisfy the same rule on adaptive validation. At most one candidate is promoted per generation.
 
-The historical config name `holdout` means **adaptive validation**: its score is
-used every iteration, so repeated selection can overfit it even though the
-proposer cannot see its cases. `scorecard` is the locked test and is evaluated
-only for the baseline and the final selected harness.
+The scorecard is unavailable to the proposer and does not participate in selection. Because
+validation is consulted repeatedly, it is called adaptive validation rather than an untouched
+holdout. Every decision, rejected candidate, prediction, resource measurement, and lineage edge is
+retained for replay.
 
-## Prime inner-loop contract
+## Security and causality
 
-An adapter receives a task, harness variant, and immutable task state. It must:
-
-1. create an isolated case workspace and a fresh `--no-session` Prime session;
-2. invoke Prime with only the task and selected harness snapshot;
-3. capture model messages, tool events, persistent computational state, evidence,
-   answer or product diff, and resource use;
-4. reserve a bounded no-tool compiler phase when the research phase did not
-   submit, then run the evaluator outside Prime;
-5. return structured outcome, resource, and behavior metrics while classifying
-   apparatus failures separately;
-6. discard the product workspace after preserving evidence.
-
-Prime is the current reference runtime, not the trust boundary. Host-side process
-control enforces time, turn, and cumulative-token ceilings because Prime's native
-autonomous flags do not bound every tool-loop shape. Short per-phase socket paths
-avoid Unix endpoint failures. This is process/workspace isolation, not a hostile
-code security sandbox.
-
-## Outer-loop contract
-
-For each generation:
-
-1. replay the current harness on visible training tasks;
-2. normalize verifier output, bounded Prime research traces, costs, tool errors,
-   and behavior telemetry, then cluster causal failure mechanisms;
-3. produce diverse, bounded candidates with falsifiable predictions;
-4. reject invalid or policy-breaking edits statically;
-5. evaluate survivors through train then adaptive validation;
-6. apply correctness, objective, cost, and integrity gates;
-7. let the controller—not Prime—archive every candidate and promote at most one;
-8. stop on saturation, budget exhaustion, repeated no-gain, or apparatus drift.
-
-Rejected candidates remain evidence, not parents by default. Lessons enter
-long-term memory only after replicated support; unsafe or contradictory lessons
-remain quarantined.
-
-## Evaluation hierarchy
-
-Evidence strength increases in this order:
-
-1. unit tests of orchestration;
-2. deterministic end-to-end fixture with a real product diff and CI result;
-3. objective-domain baseline with non-degenerate headroom;
-4. outer-loop gain on adaptive validation;
-5. locked-test gain over the seed harness;
-6. equal-budget gain over retry and sequential-refinement baselines;
-7. transfer to new projects or beneficiary models.
-
-FAB v2 supplies level 3–5 evidence for a finance-research agent. It is not, by
-itself, evidence that the same harness transfers to arbitrary software projects.
-
-## Repository boundaries
-
-```
-better_harness/          optimization kernel and compatibility API
-  contracts.py          immutable goal and metric definitions
-  coding.py             generic coding-project inner loop
-  traces.py             normalized experience evidence
-  archive.py            lineage, anytime best, leaderboard
-  agent.py              outer proposer adapter
-  core.py               orchestration and persisted run model
-  runners.py            domain adapters
-benchmarks/
-  agentic/               generic agent fixture
-  coding/                deterministic two-loop fixture
-  fabv2/                 finance-agent case study
-configs/                 reproducible experiment declarations
-docs/                    design, evidence, and limitations
-tests/                   kernel and contract tests
-```
-
-The package keeps the `better_harness` import and CLI for compatibility with
-existing artifacts. `self-harness` becomes the preferred CLI name once the
-dual-loop adapter is shipped.
+Private workspaces and allowlisted surfaces protect attribution, not host security. A production
+deployment must additionally use a container/VM sandbox, least-privilege secrets, egress policy, and
+an evaluator service the agent process cannot modify.

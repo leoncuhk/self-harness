@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from better_harness.contracts import GoalContract
-from better_harness.core import (
+from self_harness.contracts import GoalContract
+from self_harness.core import (
     CaseOutcome,
     Experiment,
     RunLayout,
@@ -17,8 +17,8 @@ from better_harness.core import (
     Variant,
     load_experiment,
 )
-from better_harness.gate import decide
-from better_harness.repeats import aggregate_split_results, run_split_repeated
+from self_harness.gate import decide
+from self_harness.repeats import aggregate_split_results, run_split_repeated
 
 
 def make_outcome(case_id: str, *, passed: bool, duration_s: float = 1.0) -> CaseOutcome:
@@ -141,7 +141,6 @@ def make_experiment(tmp_path: Path, *, repeats: int) -> Experiment:
         max_iterations=1,
         better_agent_model="m",
         better_agent_max_turns=1,
-        better_agent_deepagents_root=None,
         better_agent_system_prompt=None,
         runner_config={},
         surfaces={"p": Surface(name="p", kind="module_attr", target="a:B", filename="p.txt", base_value="x")},
