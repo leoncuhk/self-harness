@@ -1005,8 +1005,8 @@ def validate_experiment(experiment: Experiment) -> None:
     if not experiment.surfaces:
         msg = "config must define at least one surface"
         raise ValueError(msg)
-    if experiment.max_iterations < 1:
-        msg = "max_iterations must be at least 1"
+    if experiment.max_iterations < 0:
+        msg = "max_iterations must be non-negative"
         raise ValueError(msg)
     if experiment.better_agent_max_turns < 1:
         msg = "better_agent.max_turns must be at least 1"

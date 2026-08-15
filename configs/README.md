@@ -14,6 +14,9 @@ splits, proposer budget, evaluation budget, gate, and resource ceilings.
 - `fabv2_public27_self_harness.toml`: expensive 18/9 Public-27 adaptive
   development run with three repeats and two candidates; it has not been
   executed and its holdout is explicitly not a locked test.
+- `fabv2_public27_b0.toml`, `fabv2_public27_b5.toml`: fixed, zero-iteration
+  Public-27 comparators with exactly the same 18/9 split, three repeats, and
+  execution budget as the Self-Harness study.
 - `fabv2_case_study_b5.toml`: equal-budget hand-engineered FAB comparator.
 - `m2_agentic.toml`, `b5_agentic.toml`, `mvp2_agentic.toml`: earlier agentic
   benchmark stages retained for reproducibility.

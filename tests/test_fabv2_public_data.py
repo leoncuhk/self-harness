@@ -68,3 +68,19 @@ def test_public27_experiment_is_complete_stratified_adaptive_development():
     assert len(folds["folds"]) == 3
     assert all(len(fold["train"]) == 18 for fold in folds["folds"])
     assert all(len(fold["holdout"]) == 9 for fold in folds["folds"])
+
+
+def test_public27_fixed_comparators_share_the_execution_contract():
+    evolved = load_experiment(ROOT / "configs" / "fabv2_public27_self_harness.toml")
+    comparators = [
+        load_experiment(ROOT / "configs" / "fabv2_public27_b0.toml"),
+        load_experiment(ROOT / "configs" / "fabv2_public27_b5.toml"),
+    ]
+
+    for comparator in comparators:
+        assert comparator.max_iterations == 0
+        assert comparator.model == evolved.model
+        assert comparator.repeats == evolved.repeats
+        assert comparator.runner_config == evolved.runner_config
+        assert comparator.cases == evolved.cases
+        assert set(comparator.surfaces) == {"prompt"}
