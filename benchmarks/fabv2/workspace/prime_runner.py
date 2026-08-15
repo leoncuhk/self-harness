@@ -15,6 +15,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from self_harness.fab_policy import load_fab_policy
 from self_harness.prime import PrimeRunResult, run_prime_agent
 
 WORKSPACE = Path(__file__).resolve().parent
@@ -111,10 +112,7 @@ def _filing_bootstrap(
     policy_path = case_root / "runtime_policy.json"
     if not policy_path.is_file():
         return None
-    try:
-        policy = json.loads(policy_path.read_text())
-    except (OSError, ValueError):
-        return None
+    policy = load_fab_policy(policy_path)
     filing = policy.get("filing_index") if isinstance(policy, dict) else None
     if not isinstance(filing, dict) or filing.get("enabled") is not True:
         return None

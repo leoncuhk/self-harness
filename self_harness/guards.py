@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -164,6 +165,14 @@ def _surface_parse_error(  # noqa: PLR0911 - format-specific validation exits ar
         return None
     target = str(surface.target)
     if target.endswith(".json"):
+        if Path(target).name == "runtime_policy.json":
+            from self_harness.fab_policy import parse_fab_policy  # noqa: PLC0415
+
+            try:
+                parse_fab_policy(value)
+            except (TypeError, ValueError) as exc:
+                return str(exc)
+            return None
         try:
             payload = json.loads(value)
         except json.JSONDecodeError as exc:

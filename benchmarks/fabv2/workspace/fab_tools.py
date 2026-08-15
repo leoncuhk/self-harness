@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import math
 import operator
@@ -23,6 +24,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
+
+from self_harness.fab_policy import load_fab_policy
 
 MAX_END_DATE = "2026-03-01"
 MAX_DOWNLOAD_BYTES = 8_000_000
@@ -55,7 +58,27 @@ def _usage_path() -> Path | None:
     return Path(raw) if raw else None
 
 
-def _record(name: str, *, failed: bool = False) -> None:
+def _runtime_policy() -> dict[str, Any]:
+    path = Path(__file__).with_name("runtime_policy.json")
+    return load_fab_policy(path) if path.is_file() else {"schema_version": 1}
+
+
+def _scope_key(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()[:20]
+
+
+def _scoped_count(name: str, scope: str) -> int:
+    path = _usage_path()
+    if path is None or not path.exists():
+        return 0
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return 0
+    return int((payload.get("scoped_calls") or {}).get(name, {}).get(scope, 0))
+
+
+def _record(name: str, *, failed: bool = False, scope: str | None = None) -> None:
     path = _usage_path()
     if path is None:
         return
@@ -65,6 +88,9 @@ def _record(name: str, *, failed: bool = False) -> None:
         payload = {}
     calls = payload.setdefault("calls", {})
     calls[name] = int(calls.get(name, 0)) + 1
+    if scope is not None:
+        scoped = payload.setdefault("scoped_calls", {}).setdefault(name, {})
+        scoped[scope] = int(scoped.get(scope, 0)) + 1
     if failed:
         payload["errors"] = int(payload.get("errors", 0)) + 1
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,8 +108,6 @@ def _cache_root() -> Path:
 
 
 def _http(url: str) -> bytes:
-    import hashlib
-
     cached = _cache_root() / hashlib.sha256(url.encode()).hexdigest()
     if cached.exists():
         return cached.read_bytes()
@@ -299,9 +323,16 @@ def search_page_text(
     max_matches: int = 20,
 ) -> list[dict[str, Any]]:
     """Search all visible page text and return bounded contextual windows."""
+    search_policy = _runtime_policy().get("search_page") or {}
+    scope = _scope_key(url)
+    max_calls = int(search_policy.get("max_calls_per_document", 20))
+    if _scoped_count("search_page_text", scope) >= max_calls:
+        _record("search_page_text", failed=True, scope=scope)
+        message = f"runtime policy blocks more than {max_calls} searches of one document"
+        raise RuntimeError(message)
     needles = [query.strip() for query in queries if query.strip()]
     if not needles:
-        _record("search_page_text", failed=True)
+        _record("search_page_text", failed=True, scope=scope)
         message = "at least one non-empty query is required"
         raise ValueError(message)
     try:
@@ -309,25 +340,33 @@ def search_page_text(
         parser.feed(_http(url).decode("utf-8", errors="ignore"))
         text = "\n".join(parser.parts)
         lowered = text.casefold()
-        radius = max(100, min(context_chars, 5_000))
+        policy_radius = int(search_policy.get("context_chars", 5_000))
+        radius = max(100, min(context_chars, policy_radius, 5_000))
         limit = max(1, min(max_matches, 100))
+        per_query_limit = int(search_policy.get("max_results_per_query", 100))
         matches: list[dict[str, Any]] = []
         for query in needles:
             start = 0
+            query_matches = 0
             folded = query.casefold()
-            while len(matches) < limit and (offset := lowered.find(folded, start)) >= 0:
+            while (
+                len(matches) < limit
+                and query_matches < per_query_limit
+                and (offset := lowered.find(folded, start)) >= 0
+            ):
                 left = max(0, offset - radius)
                 right = min(len(text), offset + len(query) + radius)
                 matches.append(
                     {"query": query, "offset": offset, "snippet": text[left:right]}
                 )
+                query_matches += 1
                 start = offset + max(1, len(folded))
             if len(matches) >= limit:
                 break
     except Exception:
-        _record("search_page_text", failed=True)
+        _record("search_page_text", failed=True, scope=scope)
         raise
-    _record("search_page_text")
+    _record("search_page_text", scope=scope)
     return matches
 
 

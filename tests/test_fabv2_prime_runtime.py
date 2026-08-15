@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from self_harness.fab_policy import parse_fab_policy
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE = ROOT / "benchmarks" / "fabv2" / "workspace"
 
@@ -79,6 +81,56 @@ def test_full_page_search_ignores_inline_xbrl_hidden_metadata(tmp_path: Path, mo
     assert "metadata noise" not in matches[0]["snippet"]
 
 
+def test_search_policy_is_machine_enforced_and_audited(tmp_path: Path, monkeypatch):
+    ledger = tmp_path / "usage.json"
+    monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
+    monkeypatch.setattr(
+        fab_tools,
+        "_runtime_policy",
+        lambda: {
+            "schema_version": 1,
+            "search_page": {
+                "context_chars": 100,
+                "max_results_per_query": 1,
+                "max_calls_per_document": 1,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        fab_tools,
+        "_http",
+        lambda _url: b"<html><body>" + b"x" * 500 + b" target " + b"y" * 500 + b" target</body></html>",
+    )
+
+    matches = fab_tools.search_page_text(
+        "https://example.test/filing",
+        ["target"],
+        context_chars=2_000,
+        max_matches=20,
+    )
+
+    assert len(matches) == 1
+    assert len(matches[0]["snippet"]) < 250
+    with pytest.raises(RuntimeError, match="blocks more than 1"):
+        fab_tools.search_page_text("https://example.test/filing", ["target"])
+    usage = json.loads(ledger.read_text())
+    assert usage["calls"]["search_page_text"] == 2
+    assert usage["errors"] == 1
+    assert list(usage["scoped_calls"]["search_page_text"].values()) == [2]
+
+
+def test_runtime_policy_rejects_silent_unknown_fields():
+    with pytest.raises(ValueError, match="unsupported keys"):
+        parse_fab_policy(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "search_page": {"context_chars": 400, "not_enforced": 3},
+                }
+            )
+        )
+
+
 def test_sec_filings_resolves_ticker_and_returns_direct_documents(tmp_path: Path, monkeypatch):
     ledger = tmp_path / "usage.json"
     monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
@@ -119,10 +171,10 @@ def test_machine_policy_prefetches_bounded_filing_indices(tmp_path: Path, monkey
         "schema_version": 1,
         "filing_index": {
             "enabled": True,
-            "forms": ["10-K", "8-K", "INVALID"],
+            "forms": ["10-K", "8-K"],
             "start_date": "2020-01-01",
             "end_date": "2026-12-31",
-            "top_n_per_form": 50,
+            "top_n_per_form": 10,
             "max_tickers": 1,
         },
     }
