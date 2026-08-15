@@ -34,3 +34,7 @@ Validation score delta (final - seed): +0.000.
 Locked-test score delta (final - seed): +0.000.
 
 This is a causal integration check with n=1 per split and one stochastic repeat. It cannot establish a competition-wide ranking, statistical significance, transfer, or a global optimum. A promoted candidate establishes only the best validated harness found in this frozen run budget.
+
+The later continuous-objective calibration is recorded separately in
+[`fabv2-v2-calibration.md`](fabv2-v2-calibration.md); it also produced no gain
+and identified eight-turn budget exhaustion plus resume/instrumentation defects.

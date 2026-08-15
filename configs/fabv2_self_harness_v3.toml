@@ -1,9 +1,9 @@
-# Successor to the executed v1 case study. It preserves official dealbreaker
-# partial_credit for reporting but optimizes the ungated severity-weighted
-# numeric credit so near-misses produce a usable search gradient.
+# Successor to the executed v2 calibration. V2 showed that an eight-turn budget
+# yields empty submissions on all measured arms, so V3 changes only the frozen
+# execution budget before any V3 outcome is observed.
 
 [experiment]
-name = "fabv2-self-harness-v2"
+name = "fabv2-self-harness-v3"
 runner = "pytest"
 workspace_root = "../benchmarks/fabv2/workspace"
 model = "openai/deepseek-v4-flash"
@@ -42,11 +42,10 @@ min_latency_s = 30.0
 project_root = "../benchmarks/fabv2/evals"
 model_flag = "--model"
 summary_flag = "--evals-report-file"
-pytest_args = ["-q", "--max-turns=8", "--max-time=600", "--max-tokens=5000"]
-# A provider request may consume up to 3 x 120s retries inside one agent turn;
-# keep the outer process timeout above the agent budget so a clean task failure
+pytest_args = ["-q", "--max-turns=14", "--max-time=900", "--max-tokens=8000"]
+# Keep the outer process timeout above the agent budget so a clean task failure
 # is measured instead of being censored as apparatus.
-case_timeout_s = 780
+case_timeout_s = 1080
 
 [surfaces.prompt]
 kind = "workspace_file"

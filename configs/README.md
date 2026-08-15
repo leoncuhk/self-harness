@@ -7,7 +7,10 @@ splits, proposer budget, evaluation budget, gate, and resource ceilings.
 - `coding_demo.toml`: deterministic product-development dual-loop fixture.
 - `fabv2_self_harness.toml`: bounded FAB v2 structural self-harness study.
 - `fabv2_self_harness_v2.toml`: pre-registered successor with an ungated
-  severity-weighted search objective; it has not yet been executed.
+  severity-weighted search objective; its executed eight-turn calibration
+  produced only empty submissions and no objective gain.
+- `fabv2_self_harness_v3.toml`: unexecuted 14-turn successor, versioned rather
+  than silently changing V2 after observing its budget-exhaustion result.
 - `fabv2_public27_self_harness.toml`: expensive 18/9 Public-27 adaptive
   development run with three repeats and two candidates; it has not been
   executed and its holdout is explicitly not a locked test.

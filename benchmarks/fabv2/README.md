@@ -40,9 +40,10 @@ not evidence of FAB performance gain.
 
 That run also falsified the assumption that the old `numeric_recall` diagnostic
 measured answer quality: it was rubric numeric coverage and therefore constant
-for a question. `configs/fabv2_self_harness_v2.toml` is an unexecuted successor
-that exposes ungated weighted credit and true numeric-criterion recall without
-changing the official dealbreaker score.
+for a question. `configs/fabv2_self_harness_v2.toml` exposed ungated weighted
+credit and true numeric-criterion recall without changing the dealbreaker score,
+but its executed eight-turn calibration still produced empty answers and no
+gain. See `docs/fabv2-v2-calibration.md`; v3 is the unexecuted 14-turn successor.
 
 Regenerate and verify the public artifacts with:
 

@@ -9,8 +9,9 @@ official public evidence, and proposed work.
 The current repository implements a real L3 Self-Harness loop, but it has **not
 demonstrated a FAB v2 improvement, much less the highest level**. Its strongest
 evidence is orchestration correctness and conservative rejection: the executed
-three-question run scored 0 for the seed, B5, and final arm, and rejected the
-candidate. That is a valid negative result, not a leaderboard result.
+three-question v1 run scored 0 for the seed, B5, and final arm; the later v2
+continuous-objective calibration also scored 0 and rejected its candidate.
+Those are valid negative results, not leaderboard results.
 
 ZCodeProject is highly useful as a source of the complete public dataset,
 official scaffold semantics, category taxonomy, source-research experience, and
@@ -23,8 +24,8 @@ integrated with source commit and SHA-256 provenance; answer files were not.
 | Question | Verdict | Evidence |
 | --- | --- | --- |
 | Is Self-Harness structurally implemented? | Yes | isolated inner/outer loops, frozen evaluator/goal, editable-surface allowlist, repeated evaluation, conservative/objective gates, cost veto, traces, prediction ledger, archive, resume, artifact audit, deterministic E2E |
-| Has it improved FAB v2? | No observed gain | the only completed bounded run is 0/0/0 for seed, B5, and selected final |
-| Is the v2 continuous objective validated live? | No | `fabv2_self_harness_v2.toml` remains unexecuted |
+| Has it improved FAB v2? | No observed gain | both bounded v1 and v2 rejected their candidate with zero selected-arm gain |
+| Is the v2 continuous objective validated live? | Yes, negatively | the loop executed, but every eight-turn rollout exhausted its budget with an empty answer and zero credit |
 | Is Public-27 available locally? | Yes | official CSV SHA-256 pinned; 27 questions, 239 criteria, 79 must-pass, nine categories |
 | Is the local score official FAB partial credit? | No | the local deterministic judge cannot decide qualitative criteria and uses free/non-identical tools |
 | Is there an auditable ranking mechanism? | Yes, locally | candidate archive plus the new Public-27 submission contract and separate official/diagnostic tables |
@@ -110,9 +111,9 @@ harness on all 27 and disclose every prior exposure.
 2. **Apparatus fidelity:** local web search is a stub and the remaining free
    services differ from the official tools. Report both apparatus profiles;
    never pool them.
-3. **Efficacy evidence:** run non-degenerate v2 and Public-27 protocols across
-   at least three repeats. The existing one-repeat, three-case result only tests
-   integration.
+3. **Efficacy evidence:** run the preregistered v3 and later Public-27 protocols
+   across at least three repeats. The existing one-repeat, three-case results
+   only test integration and revealed eight-turn censoring.
 4. **Comparator strength:** fixed B0/B5, token-matched retry/best-of-N, and
    sequential refinement must precede an automated-evolution claim.
 5. **Contamination:** criterion text is public and failure messages expose
@@ -180,7 +181,7 @@ accepted edit nor repeated benchmark search establishes that property.
 
 ## Execution order
 
-1. run and audit the bounded v2 objective before scaling;
+1. run and audit the bounded v3 budget before scaling;
 2. calibrate qualitative judging on a human-labeled subset;
 3. execute fixed B0/B5 and equal-budget refinement arms;
 4. execute `fabv2_public27_self_harness.toml` only after cost estimation;
