@@ -64,6 +64,41 @@ def test_full_page_search_finds_text_beyond_fetch_prefix(tmp_path: Path, monkeyp
     }
 
 
+def test_sec_filings_resolves_ticker_and_returns_direct_documents(tmp_path: Path, monkeypatch):
+    ledger = tmp_path / "usage.json"
+    monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
+    tickers = {"0": {"cik_str": 1590895, "ticker": "CZR", "title": "Caesars"}}
+    submissions = {
+        "name": "Caesars Entertainment, Inc.",
+        "filings": {
+            "recent": {
+                "form": ["10-K", "10-Q", "10-K"],
+                "filingDate": ["2025-02-25", "2024-11-01", "2024-02-20"],
+                "reportDate": ["2024-12-31", "2024-09-30", "2023-12-31"],
+                "accessionNumber": ["0001590895-25-000010", "x", "0001590895-24-000010"],
+                "primaryDocument": ["czr-20241231.htm", "q3.htm", "czr-20231231.htm"],
+            }
+        },
+    }
+
+    def fake_http(url: str) -> bytes:
+        payload = tickers if url == fab_tools.TICKERS_URL else submissions
+        return json.dumps(payload).encode()
+
+    monkeypatch.setattr(fab_tools, "_http", fake_http)
+    rows = fab_tools.sec_filings(
+        "czr",
+        form_type="10-K",
+        start_date="2024-01-01",
+        end_date="2025-12-31",
+    )
+
+    assert [row["period_ending"] for row in rows] == ["2024-12-31", "2023-12-31"]
+    assert rows[0]["document_url"].endswith("/czr-20241231.htm")
+    assert rows[0]["cik"] == "0001590895"
+    assert json.loads(ledger.read_text())["calls"] == {"sec_filings": 1}
+
+
 def test_prime_runtime_isolates_case_and_reads_submission(tmp_path: Path, monkeypatch):
     fake = tmp_path / "fake_prime.py"
     fake.write_text(

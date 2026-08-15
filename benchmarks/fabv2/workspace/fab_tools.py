@@ -26,6 +26,8 @@ MAX_END_DATE = "2026-03-01"
 MAX_DOWNLOAD_BYTES = 8_000_000
 USER_AGENT = "SelfHarness-FABv2/1.0 research@example.invalid"
 FTS_URL = "https://efts.sec.gov/LATEST/search-index"
+TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+SUBMISSIONS_URL = "https://data.sec.gov/submissions"
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _BINARY = {
     ast.Add: operator.add,
@@ -168,6 +170,71 @@ def edgar_search(
     return output
 
 
+def sec_filings(
+    ticker: str,
+    *,
+    form_type: str = "10-K",
+    start_date: str = "2001-01-01",
+    end_date: str = MAX_END_DATE,
+    top_n: int = 10,
+) -> list[dict[str, Any]]:
+    """List a company's recent SEC filings without relying on keyword search."""
+    try:
+        symbol = ticker.strip().upper()
+        if not symbol or not re.fullmatch(r"[A-Z0-9.-]+", symbol):
+            raise ValueError(f"invalid ticker {ticker!r}")  # noqa: TRY301 - common audit path
+        start = _date(start_date)
+        end = min(_date(end_date), MAX_END_DATE)
+        tickers = json.loads(_http(TICKERS_URL))
+        company = next(
+            (
+                item
+                for item in tickers.values()
+                if str(item.get("ticker", "")).upper() == symbol
+            ),
+            None,
+        )
+        if company is None:
+            raise ValueError(  # noqa: TRY301 - common audit path
+                f"ticker {symbol!r} not found in SEC company tickers"
+            )
+        cik = str(int(company["cik_str"])).zfill(10)
+        payload = json.loads(_http(f"{SUBMISSIONS_URL}/CIK{cik}.json"))
+        recent = payload.get("filings", {}).get("recent", {})
+        rows: list[dict[str, Any]] = []
+        for form, filed, period, accession, document in zip(
+            recent.get("form", []),
+            recent.get("filingDate", []),
+            recent.get("reportDate", []),
+            recent.get("accessionNumber", []),
+            recent.get("primaryDocument", []),
+            strict=False,
+        ):
+            if form != form_type or not start <= filed <= end:
+                continue
+            accession_slug = accession.replace("-", "")
+            base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession_slug}"
+            rows.append(
+                {
+                    "ticker": symbol,
+                    "company": payload.get("name") or company.get("title"),
+                    "cik": cik,
+                    "form_type": form,
+                    "filed_at": filed,
+                    "period_ending": period,
+                    "document_url": f"{base}/{document}",
+                    "index_url": f"{base}/{accession_slug}-index.html",
+                }
+            )
+            if len(rows) >= max(1, min(top_n, 50)):
+                break
+    except Exception:
+        _record("sec_filings", failed=True)
+        raise
+    _record("sec_filings")
+    return rows
+
+
 class _TextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -292,6 +359,12 @@ def main(argv: list[str] | None = None) -> int:
     edgar.add_argument("--end-date", default=MAX_END_DATE)
     edgar.add_argument("--form", action="append", dest="forms")
     edgar.add_argument("--top-n", type=int, default=10)
+    filings = commands.add_parser("sec-filings")
+    filings.add_argument("ticker")
+    filings.add_argument("--form", default="10-K")
+    filings.add_argument("--start-date", default="2001-01-01")
+    filings.add_argument("--end-date", default=MAX_END_DATE)
+    filings.add_argument("--top-n", type=int, default=10)
     page = commands.add_parser("fetch-page")
     page.add_argument("url")
     page.add_argument("--max-chars", type=int, default=250_000)
@@ -314,6 +387,16 @@ def main(argv: list[str] | None = None) -> int:
                 start_date=args.start_date,
                 end_date=args.end_date,
                 form_types=args.forms,
+                top_n=args.top_n,
+            )
+        )
+    elif args.command == "sec-filings":
+        _print_json(
+            sec_filings(
+                args.ticker,
+                form_type=args.form,
+                start_date=args.start_date,
+                end_date=args.end_date,
                 top_n=args.top_n,
             )
         )
