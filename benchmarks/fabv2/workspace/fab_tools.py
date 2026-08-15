@@ -15,10 +15,12 @@ import operator
 import os
 import re
 import tempfile
+import time
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -85,9 +87,23 @@ def _http(url: str) -> bytes:
     cached = _cache_root() / hashlib.sha256(url.encode()).hexdigest()
     if cached.exists():
         return cached.read_bytes()
-    request = Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310 - HTTPS checked by callers
-    with urlopen(request, timeout=60) as response:  # noqa: S310 - HTTPS checked by callers
-        body = response.read(MAX_DOWNLOAD_BYTES + 1)
+    request = Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310 - tool allows HTTPS
+    body: bytes | None = None
+    for attempt in range(4):
+        try:
+            with urlopen(request, timeout=60) as response:  # noqa: S310 - tool allows HTTPS
+                body = response.read(MAX_DOWNLOAD_BYTES + 1)
+            break
+        except HTTPError as exc:
+            if exc.code not in {429, 500, 502, 503, 504} or attempt == 3:
+                raise
+        except URLError:
+            if attempt == 3:
+                raise
+        time.sleep(0.5 * (2**attempt))
+    if body is None:  # pragma: no cover - loop either returns data or raises
+        message = "HTTP retry loop ended without data"
+        raise RuntimeError(message)
     if len(body) > MAX_DOWNLOAD_BYTES:
         raise ValueError(f"response exceeds {MAX_DOWNLOAD_BYTES} bytes")
     cached.write_bytes(body)
@@ -243,11 +259,14 @@ class _TextExtractor(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         del attrs
-        if tag in {"script", "style", "svg"}:
+        if tag in {"script", "style", "svg", "ix:header", "ix:hidden", "xbrli:context"}:
             self.suppressed += 1
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in {"script", "style", "svg"} and self.suppressed:
+        if (
+            tag in {"script", "style", "svg", "ix:header", "ix:hidden", "xbrli:context"}
+            and self.suppressed
+        ):
             self.suppressed -= 1
 
     def handle_data(self, data: str) -> None:

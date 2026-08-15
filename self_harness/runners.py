@@ -332,6 +332,13 @@ class PytestRunner:
         env.update(self._configured_env(experiment))
         env[VARIANT_ENV] = str(variant_path)
         env["BETTER_HARNESS_WORKSPACE_ROOT"] = str(workspace_root)
+        # URL-keyed immutable research artifacts are apparatus state, not a
+        # candidate surface. Sharing them avoids variant-dependent SEC outages
+        # and repeated downloads while keeping model/evaluator state isolated.
+        env.setdefault(
+            "SELF_HARNESS_SHARED_CACHE",
+            str(experiment.workspace_root / ".cache"),
+        )
         env["PYTHONPATH"] = prepend_pythonpath(
             [runtime_dir, self.repo_root, workspace_root],
             env.get("PYTHONPATH"),

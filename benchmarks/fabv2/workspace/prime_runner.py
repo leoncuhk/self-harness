@@ -174,7 +174,14 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
     )
     env = os.environ.copy()
     env["FAB_TOOLS_USAGE_FILE"] = str(usage_path)
-    env["FAB_TOOLS_CACHE"] = str(Path(os.environ.get("FABV2_CACHE", WORKSPACE / ".cache")))
+    env["FAB_TOOLS_CACHE"] = str(
+        Path(
+            os.environ.get(
+                "FABV2_CACHE",
+                os.environ.get("SELF_HARNESS_SHARED_CACHE", WORKSPACE / ".cache"),
+            )
+        )
+    )
     gate = f"test -s {shlex.quote(answer_path.name)}"
     started = time.monotonic()
     research_socket, research_cwd = _prime_endpoint(case_root, "research")

@@ -64,6 +64,21 @@ def test_full_page_search_finds_text_beyond_fetch_prefix(tmp_path: Path, monkeyp
     }
 
 
+def test_full_page_search_ignores_inline_xbrl_hidden_metadata(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(tmp_path / "usage.json"))
+    document = (
+        b"<html><body><ix:header><ix:hidden>rent metadata noise</ix:hidden></ix:header>"
+        b"<p>Annual rent payments were $113 million.</p></body></html>"
+    )
+    monkeypatch.setattr(fab_tools, "_http", lambda _url: document)
+
+    matches = fab_tools.search_page_text("https://example.test", ["rent"], context_chars=100)
+
+    assert len(matches) == 1
+    assert "Annual rent payments" in matches[0]["snippet"]
+    assert "metadata noise" not in matches[0]["snippet"]
+
+
 def test_sec_filings_resolves_ticker_and_returns_direct_documents(tmp_path: Path, monkeypatch):
     ledger = tmp_path / "usage.json"
     monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
