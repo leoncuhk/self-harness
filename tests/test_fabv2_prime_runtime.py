@@ -285,6 +285,29 @@ print(json.dumps({'type': 'agent_end', 'messages': [message]}))
     assert os.fspath(ROOT) not in (case_root / "task.md").read_text()
 
 
+def test_prime_runtime_fails_early_with_provider_diagnostic(tmp_path: Path, monkeypatch):
+    fake = tmp_path / "fake_missing_provider.py"
+    fake.write_text(
+        "import sys\n"
+        "sys.stderr.write('OPENAI_BASE_URL is required for the self-harness provider\\n')\n"
+        "raise SystemExit(1)\n"
+    )
+    monkeypatch.setenv(
+        "PRIME_AGENT_COMMAND",
+        f"{shlex.quote(sys.executable)} {shlex.quote(str(fake))}",
+    )
+
+    with pytest.raises(RuntimeError, match="OPENAI_BASE_URL is required"):
+        prime_runner.run_question(
+            "What is the answer?",
+            model="openai/fake",
+            log_dir=tmp_path / "artifacts",
+            max_turns=5,
+            max_time=30,
+            max_tokens=1000,
+        )
+
+
 def test_prime_runtime_compiles_trace_when_research_does_not_submit(tmp_path: Path, monkeypatch):
     fake = tmp_path / "fake_compiler.py"
     fake.write_text(

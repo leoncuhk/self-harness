@@ -325,6 +325,9 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
         max_turns=research_turn_budget,
         max_tokens=research_token_budget,
     )
+    if not research_result.events and research_result.returncode != 0:
+        detail = research_result.stderr.strip() or f"exit {research_result.returncode}"
+        raise RuntimeError(f"Prime research failed before producing events: {detail}")
     (log_dir / "research_result.json").write_text(
         json.dumps(research_result.to_dict(), indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     )

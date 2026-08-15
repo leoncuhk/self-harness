@@ -40,6 +40,7 @@ STATUS_APPARATUS = "apparatus"
 APPARATUS_RULES: tuple[tuple[str, str], ...] = (
     (r"case missing from junit\.xml|no such file.*junit|failed to parse junit", "junit_unreadable"),
     (r"missing config key: .*api[_ ]?key|api[_ ]?key.*(missing|not set|required)", "provider_config"),
+    (r"\b(?:openai|anthropic)_(?:base_url|api_key)\b.*required", "provider_config"),
     (r"case process timed out", "case_timeout"),
     (r"connection error|server disconnected|remoteprotocolerror|apiconnectionerror", "transport"),
     (r"connection reset|connection aborted|broken pipe", "transport"),
