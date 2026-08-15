@@ -84,7 +84,7 @@ selection, it is not called a truly untouched holdout in the architecture docs.
 better_harness/       optimization kernel and runner adapters
 benchmarks/coding/    deterministic dual-loop product fixture
 benchmarks/agentic/   generic agent fixture and deterministic verifiers
-benchmarks/fabv2/     bounded finance-research case study
+benchmarks/fabv2/     27-question public FAB development set and bounded case study
 configs/              reproducible experiment contracts
 docs/                 architecture, evidence, limits, and results
 scripts/              artifact auditor and analysis utilities

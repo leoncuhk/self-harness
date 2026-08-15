@@ -1,4 +1,4 @@
-"""Frozen evaluator for FAB v2 smoke cases: deterministic numeric track only.
+"""Frozen diagnostic evaluator for the FAB v2 public development set.
 
 Mirrors the official Partial Credit semantics:
   - any failed must_pass (dealbreaker) criterion -> question score 0
@@ -6,8 +6,9 @@ Mirrors the official Partial Credit semantics:
   - criteria without numeric anchors are 'unknown' (LLM track is deliberately
     not implemented here; decisions use the deterministic track only)
 
-Copied from the fabv2-playbook judge (build_rubrics.extract_anchors +
-judge.score_question). Frozen: do not edit during an experiment.
+This is not the official Vals judge and cannot score qualitative criteria. Its
+partial-credit-shaped output is a search signal, not an official benchmark
+score. Frozen: do not edit during an experiment.
 """
 
 from __future__ import annotations

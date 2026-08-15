@@ -1,4 +1,4 @@
-"""FAB v2 smoke cases.
+"""FAB v2 public-development cases.
 
 Run the inner finance agent on a question, judge with the
 frozen deterministic evaluator, assert on the numeric-track partial credit.
@@ -55,8 +55,8 @@ def test_rubric_leak_guard() -> None:
 
 
 @pytest.mark.timeout(900)
-@pytest.mark.parametrize("qid", ["q004", "q015", "q024", "q012", "q007", "q019"])
-def test_question(
+@pytest.mark.parametrize("qid", sorted(QUESTIONS))
+def test_question(  # noqa: PLR0913 - pytest fixtures define the benchmark contract
     qid: str,
     artifact_dir: Path,
     model: str,

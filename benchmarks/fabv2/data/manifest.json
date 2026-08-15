@@ -1,0 +1,24 @@
+{
+  "benchmark": "Finance Agent Benchmark v2 public development set",
+  "source_repository": "https://github.com/vals-ai/finance-agent-v2",
+  "source_commit": "b979786a8f9c49c178a88720ea4bb6fb16cbf818",
+  "source_file": "data/public.csv",
+  "source_sha256": "27b48c08a6099bc076b4194cac7cefe295082b9aedcbc67f4fedfa70468b427e",
+  "license": "MIT; see THIRD_PARTY_NOTICES.md",
+  "evaluation_status": "public-development-only",
+  "question_count": 27,
+  "criterion_count": 239,
+  "must_pass_count": 79,
+  "numeric_criterion_count": 174,
+  "categories": {
+    "Adjustments": 3,
+    "Comparables": 3,
+    "Disclosure Analysis": 3,
+    "Earnings Analysis": 3,
+    "Financial Modeling": 3,
+    "General Qualitative Analysis": 3,
+    "General Quantitative Analysis": 3,
+    "Market Analysis": 3,
+    "Precedents": 3
+  }
+}
