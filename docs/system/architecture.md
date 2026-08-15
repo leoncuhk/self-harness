@@ -1,4 +1,4 @@
-# Architecture: two loops, one immutable anchor
+# Architecture: Prime execution inside a frozen controller
 
 ## System claim
 
@@ -6,17 +6,35 @@ This project optimizes a coding-agent harness. It does not claim to find a
 global optimum. A run produces the best validated harness found under a frozen
 goal contract and a recorded resource budget.
 
-The two loops are deliberately separate:
+The implemented topology is:
 
 ```
-inner loop: task -> coding agent -> product diff -> CI/verifier -> outcome/trace/metrics
-outer loop: evidence -> diagnosis -> harness candidates -> inner-loop replay -> promotion
+┌──────────────────────────────────────────────────────────────┐
+│ Self-Harness Controller                                      │
+│ frozen goal/splits/model/budget/evaluator → run → gate       │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ visible train evidence
+                    ┌──────────▼──────────┐
+                    │ Prime Outer Proposer│
+                    │ diagnose + edit only│
+                    │ declared surfaces   │
+                    └──────────┬──────────┘
+                               │ candidate harness
+┌──────────────────────────────▼───────────────────────────────┐
+│ Prime Evolvable Inner Runtime                                │
+│ persistent IPython state · frozen research tools · optional  │
+│ specialists · evidence memory · verification · compiler      │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ answer + full telemetry
+                    ┌──────────▼──────────┐
+                    │ Frozen Evaluator    │
+                    └─────────────────────┘
 ```
 
-The inner loop changes a disposable copy of a product. The outer loop changes
-the prompt, skills, tools, memory policy, workflow, and middleware used by the
-coding agent. Neither loop may change the goal contract, evaluator, private
-cases, resource ceiling, promotion rule, or audit log.
+For FAB, the inner loop researches, computes, verifies, and compiles an answer.
+For coding domains, it changes a disposable product copy and frozen CI evaluates
+the diff. The outer loop changes only declared harness surfaces. Neither Prime
+session is allowed to select its own result or change the evaluator.
 
 There is one optimizer kernel, not one optimizer per benchmark. Domains plug in
 through runner and surface adapters; they do not fork the control, selection, or
@@ -69,34 +87,38 @@ used every iteration, so repeated selection can overfit it even though the
 proposer cannot see its cases. `scorecard` is the locked test and is evaluated
 only for the baseline and the final selected harness.
 
-## Inner-loop contract
+## Prime inner-loop contract
 
-A coding-project adapter receives a task, a harness variant, and an immutable
-product seed. It must:
+An adapter receives a task, harness variant, and immutable task state. It must:
 
-1. create an isolated worktree or copy;
-2. invoke the configured coding agent with only visible task material;
-3. capture the agent transcript and product diff;
-4. run the frozen CI commands outside the agent process;
+1. create an isolated case workspace and a fresh `--no-session` Prime session;
+2. invoke Prime with only the task and selected harness snapshot;
+3. capture model messages, tool events, persistent computational state, evidence,
+   answer or product diff, and resource use;
+4. reserve a bounded no-tool compiler phase when the research phase did not
+   submit, then run the evaluator outside Prime;
 5. return structured outcome, resource, and behavior metrics while classifying
    apparatus failures separately;
 6. discard the product workspace after preserving evidence.
 
-The adapter is command based so Codex, Claude Code, OpenCode, or a deterministic
-test double can implement the same protocol.
+Prime is the current reference runtime, not the trust boundary. Host-side process
+control enforces time, turn, and cumulative-token ceilings because Prime's native
+autonomous flags do not bound every tool-loop shape. Short per-phase socket paths
+avoid Unix endpoint failures. This is process/workspace isolation, not a hostile
+code security sandbox.
 
 ## Outer-loop contract
 
 For each generation:
 
 1. replay the current harness on visible training tasks;
-2. normalize verifier output, traces, costs, and available behavior telemetry,
-   then cluster causal failure mechanisms;
+2. normalize verifier output, bounded Prime research traces, costs, tool errors,
+   and behavior telemetry, then cluster causal failure mechanisms;
 3. produce diverse, bounded candidates with falsifiable predictions;
 4. reject invalid or policy-breaking edits statically;
 5. evaluate survivors through train then adaptive validation;
 6. apply correctness, objective, cost, and integrity gates;
-7. archive every candidate and promote at most one;
+7. let the controller—not Prime—archive every candidate and promote at most one;
 8. stop on saturation, budget exhaustion, repeated no-gain, or apparatus drift.
 
 Rejected candidates remain evidence, not parents by default. Lessons enter

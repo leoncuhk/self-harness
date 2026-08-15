@@ -126,3 +126,18 @@ def test_prime_full_protocol_and_minimal_comparator_are_contract_matched():
         evolved.surfaces[name].base_value != minimal.surfaces[name].base_value
         for name in evolved.surfaces
     )
+
+
+def test_prime_evolution_smoke_has_visible_and_validation_headroom_cases():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_prime_evolve_smoke.toml")
+    assert [case.case_id for case in experiment.cases_for_split("train")] == [
+        "tests/test_fabv2.py::test_question[q005]"
+    ]
+    assert [case.case_id for case in experiment.cases_for_split("holdout")] == [
+        "tests/test_fabv2.py::test_question[q006]"
+    ]
+    assert [case.case_id for case in experiment.cases_for_split("scorecard")] == [
+        "tests/test_fabv2.py::test_question[q004]"
+    ]
+    assert experiment.better_agent_backend == "prime"
+    assert experiment.max_iterations == 1

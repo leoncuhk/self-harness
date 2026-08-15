@@ -186,6 +186,51 @@ print(json.dumps({'type': 'message_end', 'message': message}), flush=True)
     assert out["stop_reason"] == "compiled_after_max_tokens"
 
 
+def test_prime_runtime_rejects_silent_compiler_as_apparatus_failure(
+    tmp_path: Path, monkeypatch
+):
+    fake = tmp_path / "fake_silent_compiler.py"
+    counter = tmp_path / "compiler_calls.txt"
+    fake.write_text(
+        """
+import json
+import os
+import sys
+from pathlib import Path
+
+if '--no-tools' in sys.argv:
+    counter = Path(os.environ['FAKE_COMPILER_COUNTER'])
+    counter.write_text(counter.read_text() + 'x' if counter.exists() else 'x')
+else:
+    message = {
+        'id': 'research', 'role': 'assistant',
+        'content': [{'type': 'text', 'text': 'research only'}],
+        'usage': {'totalTokens': 10}, 'stopReason': 'stop',
+    }
+    print(json.dumps({'type': 'message_end', 'message': message}), flush=True)
+""".strip()
+        + "\n"
+    )
+    monkeypatch.setenv("FAKE_COMPILER_COUNTER", str(counter))
+    monkeypatch.setenv(
+        "PRIME_AGENT_COMMAND",
+        f"{shlex.quote(sys.executable)} {shlex.quote(str(fake))}",
+    )
+
+    with pytest.raises(RuntimeError, match="no JSON events after 3 attempts"):
+        prime_runner.run_question(
+            "Return an answer",
+            model="openai/fake",
+            log_dir=tmp_path / "artifacts",
+            max_turns=6,
+            max_time=30,
+            max_tokens=1000,
+        )
+
+    assert counter.read_text() == "xxx"
+    assert len(list((tmp_path / "artifacts").glob("compiler_attempt_*.json"))) == 3
+
+
 def test_strong_harness_has_all_runtime_surfaces():
     strong = ROOT / "benchmarks" / "fabv2" / "harnesses" / "strong"
     prompt = prime_runner.compose_harness_prompt(strong)

@@ -19,6 +19,19 @@ def test_normalize_outcome_reads_runner_artifacts(tmp_path: Path):
         )
     )
     (tmp_path / "trace.jsonl").write_text('{"event":"ci_end","returncode":1}\n')
+    (tmp_path / "judge.json").write_text(
+        json.dumps(
+            {
+                "partial_credit": 0.25,
+                "ungated_credit": 0.5,
+                "failed_numeric": ["missing CAGR"],
+                "private_debug": "must not be copied",
+            }
+        )
+    )
+    research_dir = tmp_path / "trajectory" / "prime_workspace"
+    research_dir.mkdir(parents=True)
+    (research_dir / "research_trace.json").write_text('[{"error":"SEC HTTP 503"}]\n')
     outcome = CaseOutcome(
         case_id="case",
         split="train",
@@ -33,7 +46,14 @@ def test_normalize_outcome_reads_runner_artifacts(tmp_path: Path):
     assert record.stop_reason == "turn_limit"
     assert record.tool_usage == {"web_search": 4}
     assert record.events[0]["returncode"] == 1
+    assert record.verifier == {
+        "partial_credit": 0.25,
+        "ungated_credit": 0.5,
+        "failed_numeric": ["missing CAGR"],
+    }
+    assert record.research_tail == '[{"error":"SEC HTTP 503"}]'
     assert "web_search" in trace_text(outcome)
+    assert "sec http 503" in trace_text(outcome)
 
 
 def test_experience_bundle_is_bounded_and_jsonl(tmp_path: Path):

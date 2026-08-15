@@ -5,6 +5,8 @@ budgets, gate, and resource ceilings.
 
 - `fabv2_prime_smoke.toml`: three-case Prime runtime integration gate. One
   repeat is never an efficacy claim.
+- `fabv2_prime_evolve_smoke.toml`: one-iteration outer-loop mechanism test with
+  a failed visible train case and non-saturated validation case.
 - `fabv2_prime.toml`: frozen 8/8/8 Prime development protocol over Public-27;
   this is the main outer-loop experiment contract.
 - `fabv2_prime_minimal.toml`: contract-matched zero-evolution minimal-harness

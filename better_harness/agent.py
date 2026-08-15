@@ -1,4 +1,4 @@
-"""Outer-loop Deep Agent and proposer workspace helpers."""
+"""Framework-neutral outer proposer and evidence-workspace helpers."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from better_harness.retry import retry_transient
 from better_harness.signatures import FailureCluster
 from better_harness.traces import write_experience_bundle
 
-DEFAULT_SYSTEM_PROMPT = """You are Better Agent, an outer-loop Deep Agent that improves another agent harness.
+DEFAULT_SYSTEM_PROMPT = """You are the outer proposer in a self-harness system.
 
 Your job is to read eval feedback and edit the provided harness surface files so the next eval run passes more cases.
 
@@ -109,7 +109,7 @@ def build_proposer_model(model: str):
 
 @dataclass(frozen=True)
 class ProposerWorkspace:
-    """Materialized workspace for the outer Deep Agent."""
+    """Materialized workspace for one isolated outer proposer."""
 
     root: Path
     current_dir: Path

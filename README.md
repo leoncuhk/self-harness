@@ -1,15 +1,17 @@
 # Self-Harness
 
-An eval-driven system that improves the development harness around a fixed
-coding agent. The optimizer may edit declared prompts, skills, tools, workflow,
-memory policy, and middleware; it may not edit the goal, evaluator, task splits,
-budgets, promotion rule, or audit evidence.
+An eval-driven system that improves the harness around a fixed task agent. The
+first live domain is FAB v2 finance research; coding projects use the same
+controller contract through a different runner. The optimizer may edit declared
+prompts, orchestration, skills, tools, evidence policy, verification, and answer
+compilation; it may not edit the goal, evaluator, task splits, model, budgets,
+promotion rule, or audit evidence.
 
 The repository implements two causally separate loops:
 
 ```text
-inner: task -> coding agent + harness -> disposable product diff -> frozen CI
-outer: traces -> diagnosis -> candidate harness -> inner-loop replay -> promotion
+inner: task -> Prime runtime + harness -> answer/product diff + telemetry -> frozen evaluator
+outer: visible traces -> Prime proposer -> candidate harness -> replay -> controller promotion
 ```
 
 “Best” always means the best validated candidate found within the declared
@@ -27,6 +29,8 @@ budget. It does not mean a global optimum.
 - candidate lineage, accepted/rejected evidence, predictions, and an anytime leaderboard;
 - explicit apparatus-failure classification and independent artifact auditing;
 - Pytest, Harbor, and generic command-based coding-project runners.
+- Prime Agent execution adapters for both FAB inner rollouts and outer proposals,
+  with host-enforced turn, token, and time ceilings.
 
 See [architecture](docs/system/architecture.md),
 [verification ladder](docs/evaluation/verification.md),
@@ -64,6 +68,11 @@ uv run self-harness run configs/coding_demo.toml \
   --output-dir runs/coding-demo
 ```
 
+The active FAB contracts are `configs/fabv2_prime_smoke.toml` (integration),
+`configs/fabv2_prime_minimal.toml` (contract-matched minimal comparator), and
+`configs/fabv2_prime.toml` (8/8/8 development protocol). They use only the new
+Prime runtime; the former FAB official/model-library harness is not retained.
+
 Run outputs contain the frozen manifest, variant values, workspace snapshots,
 per-case traces and diffs, split results, candidate decisions, archive, ledger,
 and final report. `runs/` is intentionally ignored because it can contain large
@@ -90,7 +99,7 @@ selection, it is not called a truly untouched holdout in the architecture docs.
 better_harness/       optimization kernel and runner adapters
 benchmarks/coding/    deterministic dual-loop product fixture
 benchmarks/agentic/   generic agent fixture and deterministic verifiers
-benchmarks/fabv2/     27-question public FAB development set and bounded case study
+benchmarks/fabv2/     Public-27 data, frozen evaluator, Prime runtime, and harnesses
 configs/              reproducible experiment contracts
 docs/                 indexed design, research, evaluation, and development records
 examples/             minimal runnable configuration examples

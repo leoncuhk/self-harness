@@ -1,5 +1,21 @@
 # FAB v2 bounded case study
 
+> Historical record: the tables below were produced by the removed
+> official/model-library-based FAB apparatus. They are retained only as negative
+> evidence and are not executable baselines for the Prime architecture.
+
+The active study now uses:
+
+- `fabv2_prime_smoke.toml` for a three-case lifecycle and headroom check;
+- `fabv2_prime_minimal.toml` for a contract-matched minimal-harness arm;
+- `fabv2_prime.toml` for the Public-27 8/8/8 train/adaptive-validation/locked-
+  scorecard protocol;
+- Prime Agent for both the inner runtime and outer proposer;
+- eight evolvable surfaces and a frozen evaluator-owned research tool substrate.
+
+No Prime efficacy result is claimed here until minimal, strong, evolved, and
+equal-budget comparator arms have completed under the same frozen contract.
+
 All arms use the same model, one case per split, and the same eight-turn, 360-second, 5,000-output-token-per-call limits.
 
 | Arm | Train score (pass) | Validation score (pass) | Locked-test score (pass) | Final-arm eval tokens | Optimization rollout tokens | Outer-search tokens | Wall time | Changed surfaces |

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -13,6 +14,15 @@ if TYPE_CHECKING:
     from better_harness.core import CaseOutcome
 
 MAX_TEXT_CHARS = 6000
+MAX_RESEARCH_CHARS = 12000
+VERIFIER_KEYS = (
+    "partial_credit",
+    "ungated_credit",
+    "numeric_criterion_recall",
+    "n_known",
+    "n_criteria",
+    "failed_numeric",
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +38,8 @@ class ExperienceRecord:
     turns: int | None = None
     tokens: int | None = None
     tool_usage: Any | None = None
+    verifier: dict[str, Any] | None = None
+    research_tail: str | None = None
     events: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -62,8 +74,19 @@ def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
     """Derive one stable experience record from runner-specific artifacts."""
     artifacts = Path(outcome.artifacts_dir) if outcome.artifacts_dir else None
     run_payload = _read_json(artifacts / "run.json") if artifacts else None
+    judge_payload = _read_json(artifacts / "judge.json") if artifacts else None
     events = _read_jsonl(artifacts / "trace.jsonl") if artifacts else ()
     payload = run_payload if isinstance(run_payload, dict) else {}
+    verifier = (
+        {key: judge_payload[key] for key in VERIFIER_KEYS if key in judge_payload}
+        if isinstance(judge_payload, dict)
+        else None
+    )
+    research_tail: str | None = None
+    if artifacts:
+        trace_path = artifacts / "trajectory" / "prime_workspace" / "research_trace.json"
+        with suppress(OSError):
+            research_tail = trace_path.read_text()[-MAX_RESEARCH_CHARS:].strip() or None
     return ExperienceRecord(
         case_id=outcome.case_id,
         stratum=outcome.stratum,
@@ -74,6 +97,8 @@ def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
         turns=None if payload.get("turns") is None else int(payload["turns"]),
         tokens=None if payload.get("tokens") is None else int(payload["tokens"]),
         tool_usage=payload.get("tool_usage"),
+        verifier=verifier,
+        research_tail=research_tail,
         events=events,
     )
 
@@ -85,6 +110,8 @@ def trace_text(outcome: CaseOutcome) -> str:
         "stop_reason": record.stop_reason,
         "turns": record.turns,
         "tool_usage": record.tool_usage,
+        "verifier": record.verifier,
+        "research_tail": record.research_tail,
         "events": record.events,
     }
     return json.dumps(payload, sort_keys=True, default=str)[:MAX_TEXT_CHARS].lower()

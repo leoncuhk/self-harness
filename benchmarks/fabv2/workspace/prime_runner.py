@@ -228,7 +228,8 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
         )
         compiler_input = case_root / "compiler_input.md"
         compiler_input.write_text(compiler_material)
-        for _attempt in range(2):
+        compiler_attempts = 3
+        for attempt in range(1, compiler_attempts + 1):
             compiler_socket, compiler_cwd = _prime_endpoint(case_root, "compiler")
             compiler_result = run_prime_agent(
                 command=_command(),
@@ -256,6 +257,10 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
                 max_turns=2,
                 max_tokens=min(compiler_reserve, remaining_tokens),
             )
+            (log_dir / f"compiler_attempt_{attempt}.json").write_text(
+                json.dumps(compiler_result.to_dict(), indent=2, ensure_ascii=False, sort_keys=True)
+                + "\n"
+            )
             if compiler_result.events or compiler_result.returncode != 0:
                 break
             time.sleep(0.5)
@@ -263,6 +268,9 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
             json.dumps(compiler_result.to_dict(), indent=2, ensure_ascii=False, sort_keys=True)
             + "\n"
         )
+        if not compiler_result.events:
+            msg = f"Prime compiler produced no JSON events after {compiler_attempts} attempts"
+            raise RuntimeError(msg)
         # Prime streams a complete assistant message before the host observes the
         # cumulative-token boundary. Keep that auditable text even when the
         # process is then stopped with return code 125; discarding it turns a
