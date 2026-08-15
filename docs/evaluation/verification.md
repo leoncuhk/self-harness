@@ -27,7 +27,7 @@ until you compare it against a baseline.
 | L1 | Does the loop run with a **real** outer agent? | ✅ M1 2026-08-11, all 6 criteria ([results](results.md)) |
 | L2 | What is the real baseline, and how noisy is it? | ✅ measured — MVP-1 saturated (0.917, 0 flaky) and the stop rule fired |
 | L3 | Does the proposer understand what it is doing? | ⚠️ diagnosis changed behavior once, but V4 predicted pass flips missed 0/3; still unconfirmed ([V4 audit](fabv2-v4-audit.md)) |
-| L4 | Does evolution beat spending the same budget on retries? | ❌ not established; V4 recovery costs were incompletely recorded and no retry arm ran |
+| L4 | Does evolution beat spending the same budget on retries? | ⏳ V5 protocol and oracle retry report implemented; 8/8/8 campaign not yet executed ([V5 protocol](fabv2-v5-protocol.md)) |
 | L5 | Does the gain survive a locked test and transfer? | ❌ post-MVP |
 
 ---

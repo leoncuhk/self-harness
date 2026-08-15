@@ -1032,6 +1032,7 @@ def validate_experiment(experiment: Experiment) -> None:
             f"expected one of {VALID_FINGERPRINT_DISCIPLINES}"
         )
         raise ValueError(msg)
+    _validate_recovery_timeout_order(experiment)
 
     for surface in experiment.surfaces.values():
         if surface.kind not in VALID_SURFACE_KINDS:
@@ -1084,6 +1085,47 @@ def validate_experiment(experiment: Experiment) -> None:
             if not experiment.runner_config.get(key):
                 msg = f"coding runner requires runner.coding.{key}"
                 raise ValueError(msg)
+
+
+def _runner_option(args: list[Any], name: str) -> float | None:
+    """Read a numeric ``--name=value`` or ``--name value`` runner option."""
+    rendered = [str(item) for item in args]
+    prefix = f"{name}="
+    for index, item in enumerate(rendered):
+        if item.startswith(prefix):
+            return float(item.removeprefix(prefix))
+        if item == name and index + 1 < len(rendered):
+            return float(rendered[index + 1])
+    return None
+
+
+def _validate_recovery_timeout_order(experiment: Experiment) -> None:
+    """Ensure outer watchdogs cannot kill a configured recovery phase."""
+    if experiment.runner != "pytest":
+        return
+    env = experiment.runner_config.get("env", {})
+    if not isinstance(env, dict) or str(env.get("FABV2_RECOVERY_SUBMIT", "")) != "1":
+        return
+    args = list(experiment.runner_config.get("pytest_args", ()))
+    main_s = _runner_option(args, "--max-time")
+    pytest_s = _runner_option(args, "--timeout")
+    recovery_s = float(env.get("FABV2_RECOVERY_MAX_TIME", 120))
+    outer_s = float(experiment.runner_config.get("case_timeout_s", 0))
+    if main_s is None or pytest_s is None:
+        msg = "recovery-enabled pytest runner requires explicit --max-time and --timeout"
+        raise ValueError(msg)
+    if pytest_s <= main_s + recovery_s:
+        msg = (
+            "pytest --timeout must exceed --max-time + FABV2_RECOVERY_MAX_TIME "
+            f"({pytest_s:g} <= {main_s:g} + {recovery_s:g})"
+        )
+        raise ValueError(msg)
+    if outer_s <= pytest_s:
+        msg = (
+            "runner.pytest.case_timeout_s must exceed pytest --timeout "
+            f"({outer_s:g} <= {pytest_s:g})"
+        )
+        raise ValueError(msg)
 
 
 def write_split_manifest(experiment: Experiment, output_dir: Path) -> None:

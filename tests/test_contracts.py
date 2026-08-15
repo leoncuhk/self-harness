@@ -30,10 +30,12 @@ def test_load_goal_contract_reads_constraints():
             "primary_metric": "partial_credit",
             "direction": "maximize",
             "min_delta": 0.01,
+            "require_holdout_improvement": True,
             "constraints": [{"metric": "correctness", "minimum": 0.5}],
         }
     )
     assert goal.primary_metric == "partial_credit"
+    assert goal.require_holdout_improvement
     assert goal.constraints[0].accepts(0.5)
     assert not goal.constraints[0].accepts(None)
 

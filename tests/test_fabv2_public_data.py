@@ -112,3 +112,44 @@ def test_public27_fixed_comparators_share_the_execution_contract():
         assert comparator.runner_config == evolved.runner_config
         assert comparator.cases == evolved.cases
         assert set(comparator.surfaces) == {"prompt"}
+
+
+def test_numeric24_v5_has_stratified_locked_test_and_generalization_gate():
+    evolved = load_experiment(
+        ROOT / "configs" / "fabv2_numeric24_self_harness_v5.toml"
+    )
+
+    assert evolved.repeats == 3
+    assert len(evolved.cases_for_split("train")) == 8
+    assert len(evolved.cases_for_split("holdout")) == 8
+    assert len(evolved.cases_for_split("scorecard")) == 8
+    assert len(evolved.strata_for_split("train")) == 8
+    assert len(evolved.strata_for_split("holdout")) == 8
+    assert len(evolved.strata_for_split("scorecard")) == 8
+    assert evolved.goal.require_holdout_improvement
+    assert evolved.goal.min_delta == 0.03
+    assert not evolved.goal.constraints
+    assert evolved.runner_config["env"]["FABV2_RECOVERY_SUBMIT"] == "1"
+    assert "--timeout=1050" in evolved.runner_config["pytest_args"]
+    assert evolved.runner_config["case_timeout_s"] == 1080
+
+
+def test_numeric24_v5_seed_is_official_prompt_and_b5_is_contract_matched():
+    evolved = load_experiment(
+        ROOT / "configs" / "fabv2_numeric24_self_harness_v5.toml"
+    )
+    comparator = load_experiment(ROOT / "configs" / "fabv2_numeric24_b5_v5.toml")
+
+    assert evolved.surfaces["prompt"].base_value == (
+        ROOT / "benchmarks" / "fabv2" / "workspace" / "prompt.txt"
+    ).read_text().strip()
+    assert all(
+        not evolved.surfaces[name].base_value
+        for name in ("research_policy", "verification_policy", "submission_policy")
+    )
+    assert comparator.max_iterations == 0
+    assert comparator.model == evolved.model
+    assert comparator.repeats == evolved.repeats
+    assert comparator.runner_config == evolved.runner_config
+    assert comparator.cases == evolved.cases
+    assert comparator.goal == evolved.goal

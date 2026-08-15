@@ -330,6 +330,49 @@ def test_objective_gate_rejects_pass_regression_even_when_score_rises():
     assert not decision.accepted
 
 
+def test_objective_gate_can_require_real_holdout_improvement():
+    current_train = make_split(variant="current", results={"a": False})
+    current_holdout = make_split(variant="current", results={"b": False})
+    candidate_train = replace(current_train, variant="candidate", score=0.5)
+    candidate_holdout = replace(current_holdout, variant="candidate", score=0.0)
+    decision = decide(
+        gate="objective",
+        goal=GoalContract(
+            primary_metric="score",
+            min_delta=0.01,
+            require_holdout_improvement=True,
+        ),
+        current_train=current_train,
+        current_holdout=current_holdout,
+        candidate_train=candidate_train,
+        candidate_holdout=candidate_holdout,
+    )
+
+    assert not decision.accepted
+    assert "holdout improvement required" in decision.reason
+
+
+def test_objective_gate_accepts_holdout_gain_when_required():
+    current_train = make_split(variant="current", results={"a": False})
+    current_holdout = make_split(variant="current", results={"b": False})
+    candidate_train = replace(current_train, variant="candidate", score=0.0)
+    candidate_holdout = replace(current_holdout, variant="candidate", score=0.2)
+    decision = decide(
+        gate="objective",
+        goal=GoalContract(
+            primary_metric="score",
+            min_delta=0.01,
+            require_holdout_improvement=True,
+        ),
+        current_train=current_train,
+        current_holdout=current_holdout,
+        candidate_train=candidate_train,
+        candidate_holdout=candidate_holdout,
+    )
+
+    assert decision.accepted
+
+
 def test_invalid_gate_rejected():
     with pytest.raises(ValueError, match="invalid gate"):
         gate_case(

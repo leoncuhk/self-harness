@@ -55,7 +55,6 @@ def test_rubric_leak_guard() -> None:
     )
 
 
-@pytest.mark.timeout(900)
 @pytest.mark.parametrize("qid", sorted(QUESTIONS))
 def test_question(  # noqa: PLR0913 - pytest fixtures define the benchmark contract
     qid: str,

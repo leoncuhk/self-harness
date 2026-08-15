@@ -17,6 +17,11 @@ splits, proposer budget, evaluation budget, gate, and resource ceilings.
 - `fabv2_public27_b0.toml`, `fabv2_public27_b5.toml`: fixed, zero-iteration
   Public-27 comparators with exactly the same 18/9 split, three repeats, and
   execution budget as the Self-Harness study.
+- `fabv2_numeric24_self_harness_v5.toml`: corrected 8/8/8 numeric-track
+  protocol with a locked scorecard, explicit recovery contract, three repeats,
+  and mandatory adaptive-validation improvement.
+- `fabv2_numeric24_b5_v5.toml`: hand-engineered V2 prompt under the identical
+  V5 execution and split contract.
 - `fabv2_case_study_b5.toml`: equal-budget hand-engineered FAB comparator.
 - `m2_agentic.toml`, `b5_agentic.toml`, `mvp2_agentic.toml`: earlier agentic
   benchmark stages retained for reproducibility.

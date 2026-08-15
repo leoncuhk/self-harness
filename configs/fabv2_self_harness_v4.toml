@@ -56,7 +56,7 @@ min_latency_s = 30.0
 project_root = "../benchmarks/fabv2/evals"
 model_flag = "--model"
 summary_flag = "--evals-report-file"
-pytest_args = ["-q", "--max-turns=14", "--max-time=900", "--max-tokens=8000"]
+pytest_args = ["-q", "--timeout=1050", "--max-turns=14", "--max-time=900", "--max-tokens=8000"]
 # Keep the outer process timeout above the agent budget so a clean task failure
 # is measured instead of being censored as apparatus.
 case_timeout_s = 1080

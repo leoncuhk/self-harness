@@ -31,6 +31,7 @@ from better_harness.core import (
     main,
     reusable_result,
     run_experiment,
+    validate_experiment,
 )
 from better_harness.patching import build_baseline_variant, build_variant
 from tests.test_better_harness import _write_minimal_pytest_experiment
@@ -253,6 +254,46 @@ def test_pytest_runner_applies_explicit_environment(tmp_path):
     )
 
     assert env["HARNESS_SWITCH"] == "enabled"
+
+
+def test_recovery_contract_requires_ordered_watchdogs(tmp_path):
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    broken = replace(
+        experiment,
+        runner_config={
+            **experiment.runner_config,
+            "pytest_args": ["-q", "--max-time=900", "--timeout=900"],
+            "case_timeout_s": 1080,
+            "env": {
+                "FABV2_RECOVERY_SUBMIT": "1",
+                "FABV2_RECOVERY_MAX_TIME": "120",
+            },
+        },
+    )
+
+    with pytest.raises(ValueError, match="must exceed --max-time"):
+        validate_experiment(broken)
+
+
+def test_recovery_contract_requires_outer_timeout_after_pytest(tmp_path):
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    broken = replace(
+        experiment,
+        runner_config={
+            **experiment.runner_config,
+            "pytest_args": ["-q", "--max-time=900", "--timeout=1050"],
+            "case_timeout_s": 1050,
+            "env": {
+                "FABV2_RECOVERY_SUBMIT": "1",
+                "FABV2_RECOVERY_MAX_TIME": "120",
+            },
+        },
+    )
+
+    with pytest.raises(ValueError, match="case_timeout_s must exceed"):
+        validate_experiment(broken)
 
 
 def test_resume_reloads_the_proposal_instead_of_paying_for_another_model_call(tmp_path, monkeypatch):

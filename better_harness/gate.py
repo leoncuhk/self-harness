@@ -126,14 +126,22 @@ def decide(  # noqa: PLR0913 - the gate compares two splits before and after one
                 current_ho,
                 candidate_ho,
             )
-            improved = goal.improved(current_in, candidate_in) or goal.improved(
-                current_ho,
-                candidate_ho,
+            holdout_improved = goal.improved(current_ho, candidate_ho)
+            improved = (
+                holdout_improved
+                if goal.require_holdout_improvement
+                else goal.improved(current_in, candidate_in) or holdout_improved
             )
             accepted = constraints_ok and pass_ok and non_degrading and improved
+            improvement_rule = (
+                "holdout improvement required"
+                if goal.require_holdout_improvement
+                else "either split may improve"
+            )
             reason = (
                 f"objective gate ({goal.primary_metric}, {goal.direction}): "
                 f"Δ_in={delta_in_score:+.4f} Δ_ho={delta_ho_score:+.4f}; "
+                f"{improvement_rule}; "
                 + ("accepted" if accepted else "constraint, regression, or effect floor failed")
             )
     elif gate == "combined":

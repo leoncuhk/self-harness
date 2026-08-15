@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from better_harness.apparatus import STATUS_APPARATUS
 from better_harness.core import CaseOutcome, Experiment, RunLayout, SplitResult, Variant
+from better_harness.cost import profile_split
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Sequence
@@ -229,6 +230,14 @@ def write_repeat_detail(
 ) -> None:
     """Write per-repeat detail next to the aggregated result."""
     run_dir.mkdir(parents=True, exist_ok=True)
+    profiles = [profile_split(result) for result in results]
+
+    def _mean_optional(field: str) -> float | None:
+        values = [getattr(profile, field) for profile in profiles]
+        if any(value is None for value in values):
+            return None
+        return sum(float(value) for value in values) / len(values)  # type: ignore[arg-type]
+
     payload = {
         "repeats": len(results),
         "aggregate": {
@@ -249,6 +258,17 @@ def write_repeat_detail(
             }
             for index, result in enumerate(results)
         ],
+        # Normalized cost of executing this split once. Promotion compares
+        # harness serving cost, not the arbitrary repeat chosen as evidence.
+        "cost_profile": {
+            "attempts": round(sum(profile.attempts for profile in profiles) / len(profiles)),
+            "total_duration_s": sum(profile.total_duration_s for profile in profiles)
+            / len(profiles),
+            "p95_duration_s": sum(profile.p95_duration_s for profile in profiles)
+            / len(profiles),
+            "total_tokens": _mean_optional("total_tokens"),
+            "total_cost_usd": _mean_optional("total_cost_usd"),
+        },
         "per_case": [
             {
                 "case_id": outcome.case_id,

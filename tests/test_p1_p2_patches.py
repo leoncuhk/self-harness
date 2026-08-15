@@ -310,6 +310,30 @@ def test_profile_split_reads_tokens_from_runner_summary(tmp_path: Path):
     assert profile_split(result).total_tokens == pytest.approx(1234)
 
 
+def test_profile_split_prefers_repeat_normalized_cost(tmp_path: Path):
+    (tmp_path / "repeats.json").write_text(
+        json.dumps(
+            {
+                "cost_profile": {
+                    "attempts": 2,
+                    "total_duration_s": 12.5,
+                    "p95_duration_s": 8.0,
+                    "total_tokens": 1500.0,
+                    "total_cost_usd": None,
+                }
+            }
+        )
+    )
+    result = make_split(variant="v", results={"a": True, "b": False})
+    result = SplitResult(**{**result.__dict__, "run_dir": str(tmp_path)})
+
+    profile = profile_split(result)
+
+    assert profile.attempts == 2
+    assert profile.total_tokens == pytest.approx(1500)
+    assert profile.total_duration_s == pytest.approx(12.5)
+
+
 def test_profile_split_tolerates_missing_or_broken_summaries(tmp_path: Path):
     case_dir = tmp_path / "case"
     case_dir.mkdir()

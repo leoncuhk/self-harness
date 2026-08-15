@@ -47,6 +47,7 @@ class GoalContract:
     direction: str = "maximize"
     min_delta: float = 0.0
     require_no_pass_regression: bool = True
+    require_holdout_improvement: bool = False
     constraints: tuple[MetricConstraint, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
@@ -100,5 +101,6 @@ def load_goal_contract(payload: dict[str, Any] | None) -> GoalContract:
         direction=str(raw.pop("direction", "maximize")),
         min_delta=float(raw.pop("min_delta", 0.0)),
         require_no_pass_regression=bool(raw.pop("require_no_pass_regression", True)),
+        require_holdout_improvement=bool(raw.pop("require_holdout_improvement", False)),
         constraints=constraints,
     )

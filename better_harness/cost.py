@@ -119,6 +119,24 @@ def profile_split(
     cost_keys: Sequence[str] = DEFAULT_COST_KEYS,
 ) -> CostProfile:
     """Build a cost profile for one split result."""
+    repeat_detail = Path(result.run_dir) / "repeats.json"
+    if repeat_detail.exists():
+        try:
+            normalized = json.loads(repeat_detail.read_text()).get("cost_profile")
+        except (OSError, json.JSONDecodeError):
+            normalized = None
+        if isinstance(normalized, dict):
+            return CostProfile(
+                attempts=int(normalized["attempts"]),
+                total_duration_s=float(normalized["total_duration_s"]),
+                p95_duration_s=float(normalized["p95_duration_s"]),
+                total_tokens=None
+                if normalized.get("total_tokens") is None
+                else float(normalized["total_tokens"]),
+                total_cost_usd=None
+                if normalized.get("total_cost_usd") is None
+                else float(normalized["total_cost_usd"]),
+            )
     durations = [outcome.duration_s for outcome in result.outcomes]
     tokens: float | None = None
     cost: float | None = None
