@@ -1,0 +1,10 @@
+# Replicated development loop. Candidates are selected on three stochastic
+# repeats; the one-repeat smoke contract is mechanism-only and cannot promote.
+
+extends = "fabv2_evolve_smoke.toml"
+
+[experiment]
+name = "fabv2-evolve-replicated-v1"
+max_iterations = 3
+repeats = 3
+candidates = 2

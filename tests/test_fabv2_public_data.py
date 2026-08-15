@@ -67,6 +67,7 @@ def test_minimal_and_strong_prime_harnesses_share_all_surfaces():
         "subagents.md",
         "verification.md",
         "submission.md",
+        "runtime_policy.json",
     }
     minimal = {path.name for path in (root / "minimal").iterdir()}
     strong = {path.name for path in (root / "strong").iterdir()}
@@ -94,6 +95,7 @@ def test_smoke_contract_has_frozen_three_way_split():
         "subagents",
         "verification",
         "submission",
+        "runtime_policy",
     }
     assert experiment.goal.require_holdout_improvement
     assert experiment.better_agent_config["extensions"] == [
@@ -125,7 +127,9 @@ def test_full_protocol_and_minimal_comparator_are_contract_matched():
     assert all(
         evolved.surfaces[name].base_value != minimal.surfaces[name].base_value
         for name in evolved.surfaces
+        if name != "runtime_policy"
     )
+    assert evolved.surfaces["runtime_policy"] == minimal.surfaces["runtime_policy"]
 
 
 def test_evolution_smoke_has_visible_and_validation_headroom_cases():
@@ -147,6 +151,14 @@ def test_evolution_smoke_uses_atomic_single_call_proposer_budget():
     experiment = load_experiment(ROOT / "configs" / "fabv2_evolve_smoke.toml")
     assert experiment.better_agent_max_turns == 1
     assert experiment.better_agent_config["max_tokens"] == 60000
+
+
+def test_live_evolution_claim_uses_replicated_selection():
+    experiment = load_experiment(ROOT / "configs" / "fabv2_evolve_replicated.toml")
+
+    assert experiment.repeats == 3
+    assert experiment.max_iterations == 3
+    assert experiment.candidates == 2
 
 
 def test_replication_contracts_change_only_the_accepted_surfaces():

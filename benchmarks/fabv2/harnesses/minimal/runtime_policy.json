@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "filing_index": {
+    "enabled": false,
+    "forms": ["10-K", "8-K"],
+    "start_date": "2020-01-01",
+    "end_date": "2026-12-31",
+    "top_n_per_form": 10,
+    "max_tickers": 4
+  }
+}

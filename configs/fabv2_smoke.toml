@@ -93,6 +93,12 @@ target = "submission.md"
 filename = "submission.md"
 base_file = "../benchmarks/fabv2/harnesses/strong/submission.md"
 
+[surfaces.runtime_policy]
+kind = "workspace_file"
+target = "runtime_policy.json"
+filename = "runtime_policy.json"
+base_file = "../benchmarks/fabv2/harnesses/strong/runtime_policy.json"
+
 [[cases]]
 case_id = "tests/test_fabv2.py::test_question[q004]"
 split = "train"

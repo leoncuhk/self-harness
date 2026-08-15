@@ -28,3 +28,6 @@ base_file = "../benchmarks/fabv2/harnesses/minimal/verification.md"
 
 [surfaces.submission]
 base_file = "../benchmarks/fabv2/harnesses/minimal/submission.md"
+
+[surfaces.runtime_policy]
+base_file = "../benchmarks/fabv2/harnesses/minimal/runtime_policy.json"

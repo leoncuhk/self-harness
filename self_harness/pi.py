@@ -39,7 +39,9 @@ Schema:
 
 An empty edit set is valid only when the evidence does not justify a change. Never mention or infer
 private validation or scorecard content. Compare prior visible attempts before proposing: do not
-repeat a semantically equivalent edit that produced no visible train gain."""
+repeat a semantically equivalent edit that produced no visible train gain. When traces show that
+the runtime ignored prose instructions, prefer a small declared machine-enforced policy edit over
+adding more prose; keep fixed model, evaluator, and controller budgets untouched."""
 
 REPAIR_SYSTEM_PROMPT = """Repair the attached proposal into exactly one valid JSON object.
 

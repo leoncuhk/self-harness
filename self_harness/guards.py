@@ -21,6 +21,7 @@ cheap, obvious holes, and it makes every rejection auditable.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
@@ -147,8 +148,10 @@ def _scan_forbidden(text: str, patterns: Sequence[str]) -> list[tuple[str, str]]
     return hits
 
 
-def _python_syntax_error(experiment: Experiment, name: str, value: str) -> str | None:
-    """Return a syntax error for a Python surface, or None.
+def _surface_parse_error(  # noqa: PLR0911 - format-specific validation exits are clearer
+    experiment: Experiment, name: str, value: str
+) -> str | None:
+    """Return a parse error for a structured surface, or None.
 
     Only surfaces whose target is a ``.py`` file are checked: prose surfaces are
     not code and must not be compiled. This catches the cheap half of
@@ -157,7 +160,18 @@ def _python_syntax_error(experiment: Experiment, name: str, value: str) -> str |
     at runtime, and is caught by the ``harness_did_not_load`` failure signature.
     """
     surface = experiment.surfaces.get(name)
-    if surface is None or not str(surface.target).endswith(".py"):
+    if surface is None:
+        return None
+    target = str(surface.target)
+    if target.endswith(".json"):
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError as exc:
+            return f"invalid JSON: {exc.msg} (line {exc.lineno})"
+        if not isinstance(payload, dict):
+            return "JSON policy must be an object"
+        return None
+    if not target.endswith(".py"):
         return None
     try:
         compile(value, f"<surface:{name}>", "exec")
@@ -198,7 +212,7 @@ def check_variant(  # noqa: PLR0913 - every threshold is meant to be overridable
             # guard judges the proposer's edits, not the seed it was handed.
             continue
 
-        if (syntax_error := _python_syntax_error(experiment, name, value)) is not None:
+        if (syntax_error := _surface_parse_error(experiment, name, value)) is not None:
             # A surface that does not even parse cannot teach anything, and
             # evaluating it spends a full split to rediscover that. MVP-2's
             # iteration 2 shipped middleware whose signature did not match the

@@ -114,6 +114,40 @@ def test_sec_filings_resolves_ticker_and_returns_direct_documents(tmp_path: Path
     assert json.loads(ledger.read_text())["calls"] == {"sec_filings": 1}
 
 
+def test_machine_policy_prefetches_bounded_filing_indices(tmp_path: Path, monkeypatch):
+    policy = {
+        "schema_version": 1,
+        "filing_index": {
+            "enabled": True,
+            "forms": ["10-K", "8-K", "INVALID"],
+            "start_date": "2020-01-01",
+            "end_date": "2026-12-31",
+            "top_n_per_form": 50,
+            "max_tickers": 1,
+        },
+    }
+    (tmp_path / "runtime_policy.json").write_text(json.dumps(policy))
+    (tmp_path / "fab_tools.py").write_text("# fixture\n")
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return type("Completed", (), {"returncode": 0, "stdout": "[]", "stderr": ""})()
+
+    monkeypatch.setattr(prime_runner.subprocess, "run", fake_run)
+    output = prime_runner._filing_bootstrap(  # noqa: SLF001
+        case_root=tmp_path,
+        question="Compare NASDAQ:CRWD with NYSE:PANW.",
+        env={},
+    )
+
+    assert output == tmp_path / "bootstrap_filings.json"
+    assert len(calls) == 2
+    assert all(command[command.index("--top-n") + 1] == "10" for command in calls)
+    assert all("CRWD" in command for command in calls)
+    assert {item["form"] for item in json.loads(output.read_text())} == {"10-K", "8-K"}
+
+
 def test_prime_runtime_isolates_case_and_reads_submission(tmp_path: Path, monkeypatch):
     fake = tmp_path / "fake_prime.py"
     fake.write_text(

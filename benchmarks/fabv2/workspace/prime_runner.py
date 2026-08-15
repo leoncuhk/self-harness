@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -25,6 +27,11 @@ SURFACE_FILES = (
     "subagents.md",
     "verification.md",
     "submission.md",
+)
+RUNTIME_FILES = ("runtime_policy.json", "fab_tools.py", "model_provider.ts")
+_TICKER_PATTERN = re.compile(
+    r"\b(?:NASDAQ|NYSE)\s*:\s*([A-Z][A-Z0-9.-]{0,9})\b",
+    re.IGNORECASE,
 )
 
 
@@ -94,6 +101,85 @@ def _tool_ledger(path: Path) -> tuple[dict[str, int], int]:
     return {str(key): int(value) for key, value in calls.items()}, int(payload.get("errors", 0))
 
 
+def _filing_bootstrap(
+    *,
+    case_root: Path,
+    question: str,
+    env: dict[str, str],
+) -> Path | None:
+    """Execute a bounded declarative filing-index policy before the model runs."""
+    policy_path = case_root / "runtime_policy.json"
+    if not policy_path.is_file():
+        return None
+    try:
+        policy = json.loads(policy_path.read_text())
+    except (OSError, ValueError):
+        return None
+    filing = policy.get("filing_index") if isinstance(policy, dict) else None
+    if not isinstance(filing, dict) or filing.get("enabled") is not True:
+        return None
+    allowed_forms = {"10-K", "10-Q", "8-K"}
+    forms = [str(item) for item in filing.get("forms", []) if str(item) in allowed_forms][:3]
+    if not forms:
+        return None
+    max_tickers = max(1, min(int(filing.get("max_tickers", 4)), 6))
+    top_n = max(1, min(int(filing.get("top_n_per_form", 10)), 10))
+    tickers = list(dict.fromkeys(match.upper() for match in _TICKER_PATTERN.findall(question)))[
+        :max_tickers
+    ]
+    if not tickers:
+        return None
+    start_date = str(filing.get("start_date", "2020-01-01"))
+    end_date = str(filing.get("end_date", "2026-12-31"))
+    records: list[dict[str, Any]] = []
+    for ticker in tickers:
+        for form in forms:
+            command = [
+                sys.executable,
+                str(case_root / "fab_tools.py"),
+                "sec-filings",
+                ticker,
+                "--form",
+                form,
+                "--start-date",
+                start_date,
+                "--end-date",
+                end_date,
+                "--top-n",
+                str(top_n),
+            ]
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=case_root,
+                    env=env,
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                    timeout=45,
+                )
+            except subprocess.TimeoutExpired:
+                records.append({"ticker": ticker, "form": form, "error": "timeout"})
+                continue
+            if completed.returncode:
+                records.append(
+                    {
+                        "ticker": ticker,
+                        "form": form,
+                        "error": (completed.stderr or completed.stdout).strip()[:1000],
+                    }
+                )
+                continue
+            try:
+                filings = json.loads(completed.stdout)
+            except ValueError:
+                filings = []
+            records.append({"ticker": ticker, "form": form, "filings": filings})
+    output = case_root / "bootstrap_filings.json"
+    output.write_text(json.dumps(records, indent=2, ensure_ascii=False) + "\n")
+    return output
+
+
 def _combined_usage(*results: PrimeRunResult) -> dict[str, int | float]:
     keys = {
         "model_calls",
@@ -152,7 +238,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
     if case_root.exists():
         shutil.rmtree(case_root)
     case_root.mkdir(parents=True)
-    for name in (*SURFACE_FILES, "fab_tools.py", "model_provider.ts"):
+    for name in (*SURFACE_FILES, *RUNTIME_FILES):
         source = WORKSPACE / name
         if source.exists():
             shutil.copy2(source, case_root / name)
@@ -182,6 +268,12 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
             )
         )
     )
+    bootstrap_path = _filing_bootstrap(case_root=case_root, question=question, env=env)
+    if bootstrap_path is not None:
+        user_prompt += (
+            f" Read the controller-prepared filing index in {bootstrap_path.name} before doing "
+            "open-ended filing search."
+        )
     gate = f"test -s {shlex.quote(answer_path.name)}"
     started = time.monotonic()
     research_socket, research_cwd = _prime_endpoint(case_root, "research")
