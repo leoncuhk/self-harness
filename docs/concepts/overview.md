@@ -1,6 +1,6 @@
 # Self-harness: concept and evidence base
 
-*The distilled cognition layer. Full research notes: [`archive/plan-2026-08.md`](archive/plan-2026-08.md).*
+*The distilled cognition layer. Full research notes: [`archive/plan-2026-08.md`](../archive/plan-2026-08.md).*
 
 ## Definition
 
@@ -103,14 +103,14 @@ joint weights+harness. This project operates at L3.
 **Synthesis of the 2026 literature:** the positive results all come from
 trace-grounded diagnosis over structural surfaces; the negative results all come
 from honest budget matching. No published work has both at once. That gap is
-this project's position — see the [roadmap](roadmap.md).
+this project's position — see the [roadmap](../development/roadmap.md).
 
 ## What would make self-harness "proven"
 
 1. An evolution run beats the **strongest** equal-budget test-time-scaling arm on
    validation — best-of-N, and sequential refinement wherever a deterministic
    verifier makes it available — by a margin above baseline noise, reproduced
-   across seeds (L4 of the [verification ladder](verification.md)).
+   across seeds (L4 of the [verification ladder](../evaluation/verification.md)).
 2. The gain survives a locked test set read once, is not concentrated in 2–3
    tasks, and transfers across models/benchmarks (L5).
 3. The proposer's predictions beat the base rate — evidence it is engineering,

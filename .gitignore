@@ -5,7 +5,18 @@
 *.pyc
 **/.venv/
 *.egg-info/
-runs/
+build/
+dist/
+.coverage
+htmlcov/
+.DS_Store
+.claude/worktrees/
+inputs/
+outputs/
+
+# Keep the run policy visible while raw evidence stays local and untracked.
+runs/*
+!runs/README.md
 .runtime/
 **/_runtime/
 .env

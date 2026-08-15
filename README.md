@@ -28,11 +28,13 @@ budget. It does not mean a global optimum.
 - explicit apparatus-failure classification and independent artifact auditing;
 - Pytest, Harbor, and generic command-based coding-project runners.
 
-See [architecture](docs/architecture.md), [verification ladder](docs/verification.md),
-[field synthesis](docs/overview.md), and the [bounded FAB v2 result](docs/fabv2-case-study.md)
+See [architecture](docs/system/architecture.md),
+[verification ladder](docs/evaluation/verification.md),
+[field synthesis](docs/concepts/overview.md), and the
+[bounded FAB v2 result](docs/evaluation/fabv2-case-study.md)
 before interpreting an experiment.
 
-The [ZCodeProject/Public-27 audit](docs/fabv2-zcode-audit.md) records what was
+The [ZCodeProject/Public-27 audit](docs/evaluation/fabv2-zcode-audit.md) records what was
 integrated, what remains contaminated or unverified, and the evidence required
 for an unofficial community comparison.
 
@@ -90,7 +92,10 @@ benchmarks/coding/    deterministic dual-loop product fixture
 benchmarks/agentic/   generic agent fixture and deterministic verifiers
 benchmarks/fabv2/     27-question public FAB development set and bounded case study
 configs/              reproducible experiment contracts
-docs/                 architecture, evidence, limits, and results
+docs/                 indexed design, research, evaluation, and development records
+examples/             minimal runnable configuration examples
+research/             isolated source snapshots and non-executable research archives
+runs/                 ignored local raw evidence; only its retention policy is tracked
 scripts/              artifact auditor and analysis utilities
 tests/                unit, contract, resume, and end-to-end tests
 ```

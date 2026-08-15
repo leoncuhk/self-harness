@@ -214,7 +214,7 @@ Separating these two is the contribution; most prior work matches neither.
    a suite with deterministic verifiers — which is exactly our situation — their
    strongest arm is **sequential refinement**, and it beats evolution by 5.6pp.
    An evolution run that clears B1 but was never tested against refinement has
-   not cleared the bar this paper sets. Registered as a gap ([roadmap](roadmap.md) F1).
+   not cleared the bar this paper sets. Registered as a gap ([roadmap](../development/roadmap.md) F1).
 2. **The +0.6pp held-out figure is the number to beat**, and it is the reason our
    scorecard is sealed rather than merely held out.
 3. Their two-axis budget definition is sharper than ours: our M4 rule matches
@@ -255,7 +255,7 @@ prompt.** Structural harness elements transfer; prose-level strategy does not.
 Our four surfaces are prompt / tools / skills / middleware: two of the three
 productive categories are present, **long-term memory is absent entirely**, and
 the least productive surface (prompt) carries the most weight in our seed. See
-[roadmap](roadmap.md) C.
+[roadmap](../development/roadmap.md) C.
 
 ### Critical read
 
@@ -286,7 +286,7 @@ before it adapts) as the missing test.
 What this project takes: (1) **multi-objective proposers** are a better K>1
 design than our cluster round-robin — diversity by objective, not by cluster
 index; (2) prequential scoring is a structurally cheap addition for us and an
-open gap in the literature ([roadmap](roadmap.md) E3, F2).
+open gap in the literature ([roadmap](../development/roadmap.md) E3, F2).
 
 ---
 
@@ -309,7 +309,7 @@ Relevance is as a **boundary marker, not a method to adopt**: it breaks our
 frozen-weights premise (this is L5 joint weights+harness). It also states the
 comparison we should expect to face — prompt-level scaffolding scored 56.4% vs
 96.9% for a learned access policy, i.e. *when* to use the harness may matter more
-than *what* the harness says. Our runtime-policy surface gap ([roadmap](roadmap.md) C2)
+than *what* the harness says. Our runtime-policy surface gap ([roadmap](../development/roadmap.md) C2)
 is the frozen-weights version of that lever.
 
 ---
@@ -330,7 +330,7 @@ evidence-grounded edits with predicted at-risk regressions, and **logging
 rejected candidates and negative results instead of discarding them**. We satisfy
 the middle two; observability is partial (component+decision, no experience) and
 **negative-result reuse is absent** — rejected candidates are written to
-`decision.json` but never fed back into the proposer's context ([roadmap](roadmap.md) B4).
+`decision.json` but never fed back into the proposer's context ([roadmap](../development/roadmap.md) B4).
 Seven named bottlenecks, of which diversity collapse and reward hacking are the
 two our K-candidate and guard designs touch.
 

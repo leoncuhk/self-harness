@@ -1,7 +1,7 @@
 # Gaps and roadmap
 
 *Where this implementation stands against the 2026 literature, and what to build
-next, in dependency order. Claims here are sourced from [paper-study.md](paper-study.md);
+next, in dependency order. Claims here are sourced from [paper-study.md](../concepts/paper-study.md);
 status is sourced from the code.*
 
 ## Standing
@@ -34,10 +34,10 @@ itself unsound. All of the following are now in `main`, with 112 tests:
 | Answer-key leak closed (shared case sources withheld from the proposer) | ✅ `7933965` |
 | Fingerprint discipline enforced in code | ✅ `7933965` |
 | Static surface smoke gate | ✅ `7933965` |
-| `scripts/verify_artifacts.py` — [L0.5](verification.md#l05--artifact-fidelity) | ✅ `7933965` |
+| `scripts/verify_artifacts.py` — [L0.5](../evaluation/verification.md#l05--artifact-fidelity) | ✅ `7933965` |
 | JUnit case-id resolution; sealed split evaluated once | ✅ `2369fc7` |
 
-What it found is in [results.md](results.md#correction--instrument-defects-found-2026-08-11-and-what-they-change).
+What it found is in [results.md](../evaluation/results.md#correction--instrument-defects-found-2026-08-11-and-what-they-change).
 The short version: every sealed-split number in the repo was 0/20 against a true
 17–18/20, train and holdout were clean, and 47% of measured failures pointed at
 a step budget the proposer cannot reach.

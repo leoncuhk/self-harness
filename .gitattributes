@@ -1,0 +1,3 @@
+# Archived upstream content is preserved byte-for-byte and reviewed separately.
+research/zcode/upstream/** linguist-vendored
+research/zcode/upstream/finance-agent-v2/data/* -whitespace

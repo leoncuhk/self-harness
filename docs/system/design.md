@@ -42,7 +42,7 @@ literature: **the proposer never sees an execution trace.** Inner-agent
 trajectories are discarded after each rollout, so φ(r) is computed from pytest
 assertion text rather than from behaviour, and box ② is pattern-matching error
 strings. Every published positive result in this area feeds traces to its
-proposer. Full gap list and build order: [roadmap.md](roadmap.md).
+proposer. Full gap list and build order: [roadmap.md](../development/roadmap.md).
 
 ## Evaluation methodology
 
@@ -78,7 +78,7 @@ per-rollout tokens and `system_fingerprint`s into the eval summary. Verifiers
 recompute expected values from task inputs by reference implementations — answers
 are never stored where the agent could read them.
 
-Known biases, disclosed in the [results](results.md): task-designer = experiment-runner;
+Known biases, disclosed in the [results](../evaluation/results.md): task-designer = experiment-runner;
 train failure messages contain expected values (bounded by holdout-based decisions);
 zero external comparability. Terminal-Bench 2.1 via harbor remains the confirmatory
 step for external validity.
@@ -91,4 +91,4 @@ step for external validity.
 | Provider model drift behind the proxy | per-rollout `system_fingerprint` capture; mid-stage change invalidates the stage |
 | Equal-budget comparison silently fake | token accounting verified before spending (M1); writeup states token- vs rollout-matched |
 | Testbed saturation / floor | pre-registered headroom window with a hard stop |
-| Experimenter degrees of freedom | pre-registration registry ([mvp.md](mvp.md)): criteria frozen before data, bounded revisions, one scorecard unseal |
+| Experimenter degrees of freedom | pre-registration registry ([mvp.md](../development/mvp.md)): criteria frozen before data, bounded revisions, one scorecard unseal |

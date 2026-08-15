@@ -3,7 +3,7 @@
 Chronological, append-only. Each entry is frozen before its data is collected;
 outcomes are recorded against entries, never by rewriting them.
 
-- **MVP-1** (below) — terminated at M2 by its stop rule; see [results](results.md).
+- **MVP-1** (below) — terminated at M2 by its stop rule; see [results](../evaluation/results.md).
 - **[MVP-2](#mvp-2-pre-registration)** (end of file) — L3 on the same suite with a
   calibrated weaker inner model. **Amended twice**: Amendment 2 rescopes it to L3
   only, because the frozen M4 rule is unsatisfiable at holdout n=4 (arithmetic in
@@ -16,7 +16,7 @@ outcomes are recorded against entries, never by rewriting them.
 > **Outcome (2026-08-11): the MVP terminated at M2 under the frozen headroom rule** —
 > baseline 0.917 outside [0.20, 0.85] after the single permitted difficulty revision,
 > holdout at ceiling both times. M3/M4 cancelled per protocol; the scorecard was never
-> read. See [results.md](results.md) for the full account. The criteria below are preserved
+> read. See [results.md](../evaluation/results.md) for the full account. The criteria below are preserved
 > unmodified as the record of what was frozen.
 
 Written **before** any real run. The decision criteria in this file are frozen: after
@@ -477,7 +477,7 @@ can, for any model.
 4. **Scorecard:** the single unseal still happens once, after M3 and B1 complete,
    and is reported descriptively. The locked-test *claim* is void — both because
    the M4 verdict it was tied to no longer exists and because an aggregate was
-   already exposed accidentally ([results](results.md)).
+   already exposed accidentally ([results](../evaluation/results.md)).
 
 ### What does not change
 
@@ -516,7 +516,7 @@ proposer sees, what the verifier accepts, or how any decision is made.
 **Trigger: an audit of the instrument, not of the results.** Every recorded
 outcome in every run was re-derived from the raw `junit.xml`. Five defects were
 found, all reproduced from artifacts before anything was changed; the full
-account with numbers is in [results.md](results.md#correction--instrument-defects-found-2026-08-11-and-what-they-change).
+account with numbers is in [results.md](../evaluation/results.md#correction--instrument-defects-found-2026-08-11-and-what-they-change).
 
 **The stopped M3 run is void.** Two independent reasons, either sufficient:
 the proposer was receiving all 16 verifier reference implementations — including

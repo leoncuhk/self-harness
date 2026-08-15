@@ -54,7 +54,7 @@ by costing something. Append-only.
   prediction precision 1.0 on a toy whose failure messages contain the answers is
   liveness only.
 - **Papers without an equal-budget arm can't attribute gains to their method**
-  (see [paper-study.md](paper-study.md) on 2606.09498): evolution is itself
+  (see [paper-study.md](../concepts/paper-study.md) on 2606.09498): evolution is itself
   test-time compute; seed-vs-evolved comparisons conflate search spend with
   method value.
 - **Read the ledger before the pass rate** — prediction accuracy is readable

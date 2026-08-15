@@ -115,7 +115,7 @@ No scorecard output was ever read; `runs/*-rev0` and rev1 run dirs are preserved
 
 ## Protocol-execution gaps, disclosed
 
-- **Per-rollout `system_fingerprint` logging was promised in the MVP-1 pre-registration ([mvp.md](mvp.md)) but not
+- **Per-rollout `system_fingerprint` logging was promised in the MVP-1 pre-registration ([mvp.md](../development/mvp.md)) but not
   implemented during the four baseline campaigns** — provider drift was unmonitored
   while they ran. Closed after the fact (`agent_harness.run_task` and the eval
   summary now record fingerprints), so it holds for future runs, not
@@ -127,7 +127,7 @@ No scorecard output was ever read; `runs/*-rev0` and rev1 run dirs are preserved
 
 # MVP-2 — in progress
 
-Pre-registration: [mvp.md](mvp.md#mvp-2-pre-registration). Execution log, appended
+Pre-registration: [mvp.md](../development/mvp.md#mvp-2-pre-registration). Execution log, appended
 as stages complete.
 
 ## Calibration (2026-08-11)
@@ -185,7 +185,7 @@ Two mitigations shipped and neither closed it: proposer-path retries
   length instead of staying flat, which is why every attempt has died before the
   end.
 
-Registered as gap 5 in the [roadmap](roadmap.md); items A1/A2 are the fix, and
+Registered as gap 5 in the [roadmap](../development/roadmap.md); items A1/A2 are the fix, and
 they are infrastructure only — no information reaching the proposer changes, so
 they do not touch the frozen MVP-2 protocol.
 
@@ -316,7 +316,7 @@ provider model changed mid-run. No code enforced it; there is now.
 
 MVP-2's M3 is void and was re-run on the corrected instrument. The
 pre-registration is unchanged in every respect that governs a decision; the
-instrument changes are recorded in [mvp.md](mvp.md) Amendment 3.
+instrument changes are recorded in [mvp.md](../development/mvp.md) Amendment 3.
 
 ---
 
@@ -436,7 +436,7 @@ Registered for MVP-3 under two headings, and deliberately **not** fixed
 mid-experiment:
 
 1. *Infrastructure* — iteration-internal checkpointing, so a proposer call that
-   dies does not discard the whole iteration ([roadmap](roadmap.md) gap 5, finer grained).
+   dies does not discard the whole iteration ([roadmap](../development/roadmap.md) gap 5, finer grained).
 2. *Method* — bound the proposer's context. This is the fix that addresses the
    transport symptom and the fidelity-to-the-paper problem at once, and it may
    well be improving proposal quality rather than merely enabling the run.
