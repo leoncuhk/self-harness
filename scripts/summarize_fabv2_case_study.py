@@ -66,6 +66,24 @@ def _score(split: dict[str, Any]) -> str:
     return f"{float(split['score']):.3f} ({split['passed']}/{split['total']})"
 
 
+def _optimization_splits(report: dict[str, Any]) -> list[dict[str, Any]]:
+    splits: list[dict[str, Any]] = []
+    for iteration in report.get("iterations", []):
+        candidate = iteration.get("candidate")
+        if candidate:
+            splits.extend((candidate["train"], candidate["holdout"]))
+    return splits
+
+
+def _tokens_for_splits(splits: list[dict[str, Any]]) -> int | None:
+    if not splits:
+        return 0
+    values = [_split_tokens(split) for split in splits]
+    if any(value is None for value in values):
+        return None
+    return sum(value for value in values if value is not None)
+
+
 def render(
     evolved: dict[str, Any],
     comparator: dict[str, Any],
@@ -78,14 +96,15 @@ def render(
         _arm(comparator, name="Hand-engineered B5", stage="baseline"),
         _arm(evolved, name="Self-Harness final", stage="final"),
     )
+    optimization_tokens = _tokens_for_splits(_optimization_splits(evolved))
     lines = [
         "# FAB v2 bounded case study",
         "",
         "All arms use the same model, one case per split, and the same eight-turn, "
         "360-second, 5,000-output-token-per-call limits.",
         "",
-        "| Arm | Train score (pass) | Validation score (pass) | Locked-test score (pass) | Eval tokens | Search tokens | Wall time | Changed surfaces |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+        "| Arm | Train score (pass) | Validation score (pass) | Locked-test score (pass) | Final-arm eval tokens | Optimization rollout tokens | Outer-search tokens | Wall time | Changed surfaces |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for index, arm in enumerate(arms):
         tokens = "unmeasured" if arm.total_tokens is None else f"{arm.total_tokens:,}"
@@ -97,13 +116,49 @@ def render(
             else "0"
         )
         surfaces = ", ".join(arm.changed_surfaces) or "none"
+        optimization = (
+            "unmeasured"
+            if index == 2 and optimization_tokens is None
+            else f"{optimization_tokens:,}"
+            if index == 2
+            else "0"
+        )
         lines.append(
             f"| {arm.name} | {_score(arm.splits[0])} | {_score(arm.splits[1])} | "
-            f"{_score(arm.splits[2])} | {tokens} | {search} | "
+            f"{_score(arm.splits[2])} | {tokens} | {optimization} | {search} | "
             f"{arm.total_duration_s:.1f}s | {surfaces} |"
         )
 
     seed, _, final = arms
+    lines.extend(["", "Diagnostic numeric recall (not the promotion objective):", ""])
+    for arm in arms:
+        recall = [
+            float(split.get("metrics", {}).get("numeric_recall", 0.0)) for split in arm.splits
+        ]
+        lines.append(
+            f"- {arm.name}: train {recall[0]:.3f}, validation {recall[1]:.3f}, "
+            f"locked test {recall[2]:.3f}."
+        )
+
+    candidates = [
+        iteration["candidate"]
+        for iteration in evolved.get("iterations", [])
+        if iteration.get("candidate")
+    ]
+    lines.extend(["", "## Outer-loop outcome", ""])
+    if not candidates:
+        lines.append("No candidate was produced.")
+    for candidate in candidates:
+        prediction = candidate.get("proposal", {}).get("prediction", {})
+        lines.extend(
+            [
+                f"- `{candidate['variant']}`: "
+                f"{'accepted' if candidate['accepted'] else 'rejected'}; "
+                f"train {_score(candidate['train'])}, validation {_score(candidate['holdout'])}.",
+                f"  - Gate: {candidate['reason']}",
+                f"  - Predicted flips: {', '.join(prediction.get('flip_to_pass', [])) or 'none'}.",
+            ]
+        )
     lines.extend(
         [
             "",
