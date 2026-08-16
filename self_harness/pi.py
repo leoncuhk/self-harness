@@ -42,7 +42,14 @@ An empty edit set is valid only when the evidence does not justify a change. Nev
 private validation or scorecard content. Compare prior visible attempts before proposing: do not
 repeat a semantically equivalent edit that produced no visible train gain. When traces show that
 the runtime ignored prose instructions, prefer a small declared machine-enforced policy edit over
-adding more prose; keep fixed model, evaluator, and controller budgets untouched."""
+adding more prose; keep fixed model, evaluator, and controller budgets untouched.
+
+Route the failure before editing. `diagnostic_facets` are observed signals, not proven causes. Decide
+whether the bottleneck is beneficiary capability, data-plane access, research/orchestration,
+financial semantics/computation, verification, or answer compilation. If the evidence indicates a
+fixed-model capability ceiling or a frozen data-plane failure outside the declared surfaces, return
+an empty edit instead of disguising the problem as another prompt rule. Prefer the smallest surface
+whose behavior can causally affect the selected layer."""
 
 REPAIR_SYSTEM_PROMPT = """Repair the attached proposal into exactly one valid JSON object.
 

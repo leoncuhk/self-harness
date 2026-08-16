@@ -57,8 +57,53 @@ def test_normalize_outcome_reads_runner_artifacts(tmp_path: Path):
         "failed_numeric": ["missing CAGR"],
     }
     assert record.research_tail == '[{"error":"SEC HTTP 503"}]'
+    assert record.diagnostic_facets == (
+        "budget_boundary",
+        "data_plane_access",
+        "numeric_verifier_miss",
+        "submission_not_observed",
+    )
     assert "web_search" in trace_text(outcome)
     assert "sec http 503" in trace_text(outcome)
+
+
+def test_finance_diagnostic_facets_route_cross_layer_failure(tmp_path: Path):
+    (tmp_path / "run.json").write_text(
+        json.dumps(
+            {
+                "stop_reason": "compiled_after_max_tokens",
+                "tool_usage": {"submit_final_result": 1},
+            }
+        )
+    )
+    (tmp_path / "judge.json").write_text(
+        json.dumps({"failed_numeric": ["FY2026 Adjusted EBITDA is $14,745"]})
+    )
+    research_dir = tmp_path / "trajectory" / "prime_workspace"
+    research_dir.mkdir(parents=True)
+    (research_dir / "research_trace.json").write_text(
+        "Actual source period differs from guidance projection; resolve Exhibit 99.1 through "
+        "index.json, then reconcile D&A, SBC, NWC, CapEx, and FCFF component calculation."
+    )
+    outcome = CaseOutcome(
+        case_id="q",
+        split="train",
+        stratum="financial-modeling",
+        status="failed",
+        score=0.0,
+        duration_s=1.0,
+        failure_message="assertion failed",
+        artifacts_dir=str(tmp_path),
+    )
+
+    assert normalize_outcome(outcome).diagnostic_facets == (
+        "answer_materialization",
+        "budget_boundary",
+        "cash_flow_reconciliation",
+        "filing_attachment_resolution",
+        "forecast_period_provenance",
+        "numeric_verifier_miss",
+    )
 
 
 def test_experience_bundle_is_bounded_and_jsonl(tmp_path: Path):

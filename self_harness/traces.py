@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -40,6 +41,7 @@ class ExperienceRecord:
     tool_usage: Any | None = None
     verifier: dict[str, Any] | None = None
     research_tail: str | None = None
+    diagnostic_facets: tuple[str, ...] = ()
     events: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -81,6 +83,65 @@ def compact_failure_message(message: str | None) -> str | None:
     return compact[-MAX_TEXT_CHARS:] or None
 
 
+def _diagnostic_facets(
+    *,
+    stop_reason: str | None,
+    verifier: dict[str, Any] | None,
+    research_tail: str | None,
+    failure_message: str | None,
+    tool_usage: Any | None,
+) -> tuple[str, ...]:
+    """Return deterministic, non-causal routing hints for the outer proposer.
+
+    A failure signature intentionally stays coarse and reproducible. Finance
+    failures often cross several layers, however: a correct modeling insight
+    can still fail because an exhibit was never resolved or a subtotal was not
+    materialized in the answer. These facets expose observed signals without
+    pretending that a regex established root cause.
+    """
+    text = "\n".join(
+        part for part in (failure_message, research_tail, stop_reason) if part
+    ).lower()
+    facets: set[str] = set()
+    failed_numeric = (verifier or {}).get("failed_numeric") or ()
+    if failed_numeric:
+        facets.add("numeric_verifier_miss")
+    if stop_reason and re.search(
+        r"(?:max_(?:tokens|turns)|token_limit|turn_limit|exit_125|compiled_after)",
+        stop_reason.lower(),
+    ):
+        facets.add("budget_boundary")
+    if isinstance(tool_usage, dict) and int(tool_usage.get("submit_final_result", 0) or 0) == 0:
+        facets.add("submission_not_observed")
+    if re.search(
+        r"permissionerror|operation not permitted|network is unreachable|http 40[133]|http 5\d\d",
+        text,
+    ):
+        facets.add("data_plane_access")
+    if re.search(r"exhibit 99|index\.json|filing index|cover page|attached as exhibit", text):
+        facets.add("filing_attachment_resolution")
+    if (
+        re.search(r"\bactuals?\b|actual fiscal|source period", text)
+        and re.search(r"\bguidance\b|projection period|forecast", text)
+    ):
+        facets.add("forecast_period_provenance")
+    cash_flow_terms = sum(
+        bool(re.search(pattern, text))
+        for pattern in (
+            r"stock-based compensation|\bsbc\b",
+            r"depreciation.{0,20}amortization|\bd&a\b",
+            r"working capital|\bnwc\b",
+            r"capital expenditures?|\bcapex\b",
+            r"\bfcff\b|free cash flow",
+        )
+    )
+    if cash_flow_terms >= 2:
+        facets.add("cash_flow_reconciliation")
+    if re.search(r"subtotal|component calculation|reader add|materiali[sz]", text):
+        facets.add("answer_materialization")
+    return tuple(sorted(facets))
+
+
 def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
     """Derive one stable experience record from runner-specific artifacts."""
     artifacts = Path(outcome.artifacts_dir) if outcome.artifacts_dir else None
@@ -98,18 +159,28 @@ def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
         trace_path = artifacts / "trajectory" / "prime_workspace" / "research_trace.json"
         with suppress(OSError):
             research_tail = trace_path.read_text()[-MAX_RESEARCH_CHARS:].strip() or None
+    stop_reason = None if payload.get("stop_reason") is None else str(payload["stop_reason"])
+    tool_usage = payload.get("tool_usage")
+    failure_message = compact_failure_message(outcome.failure_message)
     return ExperienceRecord(
         case_id=outcome.case_id,
         stratum=outcome.stratum,
         status=outcome.status,
         score=outcome.score,
-        failure_message=compact_failure_message(outcome.failure_message),
-        stop_reason=None if payload.get("stop_reason") is None else str(payload["stop_reason"]),
+        failure_message=failure_message,
+        stop_reason=stop_reason,
         turns=None if payload.get("turns") is None else int(payload["turns"]),
         tokens=None if payload.get("tokens") is None else int(payload["tokens"]),
-        tool_usage=payload.get("tool_usage"),
+        tool_usage=tool_usage,
         verifier=verifier,
         research_tail=research_tail,
+        diagnostic_facets=_diagnostic_facets(
+            stop_reason=stop_reason,
+            verifier=verifier,
+            research_tail=research_tail,
+            failure_message=failure_message,
+            tool_usage=tool_usage,
+        ),
         events=events,
     )
 
@@ -123,6 +194,7 @@ def trace_text(outcome: CaseOutcome) -> str:
         "tool_usage": record.tool_usage,
         "verifier": record.verifier,
         "research_tail": record.research_tail,
+        "diagnostic_facets": record.diagnostic_facets,
         "events": record.events,
     }
     return json.dumps(payload, sort_keys=True, default=str)[:MAX_TEXT_CHARS].lower()
