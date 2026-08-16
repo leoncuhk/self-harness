@@ -235,6 +235,31 @@ class Variant:
         )
         return hashlib.sha256(payload.encode()).hexdigest()
 
+    @property
+    def semantic_fingerprint(self) -> str:
+        """Hash harness meaning while ignoring JSON serialization trivia.
+
+        JSON policy surfaces are frequently emitted with different indentation
+        or key order. Treating those byte-level rewrites as new candidates buys
+        another stochastic rollout for an identical policy and creates an
+        optional-stopping path to false promotion. Prose remains byte-sensitive
+        because whitespace and ordering can affect model behavior.
+        """
+        values: dict[str, str] = {}
+        for name, value in self.values.items():
+            surface = self.surfaces[name]
+            if surface.filename.endswith(".json") or surface.target.endswith(".json"):
+                try:
+                    parsed = json.loads(value)
+                except (TypeError, ValueError):
+                    values[name] = value
+                else:
+                    values[name] = json.dumps(parsed, sort_keys=True, separators=(",", ":"))
+            else:
+                values[name] = value
+        payload = json.dumps({"model": self.model, "values": values}, sort_keys=True)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
     def attr_overrides(self) -> dict[str, str]:
         """Return module-attr overrides keyed by target."""
         return {
@@ -1444,6 +1469,7 @@ def run_experiment(
 
     iterations: list[IterationRecord] = []
     ledger: list[LedgerEntry] = []
+    seen_semantic_fingerprints = {baseline.semantic_fingerprint}
     for index in range(1, iteration_limit + 1):
         if current_train.passed == current_train.total and current_holdout.passed == current_holdout.total:
             break
@@ -1467,6 +1493,31 @@ def run_experiment(
             if not proposal.changed_surfaces:
                 continue
             proposed_any = True
+
+            semantic_fingerprint = candidate_variant.semantic_fingerprint
+            if semantic_fingerprint in seen_semantic_fingerprints:
+                # Reject before any rollout. Re-evaluating the same policy under
+                # a new label is unregistered retry scaling, not harness search.
+                evaluated.append(
+                    (
+                        CandidateEvaluation(
+                            variant=candidate_variant.key,
+                            proposal=proposal,
+                            train=current_train,
+                            holdout=current_holdout,
+                            accepted=False,
+                            reason=(
+                                "duplicate candidate: semantically identical to an already "
+                                "proposed variant"
+                            ),
+                        ),
+                        candidate_variant,
+                        current_train,
+                        current_holdout,
+                    )
+                )
+                continue
+            seen_semantic_fingerprints.add(semantic_fingerprint)
 
             guard_report: GuardReport | None = None
             if experiment.guards_enabled:

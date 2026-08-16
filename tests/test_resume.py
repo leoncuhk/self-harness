@@ -47,6 +47,34 @@ def make_variant(tmp_path: Path, *, prompt: str):
     return experiment, build_variant(experiment=experiment, label="iter-001", values=values)
 
 
+def test_semantic_fingerprint_canonicalizes_json_surfaces(tmp_path):
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture")
+    experiment = load_experiment(config)
+    baseline = build_baseline_variant(experiment)
+    surface = next(iter(experiment.surfaces.values()))
+    json_surface = replace(surface, filename="policy.json", target="policy.json")
+    surfaces = {surface.name: json_surface}
+    compact = replace(
+        baseline,
+        surfaces=surfaces,
+        values={surface.name: '{"enabled":true,"limit":5}'},
+    )
+    formatted = replace(
+        compact,
+        values={surface.name: '{\n  "limit": 5,\n  "enabled": true\n}'},
+    )
+
+    assert compact.fingerprint != formatted.fingerprint
+    assert compact.semantic_fingerprint == formatted.semantic_fingerprint
+
+
+def test_semantic_fingerprint_keeps_prose_byte_sensitive(tmp_path):
+    _experiment, compact = make_variant(tmp_path, prompt="verify then submit")
+    formatted = replace(compact, values={"prompt": "verify  then submit"})
+
+    assert compact.semantic_fingerprint != formatted.semantic_fingerprint
+
+
 def write_result(path: Path, *, variant_key: str) -> SplitResult:
     result = SplitResult(
         split="train",

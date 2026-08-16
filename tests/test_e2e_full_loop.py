@@ -167,6 +167,36 @@ def test_k_candidates_each_get_their_own_record(tmp_path, monkeypatch):
     assert (multi_dir / "history" / "visible" / "iterations" / "001" / "k01").exists()
 
 
+def test_duplicate_candidate_is_rejected_before_rollout(tmp_path, monkeypatch):
+    """A second label for identical harness content must not buy another sample."""
+    install_proposer(monkeypatch, "# Proposal\n\nSame edit twice.\n")
+    config = _write_minimal_pytest_experiment(tmp_path / "fixture-duplicate")
+    config.write_text(
+        config.read_text().replace(
+            'name = "minimal-pytest"',
+            'name = "minimal-pytest"\ncandidates = 2',
+            1,
+        )
+    )
+    evaluated: list[str] = []
+    real_run_split = runners_module.PytestRunner.run_split
+
+    def spy(self, **kwargs):
+        evaluated.append(kwargs["variant"].key)
+        return real_run_split(self, **kwargs)
+
+    monkeypatch.setattr(runners_module.PytestRunner, "run_split", spy)
+    output_dir = tmp_path / "run-duplicate"
+    run_experiment(load_experiment(config), output_dir=output_dir, max_iterations=1)
+
+    assert "iter-001-k00" in evaluated
+    assert "iter-001-k01" not in evaluated
+    entries = read_ledger(output_dir)["entries"]
+    duplicate = next(entry for entry in entries if entry["variant"] == "iter-001-k01")
+    assert duplicate["accepted"] is False
+    assert duplicate["gate_reason"].startswith("duplicate candidate:")
+
+
 def test_failure_clusters_reach_the_ledger(tmp_path, monkeypatch):
     """Baseline failures must be clustered and recorded alongside the decision."""
     install_proposer(monkeypatch, "# Proposal\n\nFix everything.\n")
