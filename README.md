@@ -51,15 +51,18 @@ FAB contracts:
 
 ```bash
 # Inner-runtime integration only; no evolution claim
-uv run self-harness run configs/fabv2_smoke.toml --output-dir runs/fabv2-smoke
+scripts/run_fabv2.sh run configs/fabv2_smoke.toml --output-dir runs/fabv2-smoke
 
 # One train/validation/scorecard outer-loop mechanism check
-uv run self-harness run configs/fabv2_evolve_smoke.toml \
+scripts/run_fabv2.sh run configs/fabv2_evolve_smoke.toml \
   --output-dir runs/fabv2-evolve-smoke
 
 # Public-27 8/8/8 development protocol
-uv run self-harness run configs/fabv2.toml --output-dir runs/fabv2
+scripts/run_fabv2.sh run configs/fabv2.toml --output-dir runs/fabv2
 ```
+
+The launcher exports values from the ignored local `.env` before starting subprocesses; plain
+`source .env` does not export unmarked assignments. It does not print credentials.
 
 Use `configs/fabv2_minimal.toml` for the contract-matched minimal comparator. A credible efficacy
 study must also run the strong zero-evolution baseline, evolved arm, and equal-total-token retry or
@@ -93,6 +96,16 @@ uv run python scripts/build_fabv2_leaderboard.py submissions/*.json \
 ```
 
 Numeric-24 development runs and one-case smoke runs are deliberately ineligible for that table.
+
+## Current FAB conclusion
+
+The latest Public-24 evolution evaluated six candidates and promoted none; the strong human harness
+remains best under that frozen one-repeat contract. A separate rubric-blind upper-bound diagnostic
+ran the same strong harness on four previously failed tasks with GPT-5.6-sol + Codex and passed 3/4
+(mean numeric credit 0.7917). Because both model and runtime changed, this shows that the beneficiary
+stack is a major bottleneck, not that model choice alone explains every failure. It is neither an
+evolved-harness win nor an official leaderboard score. Exact evidence and limitations are in the
+[FAB v2 case study](docs/evaluation/fabv2-case-study.md).
 
 Process and workspace isolation are not a hostile-code sandbox. Live agents still require an OS or
 container boundary, least-privilege credentials, and an explicit network policy.

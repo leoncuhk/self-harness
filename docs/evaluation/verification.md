@@ -42,8 +42,12 @@ precision, and the full candidate ledger. Do not add gains from experiments with
 
 ## Current claim ceiling
 
-The deterministic coding fixture establishes V1. The latest live atomic Pi smoke establishes outer
-integration and correct rejection at V2: its candidate produced no train or adaptive-validation gain,
-and the strong human seed remains the best validated harness under that contract. FAB efficacy has
-not reached V3, and V4 requires the full replicated comparator protocol. See the
-[case study](fabv2-case-study.md) for exact bounded results.
+The deterministic coding fixture establishes V1. The live atomic Pi runs establish outer integration,
+bounded proposal search, guards, semantic novelty checking, and correct rejection at V2. The
+Public-24 run evaluated six candidates; none satisfied the frozen promotion contract, so the strong
+human seed remains the best validated harness. FAB efficacy has not reached V3.
+
+The separate GPT-5.6-sol + Codex 3/4 diagnostic estimates a stronger model/runtime ceiling. It is not
+placed on this ladder because it changes the beneficiary stack and performs no harness evolution.
+V4 still requires a promoted harness, multiple repeats, and equal-total-budget retry/Best-of-N under
+one fixed stack. See the [case study](fabv2-case-study.md) for exact bounded results.
