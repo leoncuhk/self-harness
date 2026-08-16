@@ -1,0 +1,40 @@
+name = "fabv2-finance-v1"
+layers = [
+  "beneficiary_capability",
+  "data_plane",
+  "research_orchestration",
+  "finance_semantics_computation",
+  "verification_accounting_invariants",
+  "answer_compilation",
+]
+guidance = """
+First distinguish a beneficiary capability or frozen data-plane failure from an evolvable harness
+failure. For evolvable failures, choose the smallest causal surface across research/orchestration,
+finance semantics and deterministic computation, verification/accounting invariants, or answer
+compilation. A capability ceiling or unavailable frozen source requires an empty edit and a new
+experiment contract, not another prompt rule.
+"""
+
+[[facets]]
+name = "filing_attachment_resolution"
+patterns = ["exhibit 99|index\\.json|filing index|cover page|attached as exhibit"]
+
+[[facets]]
+name = "forecast_period_provenance"
+patterns = ["\\bactuals?\\b|actual fiscal|source period", "\\bguidance\\b|projection period|forecast"]
+minimum_matches = 2
+
+[[facets]]
+name = "cash_flow_reconciliation"
+patterns = [
+  "stock-based compensation|\\bsbc\\b",
+  "depreciation.{0,20}amortization|\\bd&a\\b",
+  "working capital|\\bnwc\\b",
+  "capital expenditures?|\\bcapex\\b",
+  "\\bfcff\\b|free cash flow",
+]
+minimum_matches = 2
+
+[[facets]]
+name = "answer_materialization"
+patterns = ["subtotal|component calculation|reader add|materiali[sz]"]

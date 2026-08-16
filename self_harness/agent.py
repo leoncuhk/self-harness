@@ -37,9 +37,9 @@ _SEARCH_ROLES = (
         "`runtime_policy` surface exists, target it instead of restating an ignored prose rule.",
     ),
     (
-        "tool/data plane",
-        "Prefer a general tool or data-access improvement when retrieval quality is the causal "
-        "bottleneck; do not encode task answers.",
+        "tool/interface",
+        "Improve how the inner agent invokes a declared tool when tool use is the causal "
+        "bottleneck. Do not alter the frozen data source, evaluator, or task answers.",
     ),
     (
         "memory/verification",
@@ -95,7 +95,8 @@ def build_proposer_workspace(  # noqa: PLR0913 - one workspace needs the whole i
         train_result=train_result,
         root=root,
     )
-    _write_visible_history(layout=layout, root=root)
+    (root / "diagnostic_contract.md").write_text(experiment.diagnostics.render())
+    _write_visible_history(experiment=experiment, layout=layout, root=root)
     (root / "failure_clusters.json").write_text(
         json.dumps([cluster.to_dict() for cluster in clusters], indent=2) + "\n"
     )
@@ -306,7 +307,11 @@ def _write_train_artifacts(
     ]
     (root / "train_failures.json").write_text(json.dumps(failures_payload, indent=2) + "\n")
     (root / "train_summary.json").write_text(json.dumps(train_result.to_dict(), indent=2) + "\n")
-    write_experience_bundle(root / "experience", train_result.failing_outcomes())
+    write_experience_bundle(
+        root / "experience",
+        train_result.failing_outcomes(),
+        diagnostics=experiment.diagnostics,
+    )
 
     train_cases_dir = root / "train_cases"
     train_cases_dir.mkdir(parents=True, exist_ok=True)
@@ -362,7 +367,7 @@ def _write_train_artifacts(
         )
 
 
-def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
+def _write_visible_history(*, experiment: Experiment, layout: RunLayout, root: Path) -> None:
     """Write bounded train-only feedback from earlier candidate attempts."""
     history_dir = root / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
@@ -385,7 +390,7 @@ def _write_visible_history(*, layout: RunLayout, root: Path) -> None:
             if train is not None:
                 train_metrics = train.metrics
                 failures = [
-                    normalize_outcome(outcome).to_dict()
+                    normalize_outcome(outcome, diagnostics=experiment.diagnostics).to_dict()
                     for outcome in train.failing_outcomes()[:4]
                 ]
         prediction = payload.get("prediction")
@@ -489,6 +494,7 @@ def _write_task_file(  # noqa: PLR0913 - the task file mirrors the whole iterati
                 "- Use `surface_manifest.json` to understand how each editable file maps back to the target harness.",
                 "- Use the visible train failures and train case files to decide what to change.",
                 "- Read `experience/records.jsonl` for bounded execution evidence before diagnosing a failure.",
+                "- Read `diagnostic_contract.md`; route the failure before choosing an editable surface.",
                 "- Keep changes concise and coherent.",
                 "- When you finish, update `proposal.md` with a short summary and the prediction JSON block.",
                 "- The prediction block is graded against the next run. Predict honestly, not optimistically.",

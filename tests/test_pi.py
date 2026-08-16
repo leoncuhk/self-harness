@@ -19,6 +19,9 @@ def _workspace(tmp_path: Path) -> ProposerWorkspace:
     surface = current / "system.md"
     surface.write_text("old\n")
     (tmp_path / "task.md").write_text("visible task\n")
+    (tmp_path / "diagnostic_contract.md").write_text(
+        "# Diagnostic Contract\n\n- `domain_semantics`\n"
+    )
     (tmp_path / "failure_clusters.json").write_text("[]\n")
     (tmp_path / "experience").mkdir()
     (tmp_path / "experience" / "records.jsonl").write_text('{"case_id":"train-1"}\n')
@@ -37,6 +40,7 @@ def _workspace(tmp_path: Path) -> ProposerWorkspace:
 def test_atomic_context_contains_visible_evidence_and_surfaces(tmp_path: Path):
     context = build_atomic_context(_workspace(tmp_path))
     assert "visible task" in context
+    assert "domain_semantics" in context
     assert '"case_id":"train-1"' in context
     assert "Iteration 1 changed tools; train 0/1" in context
     assert '"hypothesis":"output too large"' in context
@@ -47,6 +51,8 @@ def test_parallel_candidates_have_orthogonal_search_roles():
     assert candidate_search_role(0)[0] == "instruction/workflow"
     assert candidate_search_role(1)[0] == "machine-enforced policy"
     assert "runtime_policy" in candidate_search_role(1)[1]
+    assert candidate_search_role(2)[0] == "tool/interface"
+    assert "frozen data source" in candidate_search_role(2)[1]
     assert candidate_search_role(4) == candidate_search_role(0)
 
 

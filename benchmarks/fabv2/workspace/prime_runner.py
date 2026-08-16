@@ -441,6 +441,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
         stop_reason = "empty_submission"
     else:
         stop_reason = "submitted"
+    diagnostic_facets = [] if answer else ["submission_not_observed"]
     return {
         "runtime": "prime-agent",
         "final_answer": answer,
@@ -452,6 +453,7 @@ def run_question(  # noqa: PLR0913 - frozen evaluator contract is intentionally 
         "error_count": research_errors + compiler_errors + domain_errors,
         "tool_calls_count": sum(tool_usage.values()),
         "tool_usage": tool_usage,
+        "diagnostic_facets": diagnostic_facets,
         "recovery_used": False,
         "recovery_tokens": 0,
         "recovery_turns": 0,

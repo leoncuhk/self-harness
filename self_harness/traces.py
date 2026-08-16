@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import json
-import re
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from self_harness.diagnostics import (
+    DEFAULT_DIAGNOSTICS,
+    DiagnosticContract,
+    DiagnosticEvidence,
+    collect_diagnostic_facets,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -83,66 +89,11 @@ def compact_failure_message(message: str | None) -> str | None:
     return compact[-MAX_TEXT_CHARS:] or None
 
 
-def _diagnostic_facets(
+def normalize_outcome(
+    outcome: CaseOutcome,
     *,
-    stop_reason: str | None,
-    verifier: dict[str, Any] | None,
-    research_tail: str | None,
-    failure_message: str | None,
-    tool_usage: Any | None,
-) -> tuple[str, ...]:
-    """Return deterministic, non-causal routing hints for the outer proposer.
-
-    A failure signature intentionally stays coarse and reproducible. Finance
-    failures often cross several layers, however: a correct modeling insight
-    can still fail because an exhibit was never resolved or a subtotal was not
-    materialized in the answer. These facets expose observed signals without
-    pretending that a regex established root cause.
-    """
-    text = "\n".join(
-        part for part in (failure_message, research_tail, stop_reason) if part
-    ).lower()
-    facets: set[str] = set()
-    failed_numeric = (verifier or {}).get("failed_numeric") or ()
-    if failed_numeric:
-        facets.add("numeric_verifier_miss")
-    if stop_reason and re.search(
-        r"(?:max_(?:tokens|turns)|token_limit|turn_limit|exit_125|compiled_after)",
-        stop_reason.lower(),
-    ):
-        facets.add("budget_boundary")
-    if isinstance(tool_usage, dict) and int(tool_usage.get("submit_final_result", 0) or 0) == 0:
-        facets.add("submission_not_observed")
-    if re.search(
-        r"permissionerror|operation not permitted|network is unreachable|http 40[133]|http 5\d\d",
-        text,
-    ):
-        facets.add("data_plane_access")
-    if re.search(r"exhibit 99|index\.json|filing index|cover page|attached as exhibit", text):
-        facets.add("filing_attachment_resolution")
-    if (
-        re.search(r"\bactuals?\b|actual fiscal|source period", text)
-        and re.search(r"\bguidance\b|projection period|forecast", text)
-    ):
-        facets.add("forecast_period_provenance")
-    cash_flow_terms = sum(
-        bool(re.search(pattern, text))
-        for pattern in (
-            r"stock-based compensation|\bsbc\b",
-            r"depreciation.{0,20}amortization|\bd&a\b",
-            r"working capital|\bnwc\b",
-            r"capital expenditures?|\bcapex\b",
-            r"\bfcff\b|free cash flow",
-        )
-    )
-    if cash_flow_terms >= 2:
-        facets.add("cash_flow_reconciliation")
-    if re.search(r"subtotal|component calculation|reader add|materiali[sz]", text):
-        facets.add("answer_materialization")
-    return tuple(sorted(facets))
-
-
-def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
+) -> ExperienceRecord:
     """Derive one stable experience record from runner-specific artifacts."""
     artifacts = Path(outcome.artifacts_dir) if outcome.artifacts_dir else None
     run_payload = _read_json(artifacts / "run.json") if artifacts else None
@@ -161,6 +112,12 @@ def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
             research_tail = trace_path.read_text()[-MAX_RESEARCH_CHARS:].strip() or None
     stop_reason = None if payload.get("stop_reason") is None else str(payload["stop_reason"])
     tool_usage = payload.get("tool_usage")
+    raw_facets = payload.get("diagnostic_facets", ())
+    reported_facets = (
+        tuple(str(item) for item in raw_facets)
+        if isinstance(raw_facets, list | tuple)
+        else ()
+    )
     failure_message = compact_failure_message(outcome.failure_message)
     return ExperienceRecord(
         case_id=outcome.case_id,
@@ -174,20 +131,27 @@ def normalize_outcome(outcome: CaseOutcome) -> ExperienceRecord:
         tool_usage=tool_usage,
         verifier=verifier,
         research_tail=research_tail,
-        diagnostic_facets=_diagnostic_facets(
-            stop_reason=stop_reason,
-            verifier=verifier,
-            research_tail=research_tail,
-            failure_message=failure_message,
-            tool_usage=tool_usage,
+        diagnostic_facets=collect_diagnostic_facets(
+            diagnostics,
+            DiagnosticEvidence(
+                stop_reason=stop_reason,
+                verifier=verifier,
+                research_tail=research_tail,
+                failure_message=failure_message,
+                reported_facets=reported_facets,
+            ),
         ),
         events=events,
     )
 
 
-def trace_text(outcome: CaseOutcome) -> str:
+def trace_text(
+    outcome: CaseOutcome,
+    *,
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
+) -> str:
     """Return normalized trace hints for deterministic signature rules."""
-    record = normalize_outcome(outcome)
+    record = normalize_outcome(outcome, diagnostics=diagnostics)
     payload = {
         "stop_reason": record.stop_reason,
         "turns": record.turns,
@@ -205,10 +169,14 @@ def write_experience_bundle(
     outcomes: Sequence[CaseOutcome],
     *,
     max_cases: int = 12,
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
 ) -> list[ExperienceRecord]:
     """Write bounded trace evidence for the outer proposer and return it."""
     root.mkdir(parents=True, exist_ok=True)
-    records = [normalize_outcome(outcome) for outcome in outcomes[:max_cases]]
+    records = [
+        normalize_outcome(outcome, diagnostics=diagnostics)
+        for outcome in outcomes[:max_cases]
+    ]
     (root / "records.jsonl").write_text(
         "".join(json.dumps(record.to_dict(), sort_keys=True, default=str) + "\n" for record in records)
     )

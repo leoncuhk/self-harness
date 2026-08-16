@@ -21,6 +21,14 @@ from self_harness.core import (
     validate_experiment,
 )
 from self_harness.cost import BudgetDecision, CostProfile, check_budget, profile_split
+from self_harness.diagnostics import (
+    DEFAULT_DIAGNOSTICS,
+    DiagnosticContract,
+    DiagnosticEvidence,
+    FacetRule,
+    collect_diagnostic_facets,
+    load_diagnostic_contract,
+)
 from self_harness.gate import GateDecision, decide
 from self_harness.guards import GuardReport, check_variant
 from self_harness.ledger import (
@@ -56,6 +64,7 @@ from self_harness.signatures import (
 )
 
 __all__ = [
+    "DEFAULT_DIAGNOSTICS",
     "STATUS_APPARATUS",
     "ArchiveEntry",
     "BudgetDecision",
@@ -63,8 +72,11 @@ __all__ = [
     "CaseOutcome",
     "CodingProjectRunner",
     "CostProfile",
+    "DiagnosticContract",
+    "DiagnosticEvidence",
     "EvalCase",
     "Experiment",
+    "FacetRule",
     "FailureCluster",
     "FailureSignature",
     "FingerprintDriftError",
@@ -91,9 +103,11 @@ __all__ = [
     "classify",
     "cluster_failures",
     "cluster_split",
+    "collect_diagnostic_facets",
     "compute_flips",
     "decide",
     "is_measurable",
+    "load_diagnostic_contract",
     "load_experiment",
     "load_goal_contract",
     "main",

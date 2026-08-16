@@ -11,6 +11,9 @@ gate = "objective"
 candidates = 1
 fingerprint_discipline = "strict"
 
+[diagnostics]
+profile_file = "../benchmarks/fabv2/contracts/diagnostics.toml"
+
 [goal]
 primary_metric = "ungated_credit"
 direction = "maximize"

@@ -35,6 +35,10 @@ from self_harness.cost import (
     check_budget,
     profile_split,
 )
+from self_harness.diagnostics import (
+    DiagnosticContract,
+    load_diagnostic_contract,
+)
 from self_harness.gate import VALID_GATES, GateDecision, decide
 from self_harness.guards import GuardReport, check_variant
 from self_harness.ledger import (
@@ -155,6 +159,7 @@ class Experiment:
     budget: dict[str, Any] = dc_field(default_factory=dict)
     fingerprint_discipline: str = DEFAULT_FINGERPRINT_DISCIPLINE
     goal: GoalContract = dc_field(default_factory=GoalContract)
+    diagnostics: DiagnosticContract = dc_field(default_factory=DiagnosticContract)
 
     @property
     def guards_enabled(self) -> bool:
@@ -199,6 +204,7 @@ class Experiment:
             "repeats": self.repeats,
             "cases": [asdict(case) for case in self.cases],
             "source_digests": source_digests,
+            "diagnostics": self.diagnostics.to_dict(),
         }
         return hashlib.sha256(
             json.dumps(payload, sort_keys=True, default=str).encode()
@@ -728,6 +734,7 @@ class RunLayout:
             "repeats": experiment.repeats,
             "candidates": experiment.candidates,
             "runner_config": experiment.runner_config,
+            "diagnostics": experiment.diagnostics.to_dict(),
             "guards": experiment.guards,
             "budget": experiment.budget,
             "evaluation_fingerprint": experiment.evaluation_fingerprint,
@@ -1012,6 +1019,10 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     guards = dict(raw.get("guards", {}))
     budget = dict(raw.get("budget", {}))
     goal = load_goal_contract(raw.get("goal"))
+    diagnostics = load_diagnostic_contract(
+        raw.get("diagnostics"),
+        config_dir=config_path.parent,
+    )
 
     better_agent = raw.get("better_agent", {})
     better_agent_backend = str(better_agent.get("backend", "pi"))
@@ -1119,6 +1130,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         budget=budget,
         fingerprint_discipline=fingerprint_discipline,
         goal=goal,
+        diagnostics=diagnostics,
     )
     validate_experiment(loaded)
     return loaded
@@ -1473,7 +1485,7 @@ def run_experiment(
     for index in range(1, iteration_limit + 1):
         if current_train.passed == current_train.total and current_holdout.passed == current_holdout.total:
             break
-        clusters = cluster_split(current_train)
+        clusters = cluster_split(current_train, diagnostics=experiment.diagnostics)
         current_cost = [profile_split(current_train), profile_split(current_holdout)]
 
         evaluated: list[tuple[CandidateEvaluation, Variant, SplitResult, SplitResult]] = []

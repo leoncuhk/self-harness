@@ -44,12 +44,10 @@ repeat a semantically equivalent edit that produced no visible train gain. When 
 the runtime ignored prose instructions, prefer a small declared machine-enforced policy edit over
 adding more prose; keep fixed model, evaluator, and controller budgets untouched.
 
-Route the failure before editing. `diagnostic_facets` are observed signals, not proven causes. Decide
-whether the bottleneck is beneficiary capability, data-plane access, research/orchestration,
-financial semantics/computation, verification, or answer compilation. If the evidence indicates a
-fixed-model capability ceiling or a frozen data-plane failure outside the declared surfaces, return
-an empty edit instead of disguising the problem as another prompt rule. Prefer the smallest surface
-whose behavior can causally affect the selected layer."""
+Route the failure using the attached diagnostic contract before editing. `diagnostic_facets` are
+observed signals, not proven causes. Return an empty edit when the evidence points outside the
+declared harness surfaces. Prefer the smallest surface whose behavior can causally affect the
+selected failure layer."""
 
 REPAIR_SYSTEM_PROMPT = """Repair the attached proposal into exactly one valid JSON object.
 
@@ -77,6 +75,7 @@ def build_atomic_context(workspace: ProposerWorkspace) -> str:
     """Serialize only bounded, visible evidence and current editable surfaces."""
     sections = [
         ("TASK", workspace.root / "task.md"),
+        ("DIAGNOSTIC CONTRACT", workspace.root / "diagnostic_contract.md"),
         ("NORMALIZED EXPERIENCE", workspace.root / "experience" / "records.jsonl"),
         ("FAILURE CLUSTERS", workspace.root / "failure_clusters.json"),
         ("VISIBLE ITERATION HISTORY", workspace.root / "history" / "visible_history.md"),

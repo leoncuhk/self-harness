@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from self_harness.core import CaseOutcome
+from self_harness.diagnostics import DiagnosticContract, FacetRule
 from self_harness.traces import (
     compact_failure_message,
     normalize_outcome,
@@ -20,6 +21,7 @@ def test_normalize_outcome_reads_runner_artifacts(tmp_path: Path):
                 "turns": 14,
                 "tokens": 9000,
                 "tool_usage": {"web_search": 4},
+                "diagnostic_facets": ["submission_not_observed"],
             }
         )
     )
@@ -96,12 +98,34 @@ def test_finance_diagnostic_facets_route_cross_layer_failure(tmp_path: Path):
         artifacts_dir=str(tmp_path),
     )
 
-    assert normalize_outcome(outcome).diagnostic_facets == (
+    finance = DiagnosticContract(
+        name="finance-test",
+        facets=(
+            FacetRule("filing_attachment_resolution", (r"exhibit 99|index\.json",)),
+            FacetRule(
+                "forecast_period_provenance",
+                (r"\bactuals?\b|source period", r"\bguidance\b|forecast"),
+                minimum_matches=2,
+            ),
+            FacetRule(
+                "cash_flow_reconciliation",
+                (r"\bsbc\b", r"\bd&a\b", r"\bnwc\b", r"\bcapex\b", r"\bfcff\b"),
+                minimum_matches=2,
+            ),
+            FacetRule("answer_materialization", (r"component calculation",)),
+        ),
+    )
+
+    assert normalize_outcome(outcome, diagnostics=finance).diagnostic_facets == (
         "answer_materialization",
         "budget_boundary",
         "cash_flow_reconciliation",
         "filing_attachment_resolution",
         "forecast_period_provenance",
+        "numeric_verifier_miss",
+    )
+    assert normalize_outcome(outcome).diagnostic_facets == (
+        "budget_boundary",
         "numeric_verifier_miss",
     )
 

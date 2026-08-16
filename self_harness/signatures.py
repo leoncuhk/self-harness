@@ -32,6 +32,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
+from self_harness.diagnostics import DEFAULT_DIAGNOSTICS, DiagnosticContract
 from self_harness.traces import compact_failure_message, trace_text
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -200,7 +201,11 @@ def strip_scaffolding(failure_message: str | None) -> str:
     return "\n".join(kept).lower()
 
 
-def classify(outcome: CaseOutcome) -> FailureSignature:
+def classify(
+    outcome: CaseOutcome,
+    *,
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
+) -> FailureSignature:
     """Classify one failing outcome into ``φ(r) = (c, q, m)``."""
     if outcome.status == "flaky":
         # Mixed across repeats: the harness-level intervention is stabilisation,
@@ -208,7 +213,7 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
         return FailureSignature(CAUSE_NONDETERMINISTIC, UNDETERMINED, MECH_FLAKY)
 
     text = strip_scaffolding(outcome.failure_message)
-    trace = trace_text(outcome)
+    trace = trace_text(outcome, diagnostics=diagnostics)
     diagnostic_text = f"{text}\n{trace}" if trace else text
     # Surface-load failures are recognised from the whole message: the frame that
     # names middleware.py or tools.py is not on pytest's `E ` lines.
@@ -250,12 +255,16 @@ def classify(outcome: CaseOutcome) -> FailureSignature:
     return FailureSignature(cause, causal_status, mechanism)
 
 
-def cluster_failures(outcomes: Sequence[CaseOutcome]) -> list[FailureCluster]:
+def cluster_failures(
+    outcomes: Sequence[CaseOutcome],
+    *,
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
+) -> list[FailureCluster]:
     """Cluster failing outcomes by exact signature equality, largest first."""
     grouped: dict[str, list[CaseOutcome]] = {}
     signatures: dict[str, FailureSignature] = {}
     for outcome in outcomes:
-        signature = classify(outcome)
+        signature = classify(outcome, diagnostics=diagnostics)
         grouped.setdefault(signature.key, []).append(outcome)
         signatures[signature.key] = signature
 
@@ -280,15 +289,23 @@ def cluster_failures(outcomes: Sequence[CaseOutcome]) -> list[FailureCluster]:
     return clusters
 
 
-def cluster_split(result: SplitResult) -> list[FailureCluster]:
+def cluster_split(
+    result: SplitResult,
+    *,
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
+) -> list[FailureCluster]:
     """Cluster the failing outcomes of one split result."""
-    return cluster_failures(result.failing_outcomes())
+    return cluster_failures(result.failing_outcomes(), diagnostics=diagnostics)
 
 
-def signature_histogram(results: Sequence[SplitResult]) -> dict[str, int]:
+def signature_histogram(
+    results: Sequence[SplitResult],
+    *,
+    diagnostics: DiagnosticContract = DEFAULT_DIAGNOSTICS,
+) -> dict[str, int]:
     """Count signatures across split results, for before/after comparison."""
     counter: Counter[str] = Counter()
     for result in results:
         for outcome in result.failing_outcomes():
-            counter[classify(outcome).key] += 1
+            counter[classify(outcome, diagnostics=diagnostics).key] += 1
     return dict(counter)
