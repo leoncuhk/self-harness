@@ -40,6 +40,48 @@ The human belongs at the criterion/governance boundary, not in routine proposal 
 review can improve safety and evaluator validity, but must not silently tune the same scorecard later
 reported as untouched.
 
+## Project value and intended outcome
+
+The useful product is not merely a better prompt. It is an experimental control plane that converts
+harness engineering from anecdotal tuning into a reproducible search process. Given a fixed
+beneficiary stack and contract, it should answer four questions:
+
+1. Did behavior improve under an evaluator the optimizer could not edit?
+2. Was the gain caused by the harness rather than a stronger model, repaired data route, larger
+   budget, evaluator bug, or stochastic retry?
+3. Did the gain survive adaptive validation, regression, cost, and latency gates?
+4. Can the evidence be replayed, audited, and transferred without importing one benchmark's domain
+   assumptions into the generic Controller?
+
+This gives the project practical value even before autonomous evolution becomes strong. It provides
+shared infrastructure for controlled Agent experiments, preserves negative results, and prevents
+apparatus repairs from being reported as intelligence gains. It also provides the substrate on which
+better proposers, acquisition policies, and inner runtimes can be compared under identical rules.
+
+The intended outcome has two stages. First, establish controlled evidence that a structured harness
+can improve correctness or efficiency for a fixed task stack. Second, make the outer loop discover
+such changes reproducibly and outperform strong human seeds plus equal-budget search baselines. The
+first has bounded FAB evidence; the second remains the central open research objective.
+
+## Evidence taxonomy
+
+The project uses distinct names for distinct forms of progress:
+
+- **Apparatus improvement:** fixes execution, telemetry, evaluator, or frozen data validity. It
+  increases confidence in measurements, not task capability.
+- **Human-directed harness improvement:** a matched control supports harness value, but not
+  autonomous search value.
+- **Autonomous candidate improvement:** the proposer generates a change that clears the frozen
+  promotion contract on replicated train and adaptive validation.
+- **Search-method value:** autonomous evolution beats strong zero-evolution and equal-total-budget
+  retry or Best-of-N.
+- **Generalization and compounding:** a sealed scorecard, new domains or models, and later generations
+  demonstrate increasingly stronger claims.
+
+Software correctness is therefore necessary but never substituted for efficacy. A green suite
+establishes that the experiment can be trusted to run; only controlled task outcomes establish that
+the harness or search method works.
+
 ## What transfers across domains
 
 The reusable object is not a universal prompt or one preferred Agent framework. It is the protocol:
@@ -74,6 +116,9 @@ probably wrong.
 - A better diagnosis vocabulary can reduce wasted search but is not itself improvement. Only a
   candidate that clears frozen train, adaptive-validation, cost, and regression gates is evidence of
   harness efficacy.
+- The current FAB hard-4 result establishes bounded human-directed harness value. It does not raise
+  the autonomous outer loop beyond integration and correct rejection because Pi did not discover
+  the accepted mechanisms.
 
 ## Scientific claim language
 

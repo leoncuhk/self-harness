@@ -2,7 +2,7 @@
 
 The maintained documentation is deliberately small:
 
-1. [Concepts](concepts/overview.md): what self-harness is and is not.
+1. [Concepts](concepts/overview.md): project value, evidence taxonomy, and what self-harness is and is not.
 2. [Architecture](system/architecture.md): ownership and data flow of both loops.
 3. [Verification](evaluation/verification.md): the evidence required for each claim.
 4. [FAB v2 case study](evaluation/fabv2-case-study.md): current measured status.

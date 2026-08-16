@@ -1,7 +1,7 @@
 # Self-Harness
 
-An eval-driven system that improves the engineering harness around a fixed agent. It implements
-two causally separate loops:
+An eval-driven system for searching, validating, and governing changes to the engineering harness
+around a fixed agent. It implements two causally separate loops:
 
 ```text
 product task ──> inner runtime ──> typed evidence + answer/code ──> frozen evaluator
@@ -24,6 +24,41 @@ The repository currently proves three different things at different evidence lev
 - one human-directed harness construction sequence now solves all four sampled hard FAB tasks with
   GPT-5.6-sol + Codex under one harness and data contract (4/4, each 1.0). This is a targeted
   diagnostic result, not an autonomous outer-loop win or an official leaderboard submission.
+
+## Why this project matters
+
+Self-Harness turns informal prompt and workflow tuning into an executable, auditable, and
+falsifiable experiment. Its primary value is not a claim that any agent can already improve itself
+to a global optimum. It is a control system for determining whether an agent system actually became
+better, why it changed, and whether the change survives protected evaluation.
+
+The project contributes four reusable capabilities:
+
+1. **Causal separation.** It distinguishes model capability, data availability, inference budget,
+   apparatus defects, and harness behavior instead of crediting every score increase to evolution.
+2. **Portable optimization infrastructure.** Frozen contracts, train/adaptive-validation/scorecard
+   splits, atomic candidate edits, guards, cost gates, archives, resume, and artifact audits transfer
+   across coding, finance, and future vertical adapters.
+3. **Measured harness value.** The bounded q025 control shows that a harness can change both
+   correctness and efficiency under the same sampled model, tools, data, and timeout.
+4. **Protection against false progress.** Negative and rejected results remain first-class evidence;
+   evaluator repairs, stronger models, extra retries, leakage, and data fixes are not mislabeled as
+   autonomous self-improvement.
+
+Claims are separated by evidence type:
+
+| Observed change | What the evidence supports | What it does not establish |
+|---|---|---|
+| Runner, evaluator, or data-route fix | the apparatus is more trustworthy | harness efficacy |
+| Human-directed harness beats a matched control | bounded causal harness value | autonomous search |
+| Proposer candidate clears frozen train and adaptive validation | domain-level self-improvement | generalization or compounding |
+| Scorecard, new domains, and later generations improve | generalization or recursive compounding at the corresponding level | a global optimum |
+
+The present maturity is deliberately stated conservatively: the software and dual-loop contracts
+are well tested; live Pi proposal and rejection operate correctly; the sampled FAB harness has real
+bounded value; but autonomous FAB search has not yet reached the project's V3 efficacy threshold.
+The long-term goal is to make the final two statements converge—turning improvements that a human
+can diagnose and validate into improvements that the outer loop can discover reproducibly.
 
 ## Runtime adapters
 
@@ -143,11 +178,11 @@ exposed q013's separate historical-market-data and accounting-taxonomy failures.
 
 The current unified strong harness combines the general fixes with evaluator-owned official SEC
 snapshots for the fragile historical facts. Under one rubric-blind GPT-5.6-sol + Codex protocol it
-scored q004=q013=q022=q025=1.0 (4/4). q013 also passed a separate fresh run at 1.0. On the critical
-q025 control, removing the project harness while retaining the same model, tools, data, and budget
-failed at gated 0.0 / ungated 0.6 and used roughly 1.19M input tokens versus the strong harness's
-0.65M. This is evidence that the harness independently helps this sampled task; it is not evidence
-that Pi autonomously discovered the final sequence.
+scored q004=q013=q022=q025=1.0 (4/4). q013 also passed a separate fresh run at 1.0. On critical
+q025, the native control removed the project harness while retaining the same model, tools, data,
+timeout, and evaluator. It failed at gated 0.0 / ungated 0.6 and used roughly 1.19M input tokens
+versus the strong harness's 0.65M. This supports independent harness value on the sampled task; it
+is not evidence that Pi autonomously discovered the final sequence.
 
 These four public tasks were used for diagnosis, so the result is in-sample and cannot establish a
 Public-27 optimum, cross-domain transfer, or leaderboard readiness. The official Vals score remains
