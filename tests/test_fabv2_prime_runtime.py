@@ -13,6 +13,7 @@ from self_harness.fab_policy import parse_fab_policy
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE = ROOT / "benchmarks" / "fabv2" / "workspace"
+sys.path.insert(0, str(WORKSPACE))
 
 
 def _load(name: str, path: Path):

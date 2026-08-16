@@ -1,0 +1,17 @@
+# Unrun publication contract: Public-27 x three repeats, frozen strong harness, Codex inner.
+
+extends = "fabv2_public27_strong.toml"
+
+[experiment]
+name = "fabv2-codex-public27-strong-v1"
+model = "gpt-5.6-sol"
+max_iterations = 0
+repeats = 3
+
+[runner.pytest]
+pytest_args = ["-q", "--max-turns=1", "--max-time=600", "--max-tokens=2000000"]
+case_timeout_s = 660
+
+[runner.pytest.env]
+FABV2_INNER_RUNTIME = "codex"
+CODEX_REASONING_EFFORT = "medium"

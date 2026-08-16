@@ -7,7 +7,7 @@ The maintained documentation is deliberately small:
 3. [Verification](evaluation/verification.md): the evidence required for each claim.
 4. [FAB v2 case study](evaluation/fabv2-case-study.md): current measured status.
 5. [ADR 0001](adr/0001-dual-loop-boundary.md): product/harness separation.
-6. [ADR 0002](adr/0002-agent-runtime-selection.md): current Prime/Pi runtime adapters.
+6. [ADR 0002](adr/0002-agent-runtime-selection.md): replaceable Prime/Codex inner and Pi outer adapters.
 7. [ADR 0003](adr/0003-fab-layered-optimization.md): layered FAB diagnosis and typed evidence.
 8. [ADR 0004](adr/0004-declarative-domain-diagnostics.md): portable domain diagnostic contracts.
 

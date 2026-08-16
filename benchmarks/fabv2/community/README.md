@@ -58,3 +58,9 @@ uv run python scripts/build_fabv2_leaderboard.py submissions/*.json \
 
 `submission.example.json` documents the shape but is intentionally incomplete
 and must not be reported as a result.
+
+`evidence/codex_hard4_v1.json` is a machine-readable, hash-pinned summary of the
+targeted hard-4 diagnostic discussed in the case study. It explicitly records
+that the sequence was human-directed, did not use the autonomous proposer, did
+not complete Public-27, and is not leaderboard-eligible. It is evidence, not a
+community submission.

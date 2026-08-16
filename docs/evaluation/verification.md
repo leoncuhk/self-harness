@@ -55,10 +55,13 @@ rejection at V2. The Public-24 run evaluated six candidates; none satisfied the 
 contract, so the strong human seed remains the best validated harness. FAB efficacy has not reached
 V3.
 
-The separate GPT-5.6-sol + Codex 3/4 diagnostic estimates a stronger model/runtime ceiling. It is not
-placed on this ladder because it changes the beneficiary stack and performs no harness evolution.
-V4 still requires a promoted harness, multiple repeats, and equal-total-budget retry/Best-of-N under
-one fixed stack. See the [case study](fabv2-case-study.md) for exact bounded results.
+The earlier GPT-5.6-sol + Codex 3/4 diagnostic estimated a stronger model/runtime ceiling. After a
+human-directed repair sequence and frozen data fixes, the unified strong harness reached 4/4 on the
+same sampled hard set; a q025 native control failed while using more tokens and time. This is not
+placed on the autonomous-improvement ladder because Pi did not discover the sequence and the
+Public-27 replicated arm has not run. V4 still requires a promoted harness, multiple repeats, and
+equal-total-budget retry/Best-of-N under one fixed stack. See the [case study](fabv2-case-study.md)
+for exact bounded results.
 
 The q025 v5 profile is a replicated single-case success, not a V3 result: it was human-directed, the
 atomic proposer did not autonomously discover the sequence, and one regression control failed while

@@ -1,0 +1,67 @@
+{
+  "evidence_id": "codex-hard4-v1",
+  "status": "targeted-development-diagnostic",
+  "measured_at": "2026-08-16",
+  "claim_scope": {
+    "human_directed_codex_assisted_harness": true,
+    "autonomous_outer_loop_improvement": false,
+    "formal_controller_rerun_completed": false,
+    "public27_complete": false,
+    "official_leaderboard_result": false
+  },
+  "apparatus": {
+    "model": "gpt-5.6-sol",
+    "runtime": "codex-cli-0.147.0",
+    "reasoning_effort": "medium",
+    "timeout_seconds": 600,
+    "judge": "frozen-numeric-diagnostic",
+    "rubric_visible_to_agent": false,
+    "dataset_sha256": "27b48c08a6099bc076b4194cac7cefe295082b9aedcbc67f4fedfa70468b427e",
+    "harness_sha256": "776cf553cee6440460f9c974c4fedb13f2c04ce3e0b53645767ef4574082ff1c",
+    "market_data_sha256": "bcf7275cfeee62835ffb13938b0e17a2db51a85c488eecb236f4bcf5db3370c5",
+    "sec_data_sha256": "d4a3bd0739d8107efb06b14debae8b290635c2bf50be50d7a016ee0f6efcd486"
+  },
+  "strong_harness": [
+    {
+      "qid": "q004",
+      "gated_credit": 1.0,
+      "ungated_credit": 1.0,
+      "input_tokens": 303823,
+      "output_tokens": 4358,
+      "latency_seconds": 122.883
+    },
+    {
+      "qid": "q013",
+      "gated_credit": 1.0,
+      "ungated_credit": 1.0,
+      "input_tokens": 852574,
+      "output_tokens": 9005,
+      "latency_seconds": 250.644
+    },
+    {
+      "qid": "q022",
+      "gated_credit": 1.0,
+      "ungated_credit": 1.0,
+      "input_tokens": 929248,
+      "output_tokens": 9728,
+      "latency_seconds": 243.275
+    },
+    {
+      "qid": "q025",
+      "gated_credit": 1.0,
+      "ungated_credit": 1.0,
+      "input_tokens": 653863,
+      "output_tokens": 11325,
+      "latency_seconds": 277.98
+    }
+  ],
+  "native_control": {
+    "qid": "q025",
+    "gated_credit": 0.0,
+    "ungated_credit": 0.6,
+    "input_tokens": 1192962,
+    "output_tokens": 13927,
+    "latency_seconds": 395.83
+  },
+  "publication_note": "Reviewed summary only; raw answers and traces remain local. This file is not a Public-27 community submission."
+}

@@ -1,0 +1,37 @@
+# Rerun contract for the best measured hard-case stack: strong harness + Codex, no evolution.
+
+extends = "fabv2_smoke.toml"
+
+[experiment]
+name = "fabv2-codex-hard4-v1"
+model = "gpt-5.6-sol"
+max_iterations = 0
+repeats = 1
+
+[runner.pytest]
+pytest_args = ["-q", "--max-turns=1", "--max-time=600", "--max-tokens=2000000"]
+case_timeout_s = 660
+
+[runner.pytest.env]
+FABV2_INNER_RUNTIME = "codex"
+CODEX_REASONING_EFFORT = "medium"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q004]"
+split = "train"
+stratum = "diagnosed-hard"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q013]"
+split = "train"
+stratum = "diagnosed-hard"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q022]"
+split = "holdout"
+stratum = "diagnosed-hard"
+
+[[cases]]
+case_id = "tests/test_fabv2.py::test_question[q025]"
+split = "holdout"
+stratum = "diagnosed-hard"

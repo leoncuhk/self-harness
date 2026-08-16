@@ -1,4 +1,4 @@
-"""Evaluator-owned, key-free finance research tools for the Prime RLM.
+"""Evaluator-owned, key-free finance research tools for FAB inner runtimes.
 
 The outer optimizer may change how these tools are described and orchestrated,
 but it cannot change this capability substrate.  Every call is counted in a

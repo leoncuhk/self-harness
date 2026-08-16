@@ -7,6 +7,8 @@
 - `fabv2_evolve_runtime.toml`: three-repeat outer loop with compiler headroom and machine tool-output policy.
 - `fabv2_evolve_replicated.toml`: three-repeat live evolution contract; use this for promotion claims.
 - `fabv2_public27_strong.toml`: frozen strong harness, Public-27 × three-repeat publication arm.
+- `fabv2_codex_hard4.toml`: Codex rerun contract for the measured hard-4 stack.
+- `fabv2_codex_public27_strong.toml`: unrun Codex Public-27 × three-repeat publication contract.
 - `fabv2_minimal.toml`: zero-evolution minimal FAB comparator.
 - `fabv2.toml`: Public-27 Numeric-24 8/8/8 development protocol.
 - `fabv2_context_v2.toml`: same 8/8/8 contract with aggregate proposer evidence compaction.

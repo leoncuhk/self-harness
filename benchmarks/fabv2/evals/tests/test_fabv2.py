@@ -26,11 +26,18 @@ sys.path.insert(0, str(WORKSPACE))
 sys.path.insert(0, str(ROOT / "frozen"))
 
 import judge  # noqa: E402  (frozen evaluator)
-import prime_runner  # noqa: E402  (workspace module)
 import telemetry  # noqa: E402  (frozen evaluator)
 
+RUNTIME = os.environ.get("FABV2_INNER_RUNTIME", "prime").strip().lower()
+if RUNTIME == "prime":
+    import prime_runner as inner_runner
+elif RUNTIME == "codex":
+    import codex_runner as inner_runner
+else:
+    raise RuntimeError(f"unsupported FABV2_INNER_RUNTIME {RUNTIME!r}")
+
 QUESTIONS = json.loads((ROOT.parent / "questions.json").read_text())
-PROMPT = prime_runner.compose_harness_prompt(WORKSPACE)
+PROMPT = inner_runner.compose_harness_prompt(WORKSPACE)
 CRITERIA_TEXTS = [
     c["text"]
     for q in json.loads((ROOT / "frozen" / "rubrics.json").read_text())
@@ -65,7 +72,7 @@ def test_question(  # noqa: PLR0913 - pytest fixtures define the benchmark contr
     record_metrics,
 ) -> None:
     question = QUESTIONS[qid]
-    out = prime_runner.run_question(
+    out = inner_runner.run_question(
         question,
         model=model,
         log_dir=artifact_dir / "trajectory",

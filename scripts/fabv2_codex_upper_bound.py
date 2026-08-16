@@ -17,9 +17,9 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
-from typing import Any
+
+from self_harness.codex import run_codex_agent
 
 ROOT = Path(__file__).resolve().parents[1]
 FAB_ROOT = ROOT / "benchmarks" / "fabv2"
@@ -88,9 +88,7 @@ def _prepare_workspace(workspace: Path, qid: str, harness_dir: Path | None) -> N
     package.mkdir()
     (package / "__init__.py").write_text("")
     shutil.copy2(ROOT / "self_harness" / "fab_policy.py", package / "fab_policy.py")
-    (workspace / "task.md").write_text(
-        f"# Finance research task\n\n{QUESTIONS[qid].strip()}\n"
-    )
+    (workspace / "task.md").write_text(f"# Finance research task\n\n{QUESTIONS[qid].strip()}\n")
     if harness_dir is not None:
         harness = "\n\n".join(
             f"## {name}\n\n{(workspace / name).read_text().strip()}" for name in SURFACES
@@ -121,18 +119,6 @@ def _prompt(workspace: Path, has_harness: bool) -> str:
     )
 
 
-def _usage(events: list[dict[str, Any]]) -> dict[str, int | None]:
-    for event in reversed(events):
-        usage = event.get("usage")
-        if isinstance(usage, dict):
-            return {
-                "input_tokens": usage.get("input_tokens"),
-                "cached_input_tokens": usage.get("cached_input_tokens"),
-                "output_tokens": usage.get("output_tokens"),
-            }
-    return {"input_tokens": None, "cached_input_tokens": None, "output_tokens": None}
-
-
 def _run_case(  # noqa: PLR0913 - explicit fields are part of the recorded protocol
     *,
     qid: str,
@@ -148,65 +134,29 @@ def _run_case(  # noqa: PLR0913 - explicit fields are part of the recorded proto
     case_dir.mkdir(parents=True, exist_ok=True)
     _prepare_workspace(workspace, qid, harness_dir)
     last_message = case_dir / "last_message.md"
-    command = [
-        "codex",
-        "exec",
-        "--model",
-        model,
-        "--ephemeral",
-        "--skip-git-repo-check",
-        "--ignore-rules",
-        "--sandbox",
-        "workspace-write",
-        "--config",
-        f'model_reasoning_effort="{effort}"',
-        "--json",
-        "--output-last-message",
-        str(last_message),
-        "--cd",
-        str(workspace),
-        _prompt(workspace, harness_dir is not None),
-    ]
-    (case_dir / "command.json").write_text(json.dumps(command, indent=2) + "\n")
     env = os.environ.copy()
     env["FAB_TOOLS_CACHE"] = str(workspace / ".fab-cache")
     env["FAB_TOOLS_USAGE_FILE"] = str(workspace / "tool_usage.json")
     env["FAB_MARKET_DATA"] = str(workspace / "market_data.json")
     env["FAB_SEC_DATA"] = str(workspace / "sec_data.json")
-    started = time.monotonic()
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=workspace,
-            env=env,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=timeout_s,
-        )
-        returncode = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as exc:
-        returncode = 124
-        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        raw_stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        stderr = f"{raw_stderr}\nCodex case timed out after {timeout_s}s".strip()
-    duration_s = time.monotonic() - started
-    (case_dir / "stdout.jsonl").write_text(stdout)
-    (case_dir / "stderr.log").write_text(stderr)
-    events = []
-    for line in stdout.splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(event, dict):
-            events.append(event)
+    run = run_codex_agent(
+        model=model,
+        prompt=_prompt(workspace, harness_dir is not None),
+        cwd=workspace,
+        output_last_message=last_message,
+        timeout_s=timeout_s,
+        reasoning_effort=effort,
+        env=env,
+    )
+    (case_dir / "command.json").write_text(json.dumps(list(run.argv), indent=2) + "\n")
+    (case_dir / "stdout.jsonl").write_text(
+        "".join(json.dumps(event) + "\n" for event in run.events)
+    )
+    (case_dir / "stderr.log").write_text(run.stderr)
     answer_path = workspace / "final_answer.md"
     answer = answer_path.read_text().strip() if answer_path.exists() else ""
-    if not answer and last_message.exists():
-        answer = last_message.read_text().strip()
+    if not answer:
+        answer = run.final_text
     (case_dir / "answer.txt").write_text(answer + ("\n" if answer else ""))
 
     sys.path.insert(0, str(FAB_ROOT / "evals" / "frozen"))
@@ -221,14 +171,14 @@ def _run_case(  # noqa: PLR0913 - explicit fields are part of the recorded proto
         "model": model,
         "runtime": "codex-cli",
         "harness": harness_label,
-        "returncode": returncode,
-        "duration_s": round(duration_s, 3),
+        "returncode": run.returncode,
+        "duration_s": round(run.duration_s, 3),
         "answer_chars": len(answer),
         "passed": bool(verdict["partial_credit"] >= 0.75),
         "partial_credit": verdict["partial_credit"],
         "ungated_credit": verdict["ungated_credit"],
         "numeric_criterion_recall": verdict["numeric_criterion_recall"],
-        "usage": _usage(events),
+        "usage": run.usage,
     }
     (case_dir / "result.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     return result
@@ -315,9 +265,7 @@ def main() -> int:
         "ungated_credit": sum(item["ungated_credit"] for item in results) / len(results),
         "results": results,
     }
-    (output_dir / "summary.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n"
-    )
+    (output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 

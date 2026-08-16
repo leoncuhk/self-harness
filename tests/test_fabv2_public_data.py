@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -47,9 +48,11 @@ def test_public27_has_three_questions_in_each_of_nine_categories():
     assert set(manifest["categories"].values()) == {3}
 
 
-def test_prime_runtime_replaces_the_archived_official_harness():
+def test_runtime_adapters_replace_the_archived_official_harness():
     workspace = ROOT / "benchmarks" / "fabv2" / "workspace"
     assert (workspace / "prime_runner.py").exists()
+    assert (workspace / "codex_runner.py").exists()
+    assert (workspace / "harness_runtime.py").exists()
     assert (workspace / "fab_tools.py").exists()
     assert (workspace / "model_provider.ts").exists()
     assert (workspace / "runtime_policy.ts").exists()
@@ -174,3 +177,44 @@ def test_public27_publication_arm_is_complete_and_frozen():
     assert {case.case_id.rsplit("[", 1)[-1].removesuffix("]") for case in experiment.cases} == {
         f"q{index:03d}" for index in range(1, 28)
     }
+
+
+def test_published_hard4_evidence_is_scoped_and_pinned():
+    root = ROOT / "benchmarks" / "fabv2"
+    evidence = json.loads(
+        (root / "community" / "evidence" / "codex_hard4_v1.json").read_text()
+    )
+    scope = evidence["claim_scope"]
+    assert scope == {
+        "human_directed_codex_assisted_harness": True,
+        "autonomous_outer_loop_improvement": False,
+        "formal_controller_rerun_completed": False,
+        "public27_complete": False,
+        "official_leaderboard_result": False,
+    }
+    digest = hashlib.sha256()
+    for name in (
+        "system.md",
+        "orchestration.md",
+        "tools.md",
+        "research.md",
+        "evidence.md",
+        "subagents.md",
+        "verification.md",
+        "submission.md",
+    ):
+        digest.update(name.encode())
+        digest.update((root / "harnesses" / "strong" / name).read_bytes())
+    apparatus = evidence["apparatus"]
+    manifest = json.loads((root / "data" / "manifest.json").read_text())
+    assert manifest["source_sha256"] == apparatus["dataset_sha256"]
+    assert digest.hexdigest() == apparatus["harness_sha256"]
+    assert hashlib.sha256((root / "workspace" / "market_data.json").read_bytes()).hexdigest() == (
+        apparatus["market_data_sha256"]
+    )
+    assert hashlib.sha256((root / "workspace" / "sec_data.json").read_bytes()).hexdigest() == (
+        apparatus["sec_data_sha256"]
+    )
+    assert len(evidence["strong_harness"]) == 4
+    assert all(item["gated_credit"] == item["ungated_credit"] == 1.0 for item in evidence["strong_harness"])
+    assert evidence["native_control"]["gated_credit"] == 0.0

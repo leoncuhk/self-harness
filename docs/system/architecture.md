@@ -28,7 +28,7 @@
 
 Only the Controller promotes a candidate. No runtime or proposer can change the goal, task
 assignment, evaluator, model route, inference budget, data plane, resource gate, scorecard, or
-historical archive. Prime and Pi are current adapters, not architectural authorities.
+historical archive. Prime, Codex, and Pi are adapters, not architectural authorities.
 
 The system has four intentionally small planes:
 
@@ -59,11 +59,13 @@ prompt prose when the model cannot perform the task or the required source is un
 
 ## Inner loop
 
-Each rollout starts from a private harness snapshot and fresh agent process. FAB currently uses
-Prime because the task benefits from persistent IPython state and optional `rlm(...)` specialists;
-another runtime is valid if it satisfies the same artifact and budget contract. The host enforces
-time/token/turn ceilings, attributes child usage, persists full telemetry, and reserves a separate
-no-tool compiler so a research cutoff does not force an empty answer.
+Each rollout starts from a private harness snapshot and fresh agent process. FAB has two formal inner
+adapters. Prime is the lower-cost research baseline with persistent IPython state, optional
+`rlm(...)` specialists, and a reserved no-tool compiler. Codex is the current high-capability path
+and measured best stack. The experiment selects either adapter through a fingerprinted environment
+field; both return the same answer and telemetry contract to the frozen evaluator. Prime supports
+host-enforced time/token/turn ceilings. Codex currently supports a host-enforced wall-time ceiling
+and post-run token accounting, so a Codex experiment must not claim a hard token/turn cutoff.
 
 The target FAB inner flow is structured rather than a free-form research transcript:
 

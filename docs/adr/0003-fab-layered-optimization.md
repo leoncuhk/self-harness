@@ -51,10 +51,9 @@ global promotion.
 - SEC filings, market prices, and other evaluation inputs should come from a versioned host service
   or immutable snapshot with recorded content hashes. Agent-sandbox networking is not an adequate
   experimental data plane.
-- Prime is the current FAB inner adapter and Pi the current atomic proposer. Codex is useful as a
-  ceiling diagnostic. None is part of the domain-independent architecture.
+- Prime and Codex are formal FAB inner adapters and Pi is the current atomic proposer. Codex is the
+  measured best beneficiary stack. None is part of the domain-independent architecture.
 - q025 v5 stays experimental until replicated train and adaptive-validation controls pass under one
   frozen data plane. A successful training case is not a globally promoted harness.
 - Bayesian or LLM-guided acquisition becomes useful only after enough comparable candidates exist;
   it does not repair weak measurements or replace the promotion gate.
-

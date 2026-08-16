@@ -27,13 +27,22 @@ The repository currently proves three different things at different evidence lev
 
 ## Runtime adapters
 
-- **Prime Agent is the current inner adapter** for FAB: persistent IPython state, evaluator-owned finance
-  tools, optional `rlm(...)` specialists, evidence memory, verification, and a reserved compiler.
+- **Prime Agent is the research-baseline inner adapter** for FAB: persistent IPython state,
+  evaluator-owned finance tools, optional `rlm(...)` specialists, evidence memory, verification,
+  and a reserved compiler.
+- **Codex is the current high-capability inner adapter** and the measured best FAB stack. It uses
+  the same materialized harness, tools, frozen evaluator, telemetry shape, and Controller path as
+  Prime; it is selected by the experiment contract rather than a side script.
 - **Pi is the current outer adapter**: one tool-free model call returns an atomic JSON candidate. This is
   intentionally smaller than a coding-agent loop because the Controller already provides bounded,
   normalized evidence. Invalid, partial, or undeclared edits are rejected before evaluation.
 - **DeepAgents is not required.** It was useful background, but adds an unnecessary framework and
   dependency boundary to this implementation.
+
+The recorded hard-4 result predates the formal Codex Controller adapter and was produced by the
+rubric-blind diagnostic wrapper. Its answers were re-scored offline and its harness/data hashes
+still match the repository. `fabv2_codex_hard4.toml` is an unrun rerun contract; adapter equivalence
+is covered by tests, not misreported as a second live result.
 
 The architecture does not depend on any of these frameworks. Plain Python owns the causal control
 plane; agent frameworks are replaceable execution adapters. Before search, the system distinguishes a weak
@@ -54,12 +63,13 @@ See [architecture](docs/system/architecture.md), [concepts](docs/concepts/overvi
 
 ## Quick start
 
-Requirements: Python 3.12+, `uv`, Prime Agent for FAB inner runs, Pi for live outer proposals, and
-credentials for the configured model route.
+Requirements: Python 3.12+, `uv`, Prime Agent or Codex CLI for the selected FAB inner runtime, Pi
+for live outer proposals, and credentials for the configured model route.
 
 ```bash
 uv sync --extra dev
 uv run self-harness validate configs/coding_demo.toml
+uv run self-harness validate configs/fabv2_codex_hard4.toml
 uv run pytest -q
 uv run ruff check .
 ```
@@ -82,6 +92,10 @@ scripts/run_fabv2.sh run configs/fabv2_evolve_smoke.toml \
 
 # Public-27 8/8/8 development protocol
 scripts/run_fabv2.sh run configs/fabv2.toml --output-dir runs/fabv2
+
+# Rerun the measured hard-4 stack through the formal Controller path
+scripts/run_fabv2.sh run configs/fabv2_codex_hard4.toml \
+  --output-dir runs/fabv2-codex-hard4
 ```
 
 The launcher exports values from the ignored local `.env` before starting subprocesses; plain
@@ -96,7 +110,7 @@ Best-of-N comparator with multiple repeats before opening the scorecard.
 ```text
 self_harness/     frozen controller, gates, evidence, and runtime adapters
 benchmarks/coding/  deterministic product-development dual-loop fixture
-benchmarks/fabv2/   Public-27 data, Prime inner runtime, harnesses, frozen evaluator
+benchmarks/fabv2/   Public-27 data, inner adapters, harnesses, frozen evaluator
 configs/            executable experiment contracts
 docs/               current concepts, architecture decisions, and evidence limits
 scripts/            independent artifact audit and FAB leaderboard utilities

@@ -15,20 +15,12 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from harness_runtime import SURFACE_FILES, compose_harness_prompt
+
 from self_harness.fab_policy import load_fab_policy
 from self_harness.prime import PrimeRunResult, run_prime_agent
 
 WORKSPACE = Path(__file__).resolve().parent
-SURFACE_FILES = (
-    "system.md",
-    "orchestration.md",
-    "tools.md",
-    "research.md",
-    "evidence.md",
-    "subagents.md",
-    "verification.md",
-    "submission.md",
-)
 RUNTIME_FILES = (
     "runtime_policy.json",
     "runtime_policy.ts",
@@ -41,18 +33,6 @@ _TICKER_PATTERN = re.compile(
     r"\b(?:NASDAQ|NYSE)\s*:\s*([A-Z][A-Z0-9.-]{0,9})\b",
     re.IGNORECASE,
 )
-
-
-def compose_harness_prompt(root: Path) -> str:
-    """Compose all non-empty declared surfaces in a stable order."""
-    parts = []
-    for name in SURFACE_FILES:
-        path = root / name
-        if not path.exists() or not (content := path.read_text().strip()):
-            continue
-        title = name.removesuffix(".md").replace("_", " ").title()
-        parts.append(f"## {title}\n{content}")
-    return "\n\n".join(parts).strip() + "\n"
 
 
 def _command() -> object | None:
