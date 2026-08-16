@@ -35,6 +35,7 @@ RUNTIME_FILES = (
     "fab_tools.py",
     "market_data.json",
     "model_provider.ts",
+    "sec_data.json",
 )
 _TICKER_PATTERN = re.compile(
     r"\b(?:NASDAQ|NYSE)\s*:\s*([A-Z][A-Z0-9.-]{0,9})\b",

@@ -95,6 +95,66 @@ def test_price_history_prefers_complete_frozen_official_series(tmp_path: Path, m
     assert json.loads(ledger.read_text())["calls"] == {"price_history": 1}
 
 
+def test_sec_filings_resolves_delisted_ticker_from_frozen_index(tmp_path: Path, monkeypatch):
+    ledger = tmp_path / "usage.json"
+    source = tmp_path / "sec.json"
+    source.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "filing_coverage": [
+                    {
+                        "ticker": "OLD",
+                        "company": "Old Issuer",
+                        "cik": "0000000001",
+                        "form_type": "10-K",
+                        "coverage_start": "2025-01-01",
+                        "coverage_end": "2025-12-31",
+                        "filings": [
+                            {
+                                "filed_at": "2025-02-01",
+                                "period_ending": "2024-12-31",
+                                "document_url": "https://example.test/10k",
+                                "index_url": "https://example.test/index",
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
+    monkeypatch.setenv("FAB_SEC_DATA", str(source))
+    monkeypatch.setattr(fab_tools, "_http", lambda _url: pytest.fail("live SEC lookup used"))
+
+    rows = fab_tools.sec_filings(
+        "old", form_type="10-K", start_date="2025-01-01", end_date="2025-03-01"
+    )
+
+    assert rows[0]["cik"] == "0000000001"
+    assert rows[0]["document_url"] == "https://example.test/10k"
+    assert rows[0]["source_type"] == "evaluator_frozen_sec_index"
+
+
+def test_http_prefers_frozen_official_document_extract(tmp_path: Path, monkeypatch):
+    source = tmp_path / "sec.json"
+    source.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "document_extracts": [
+                    {"url": "https://example.test/10k", "body": "<p>Revenue 42</p>"}
+                ],
+            }
+        )
+    )
+    monkeypatch.setenv("FAB_SEC_DATA", str(source))
+    monkeypatch.setenv("FAB_TOOLS_OFFLINE", "1")
+    monkeypatch.setenv("FAB_TOOLS_CACHE", str(tmp_path / "cache"))
+
+    assert fab_tools._http("https://example.test/10k") == b"<p>Revenue 42</p>"  # noqa: SLF001
+
+
 def test_full_page_search_finds_text_beyond_fetch_prefix(tmp_path: Path, monkeypatch):
     ledger = tmp_path / "usage.json"
     monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))

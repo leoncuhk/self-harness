@@ -107,6 +107,24 @@ def _cache_root() -> Path:
     return path
 
 
+def _sec_data() -> dict[str, Any]:
+    path = Path(os.environ.get("FAB_SEC_DATA", Path(__file__).with_name("sec_data.json")))
+    if not path.is_file():
+        return {"schema_version": 1}
+    payload = json.loads(path.read_text())
+    if payload.get("schema_version") != 1:
+        message = "unsupported SEC-data schema"
+        raise ValueError(message)
+    return payload
+
+
+def _frozen_document(url: str) -> bytes | None:
+    for document in _sec_data().get("document_extracts", []):
+        if document.get("url") == url:
+            return str(document["body"]).encode()
+    return None
+
+
 def _offline() -> bool:
     return os.environ.get("FAB_TOOLS_OFFLINE", "").strip().lower() in {
         "1",
@@ -117,6 +135,8 @@ def _offline() -> bool:
 
 
 def _http(url: str) -> bytes:
+    if (frozen := _frozen_document(url)) is not None:
+        return frozen
     cached = _cache_root() / hashlib.sha256(url.encode()).hexdigest()
     if cached.exists():
         return cached.read_bytes()
@@ -236,6 +256,31 @@ def sec_filings(
             raise ValueError(f"invalid ticker {ticker!r}")  # noqa: TRY301 - common audit path
         start = _date(start_date)
         end = min(_date(end_date), MAX_END_DATE)
+        for coverage in _sec_data().get("filing_coverage", []):
+            if (
+                str(coverage.get("ticker", "")).upper() == symbol
+                and coverage.get("form_type") == form_type
+                and str(coverage.get("coverage_start", "")) <= start
+                and end <= str(coverage.get("coverage_end", ""))
+            ):
+                limit = max(1, min(top_n, 50))
+                rows = [
+                    {
+                        "ticker": symbol,
+                        "company": coverage["company"],
+                        "cik": coverage["cik"],
+                        "form_type": form_type,
+                        "filed_at": filing["filed_at"],
+                        "period_ending": filing["period_ending"],
+                        "document_url": filing["document_url"],
+                        "index_url": filing["index_url"],
+                        "source_type": "evaluator_frozen_sec_index",
+                    }
+                    for filing in coverage.get("filings", [])
+                    if start <= filing["filed_at"] <= end
+                ][:limit]
+                _record("sec_filings")
+                return rows
         tickers = json.loads(_http(TICKERS_URL))
         company = next(
             (
