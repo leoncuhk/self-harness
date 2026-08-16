@@ -107,5 +107,11 @@ stack is a major bottleneck, not that model choice alone explains every failure.
 evolved-harness win nor an official leaderboard score. Exact evidence and limitations are in the
 [FAB v2 case study](docs/evaluation/fabv2-case-study.md).
 
+The human-directed, Codex-assisted q025 diagnostic case subsequently produced an experimental forecast-provenance harness that
+passes q025 at 1.000 in 3/3 independent Codex repeats, up from two clean baseline failures. It is
+kept under `benchmarks/fabv2/harnesses/experimental/` rather than promoted because one of three
+one-repeat regression controls failed. This is a successful local harness-construction example, not
+yet a globally better FAB harness.
+
 Process and workspace isolation are not a hostile-code sandbox. Live agents still require an OS or
 container boundary, least-privilege credentials, and an explicit network policy.

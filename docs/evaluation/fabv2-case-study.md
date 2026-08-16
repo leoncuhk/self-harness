@@ -72,6 +72,54 @@ An earlier `v1` diagnostic is invalid apparatus evidence: its usage-ledger path 
 writable sandbox. It is retained locally only to preserve the failure history and is not included in
 the result.
 
+### Direct native-Codex control on q025
+
+`runs/fabv2-codex-native-q025-v1` removed the project strong harness and gave a fresh, rubric-blind
+Codex process only q025, the public tools, and the output contract. This one pre-registered attempt
+also failed: 0.000 gated credit, 0.400 ungated credit, 0.4615 numeric recall, 335.3 seconds, and a
+normal process exit. It estimated $237.96 billion instead of approximately $239.207 billion.
+
+The native and strong-harness Codex attempts independently made the same substantive choice: they
+used FY2027 guidance percentages to construct operating margin, D&A, restructuring, SBC, and CapEx,
+rather than carrying forward the requested FY2026 actual base. Removing Prime and removing the
+project harness therefore do not solve q025. This is evidence of a stable task-interpretation error
+under the sampled GPT-5.6-sol stack.
+
+### q025 diagnostic micro-evolution
+
+A human-directed, Codex-assisted frozen sequence then tested whether general harness construction could repair q025 without
+encoding Salesforce, FY2026, q025, or target numbers. Each revision addressed the newly observed
+failure mechanism; semantically identical retries were not used.
+
+| Arm | New general mechanism | Gated / ungated | Result |
+|---|---|---:|---|
+| Native Codex | no project harness | 0.000 / 0.400 | wrong guidance-period ratios |
+| Strong harness | existing project seed | 0.467 / 0.467 | wrong guidance-period ratios |
+| v1 | forecast source-period provenance | 0.000 / 0.333 | chose actuals but invented missing inputs |
+| v2 | resolve 8-K exhibits through filing index | 0.000 / 0.333 | used unavailable HTML index, fell back to FY2025 |
+| v3 | deterministic `<accession>/index.json` route | 0.733 / 0.733 | exact EV; three subtotals not materialized |
+| v4 | explicit derived subtotal/sign compiler | 0.000 / 0.600 | incorrectly deducted SBC a second time |
+| **v5** | FCFF noncash reconciliation invariant | **1.000 / 1.000** | **13/13 criteria, both MUST criteria passed** |
+
+The frozen v5 profile then passed q025 in two additional independent repeats: **3/3 passes, all at
+1.000**, with wall times of 251.9, 295.9, and 273.4 seconds. This is strong evidence that harness
+construction fixed the known training case, not merely a lucky single rollout. The reusable changes
+span four surfaces: forecast provenance in orchestration, SEC exhibit discovery in tools, noncash
+FCFF reconciliation in verification, and explicit subtotal/sign materialization in submission.
+
+The negative control is equally important. On three tasks previously passed by the strong harness,
+v5 scored q004=1.000, q013=0.600 (failed), and q022=0.900. q013's `price-history` calls were blocked
+inside the isolated workspace and the fallback source returned a different unaffected price; the new
+forecast rules were not active on that task. This looks more like data-route variance than a direct
+policy conflict, but the frozen no-regression gate cannot waive it after seeing the result.
+
+Therefore v5 is archived at
+`benchmarks/fabv2/harnesses/experimental/forecast-provenance-v1` as a successful q025 case study,
+but it is **not promoted** over `harnesses/strong`. A global promotion requires replicated controls
+with a frozen data plane and non-degrading adaptive validation. This sequence demonstrates what a
+good outer loop must discover, but it is not evidence that the current atomic Pi proposer discovered
+the chain autonomously.
+
 ## What is and is not established
 
 - The controller, frozen boundary, atomic proposer, guards, resume logic, scorecard isolation,
