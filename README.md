@@ -4,11 +4,11 @@ An eval-driven system that improves the engineering harness around a fixed agent
 two causally separate loops:
 
 ```text
-product task ──> Prime inner runtime ──> answer or code change ──> frozen evaluator
-                     ▲                                         │
-                     │ candidate harness                       │ visible train evidence
-                     │                                         ▼
-              frozen controller <── atomic Pi proposer <── diagnostics
+product task ──> inner runtime ──> typed evidence + answer/code ──> frozen evaluator
+                    ▲                                                 │
+                    │ candidate harness                              │ visible train evidence
+                    │                                                 ▼
+             frozen controller <── outer proposer <── layer diagnosis
 ```
 
 The Controller alone owns the goal, splits, evaluator, model, budgets, guards, archive, and
@@ -16,15 +16,21 @@ promotion decision. The proposer may change only declared harness surfaces. “B
 validated candidate found under one recorded contract and budget; it never means a global optimum
 or an official FAB leaderboard result.
 
-## Runtime choice
+## Runtime adapters
 
-- **Prime Agent is the inner runtime** for FAB: persistent IPython state, evaluator-owned finance
+- **Prime Agent is the current inner adapter** for FAB: persistent IPython state, evaluator-owned finance
   tools, optional `rlm(...)` specialists, evidence memory, verification, and a reserved compiler.
-- **Pi is the outer proposer**: one tool-free model call returns an atomic JSON candidate. This is
+- **Pi is the current outer adapter**: one tool-free model call returns an atomic JSON candidate. This is
   intentionally smaller than a coding-agent loop because the Controller already provides bounded,
   normalized evidence. Invalid, partial, or undeclared edits are rejected before evaluation.
 - **DeepAgents is not required.** It was useful background, but adds an unnecessary framework and
   dependency boundary to this implementation.
+
+The architecture does not depend on any of these frameworks. Before search, it distinguishes a weak
+beneficiary model or broken data route from an evolvable orchestration, finance-semantics,
+verification, or compiler failure. FAB candidates should pass typed source-period provenance,
+calculation, invariant, and answer-manifest artifacts through that inner flow; external market data
+must be frozen before a global promotion claim is credible.
 
 See [architecture](docs/system/architecture.md), [concepts](docs/concepts/overview.md), and the
 [verification standard](docs/evaluation/verification.md).
@@ -111,7 +117,8 @@ The human-directed, Codex-assisted q025 diagnostic case subsequently produced an
 passes q025 at 1.000 in 3/3 independent Codex repeats, up from two clean baseline failures. It is
 kept under `benchmarks/fabv2/harnesses/experimental/` rather than promoted because one of three
 one-repeat regression controls failed. This is a successful local harness-construction example, not
-yet a globally better FAB harness.
+yet a globally better FAB harness. The resulting layered optimization decision is recorded in
+[ADR 0003](docs/adr/0003-fab-layered-optimization.md).
 
 Process and workspace isolation are not a hostile-code sandbox. Live agents still require an OS or
 container boundary, least-privilege credentials, and an explicit network policy.

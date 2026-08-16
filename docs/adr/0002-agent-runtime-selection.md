@@ -1,13 +1,14 @@
-# ADR 0002: Prime inner, atomic Pi outer
+# ADR 0002: Prime inner and atomic Pi outer adapters
 
 - Status: accepted
 - Date: 2026-08-15
 
 ## Decision
 
-Use Prime Agent for the FAB inner runtime. Use Pi for a single tool-free atomic outer proposal. Keep
-the framework-neutral Controller as the sole evaluation and selection authority. DeepAgents is not a
-runtime dependency.
+Use Prime Agent as the current FAB inner adapter. Use Pi as the current single-call, tool-free outer
+proposal adapter. Keep the framework-neutral Controller as the sole evaluation and selection
+authority. DeepAgents is not a runtime dependency. These choices may be replaced without changing
+the experiment or artifact contracts.
 
 ## Evidence
 
@@ -30,6 +31,10 @@ in one call, 17,224 tokens, and 58.7 seconds on the same model route.
 - Runtime popularity is not evidence. Prime/Pi versions and model routes remain recorded in run
   artifacts, and efficacy still depends on candidate evaluation.
 - Prime and Pi process isolation is not a security sandbox.
+- Codex may diagnose a beneficiary ceiling, but changing model and runtime defines a different arm;
+  it cannot establish self-harness efficacy for the original stack.
+- Domain structure and frozen data access belong to the controller/benchmark contract, not to a
+  framework. See ADR 0003.
 
 ## Sources
 
