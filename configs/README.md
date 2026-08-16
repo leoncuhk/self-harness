@@ -5,7 +5,8 @@
 - `fabv2_evolve_smoke.toml`: one train/validation/scorecard mechanism check.
 - `fabv2_replicate_strong.toml`: three-repeat strong-seed comparator on the preflight cases.
 - `fabv2_evolve_runtime.toml`: three-repeat outer loop with compiler headroom and machine tool-output policy.
-- `fabv2_evolve_replicated.toml`: three-repeat live evolution contract; use this for promotion claims.
+- `fabv2_evolve_replicated.toml`: three-repeat live evolution contract with matched-question,
+  family-wise uncertainty gating; use this for provisional promotion claims.
 - `fabv2_public27_strong.toml`: frozen strong harness, Public-27 × three-repeat publication arm.
 - `fabv2_codex_hard4.toml`: Codex rerun contract for the measured hard-4 stack.
 - `fabv2_codex_public27_strong.toml`: unrun Codex Public-27 × three-repeat publication contract.

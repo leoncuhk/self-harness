@@ -3,30 +3,20 @@
 ## Ownership boundary
 
 ```text
-┌───────────────────────────────────────────────────────────────┐
-│ Frozen Self-Harness Controller                                │
-│ goal · splits · model · budgets · evaluator · guards · gate   │
-│ run · diagnose · aggregate telemetry · archive · select       │
-└──────────────────────────────┬────────────────────────────────┘
-                               │ bounded visible train evidence
-                    ┌──────────▼──────────┐
-                    │ Outer Proposer     │
-                    │ diagnose one layer │
-                    │ JSON patch + claim │
-                    └──────────┬──────────┘
-                               │ validated declared surfaces
-┌──────────────────────────────▼────────────────────────────────┐
-│ Evolvable Inner Runtime                                       │
-│ obligations → evidence/provenance → calculations/invariants   │
-│ orchestrator · specialists · verification · answer compiler   │
-└──────────────────────────────┬────────────────────────────────┘
-                               │ answer/product diff + telemetry
-                    ┌──────────▼──────────┐
-                    │ Frozen Evaluator   │
-                    └────────────────────┘
+                         immutable control plane
+        goal / splits / evaluator / budget / permissions / audit
+                                  │
+                                  ▼
+product task ──> inner agent ──> answer/code + full telemetry ──> frozen evaluation
+                    ▲                                             │
+                    │                                             ▼
+              current harness                         layered failure evidence
+                    ▲                                             │
+                    └── outer loop: diagnose → propose → experiment → promote/reject
 ```
 
-Only the Controller promotes a candidate. No runtime or proposer can change the goal, task
+The upper row is an ownership boundary, not an instruction prompt. Only the Controller promotes a
+candidate. No runtime or proposer can change the goal, task
 assignment, evaluator, model route, inference budget, data plane, resource gate, scorecard, or
 historical archive. Prime, Codex, and Pi are adapters, not architectural authorities.
 
@@ -101,15 +91,26 @@ open-ended coding-agent file loop adds cost and failure modes without useful cap
 
 ## Selection
 
-A candidate must pass static path/leak/syntax/growth guards, improve the primary train objective by
-the frozen floor, avoid pass and constraint regressions, remain inside cost/latency ceilings, and
-satisfy the same rule on adaptive validation. Cheap train smoke precedes validation; replicated
-confirmation is required for a finalist. At most one candidate is promoted per generation.
+A candidate must pass static path/leak/syntax/growth guards, improve the primary objective by the
+frozen floor, avoid pass and constraint regressions, and remain inside cost/latency ceilings.
+Publication-grade contracts additionally match incumbent and candidate by question, resample
+question clusters, and require the family-wise confidence interval to clear the effect floor on
+adaptive validation. The correction uses the maximum candidate comparisons declared before the run;
+the optimizer cannot gain significance by silently trying more variants. At most one candidate is
+provisionally promoted per generation.
 
-The scorecard is unavailable to the proposer and does not participate in selection. Because
+Matched questions are not claimed to be paired hidden randomness. Repeats remain independent model
+executions unless a provider exposes a reliable seed. The estimate therefore reports question-level
+uncertainty and provenance honestly rather than manufacturing stronger causal language.
+
+The scorecard is unavailable to the proposer and does not participate in adaptive selection. Because
 validation is consulted repeatedly, it is called adaptive validation rather than an untouched
 holdout. Every decision, rejected candidate, prediction, resource measurement, and lineage edge is
 retained for replay.
+
+An adaptive-validation winner is a **provisional promotion**. A **confirmed release** additionally
+requires the pre-registered replicated confirmation/scorecard protocol. This distinction prevents a
+run-local winner from being presented as a publication result.
 
 A reported search win also needs a strong zero-evolution baseline and an equal-total-budget
 retry/Best-of-N arm. Otherwise an apparent evolutionary gain may be ordinary stochastic resampling.

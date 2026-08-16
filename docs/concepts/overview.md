@@ -21,6 +21,34 @@ the sole authority on whether its own evaluator remains valid. A credible loop t
 external anchor it cannot edit: frozen tests, formal proof, private data, physical measurement, or
 human governance.
 
+This is the project's low-entropy definition:
+
+> Self-harness is evaluator-grounded evolution of persistent agent-system artifacts under an
+> immutable control plane.
+
+The evaluator need not be handwritten or manual. Test generation, differential testing, formal
+checking, metamorphic testing, and red-team evaluation can all be automated. What remains external is
+the authority over the goal, evaluator validity, protected evidence, permissions, and claim policy.
+The system automates search; it does not get unilateral authority to redefine success.
+
+## Three independent axes, not one L0-L5 ladder
+
+A single ladder that mixes answer revision, memory, programs, harnesses, optimizers, and weights
+incorrectly implies that every step is a more capable superset of the previous one. Classify a system
+on three independent axes instead:
+
+| Axis | Question | Examples |
+|---|---|---|
+| Update target | What persists across generations? | answer, memory/wiki, task program, harness, optimizer, weights |
+| Loop closure | Which operations are autonomous? | propose, execute, evaluate, select, persist, meta-update |
+| Evidence strength | Why believe the change is better? | formal proof, executable verifier, sealed data, rubric/judge, intrinsic signal |
+
+Recursive status is a separate causal property: the edited component must participate in producing
+the next edit. Strong RSI additionally requires controlled evidence that improvement efficiency per
+unit budget increases across generations and transfers beyond the tasks used to select it. Editing a
+harness that is reused next round creates a recursive path; it does not by itself prove recursive
+acceleration.
+
 ## Relationship to recursive self-improvement
 
 Self-harness is recursive artifact improvement: the system changes machinery that shapes its own
@@ -28,6 +56,15 @@ future behavior. It is not automatically strong recursive self-improvement. That
 requires controlled evidence that an improved system becomes better at producing further
 improvements and that gains compound across generations. One accepted edit, repeated search, or a
 higher benchmark score is insufficient.
+
+```text
+edited component
+      ├── does not produce the next edit ──> persistent artifact improvement
+      └── participates in the next edit
+              ├── task score improves only ──> system-level self-improvement
+              └── later improvement/unit-budget also improves,
+                  under equal-budget hidden tests and across generations ──> RSI evidence
+```
 
 ## Why two loops
 
@@ -72,11 +109,19 @@ The project uses distinct names for distinct forms of progress:
 - **Human-directed harness improvement:** a matched control supports harness value, but not
   autonomous search value.
 - **Autonomous candidate improvement:** the proposer generates a change that clears the frozen
-  promotion contract on replicated train and adaptive validation.
+  promotion contract on replicated train and adaptive validation. This is a provisional promotion,
+  not yet a confirmed release.
 - **Search-method value:** autonomous evolution beats strong zero-evolution and equal-total-budget
   retry or Best-of-N.
 - **Generalization and compounding:** a sealed scorecard, new domains or models, and later generations
   demonstrate increasingly stronger claims.
+
+Point estimates are insufficient for publication-grade autonomous promotion. The matched-question
+measurement policy reports the mean per-question improvement, a family-wise confidence interval,
+missing pairs, and an approximate minimum detectable effect. It does not call independently sampled
+model executions shared-seed paired trials. Quality remains the primary objective; token, money, and
+latency budgets are constraints or Pareto reporting dimensions. A raw `score/token` objective would
+reward premature exits and change the meaning of task success, so it is deliberately not used.
 
 Software correctness is therefore necessary but never substituted for efficacy. A green suite
 establishes that the experiment can be trusted to run; only controlled task outcomes establish that
@@ -130,3 +175,11 @@ cross-model transfer, or superiority over equal-budget retry. Those require sepa
 Primary design influences: Self-Harness (failure signatures and monotone promotion), Agentic Harness
 Engineering (trajectory observability and structural surfaces), autoresearch/AlphaEvolve (external
 fitness and archives), and evaluation work emphasizing sealed tests and equal-compute comparisons.
+
+Self-Harness v2 now reports multiple models across Terminal-Bench 2.0, SWE-bench Verified, and
+AppWorld, so it is broader than its earlier Terminal-Bench-only release. AHE offers stronger public
+engineering detail and frozen-harness transfer evidence, but its component boundaries should not be
+treated as proven causal orthogonality. Weco's AIDE² is useful evidence that multiple harness edits can
+accumulate under a large private evaluation program; it remains a first-party report, explicitly does
+not establish ignition, and reports complexity/dead-code failures. These projects motivate the design
+but do not raise this repository's evidence level without local, contract-matched experiments.

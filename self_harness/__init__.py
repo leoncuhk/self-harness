@@ -40,6 +40,12 @@ from self_harness.ledger import (
     score_prediction,
     write_ledger,
 )
+from self_harness.measurement import (
+    MatchedEstimate,
+    MeasurementContract,
+    load_measurement_contract,
+    matched_question_estimate,
+)
 from self_harness.patching import (
     build_baseline_variant,
     build_variant,
@@ -85,6 +91,8 @@ __all__ = [
     "GoalContract",
     "GuardReport",
     "LedgerEntry",
+    "MatchedEstimate",
+    "MeasurementContract",
     "MetricConstraint",
     "Prediction",
     "Proposal",
@@ -110,7 +118,9 @@ __all__ = [
     "load_diagnostic_contract",
     "load_experiment",
     "load_goal_contract",
+    "load_measurement_contract",
     "main",
+    "matched_question_estimate",
     "parse_harbor_case",
     "parse_prediction",
     "parse_pytest_outcomes",

@@ -8,7 +8,7 @@ A green test suite proves orchestration correctness, not self-improvement effica
 | V0 | Software contract works | unit, integration, lint, artifact audit |
 | V1 | Both loops are causally real | frozen CI/evaluator changes only after a harness candidate |
 | V2 | Live proposer integration works | one complete atomic candidate, usage, guards, decision |
-| V3 | Candidate helps the target domain | replicated train and adaptive-validation gain |
+| V3 | Candidate helps the target domain | replicated matched-question gain whose family-wise interval clears the frozen floor |
 | V4 | Search method adds value | beats strong zero-evolution and equal-total-budget retry/Best-of-N |
 | V5 | Result generalizes | one-shot scorecard plus new tasks, projects, or models |
 | V6 | Recursive compounding | later generations improve the ability to generate further gains |
@@ -36,6 +36,32 @@ service with recorded hashes. If that condition changes, results belong to diffe
 Report objective, gated pass rate, per-case deltas, tokens, latency, apparatus failures, prediction
 precision, and the full candidate ledger. Do not add gains from experiments with different baselines.
 
+## Measurement and promotion
+
+Smoke runs use point estimates only and cannot support efficacy claims. A publication-grade objective
+gate freezes a `[measurement]` contract before search and then:
+
+1. compares incumbent and candidate only on identical measured question ids;
+2. expresses every delta in the declared improvement direction;
+3. resamples questions as clusters, retaining repeat-averaged evidence within each question;
+4. adjusts the interval for `max_iterations × candidates`, the maximum pre-registered comparisons;
+5. requires a complete matched matrix, enough questions, and a lower bound above the effect floor;
+6. separately applies no-pass-regression, metric constraints, apparatus, cost, and latency vetoes.
+
+The report includes an approximate minimum detectable effect (effect floor plus the simultaneous
+normal critical margin). It is a planning diagnostic, not a universal sample-size law: task clusters,
+provider randomness, adaptive selection, and apparatus failures still matter. When the interval is
+too wide, the correct result is “unresolved under this contract,” not promotion and not proof that the
+proposal was useless.
+
+Cost is not divided into score. Quality remains primary; money, tokens, and latency are constraints
+and reporting dimensions. An efficiency frontier may be reported alongside quality, but a low-cost
+incomplete answer cannot outrank a correct answer merely through a favourable denominator.
+
+An adaptive-validation winner is recorded as a provisional promotion. Only the pre-registered final
+comparison and single scorecard read can support a confirmed release. The scorecard may invalidate a
+generalization claim; it never sends content back into the same search run.
+
 ## Integrity rules
 
 - Evaluator, split, model, budget, and gate fingerprints are frozen in the manifest.
@@ -46,6 +72,8 @@ precision, and the full candidate ledger. Do not add gains from experiments with
 - Any cited run must pass `scripts/verify_artifacts.py`, which re-derives outcomes from raw JUnit
   evidence without using the production result parser.
 - Smoke results (`n=1`, one repeat) establish lifecycle and directional evidence only.
+- Independently sampled model rollouts are called matched by question, not shared-randomness paired.
+- Trying more candidates than the frozen family-wise comparison count voids the confidence claim.
 
 ## Current claim ceiling
 

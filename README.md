@@ -4,11 +4,16 @@ An eval-driven system for searching, validating, and governing changes to the en
 around a fixed agent. It implements two causally separate loops:
 
 ```text
-product task ──> inner runtime ──> typed evidence + answer/code ──> frozen evaluator
-                    ▲                                                 │
-                    │ candidate harness                              │ visible train evidence
-                    │                                                 ▼
-             frozen controller <── outer proposer <── layer diagnosis
+                         immutable control plane
+        goal / splits / evaluator / budget / permissions / audit
+                                  │
+                                  ▼
+product task ──> inner agent ──> answer/code + full telemetry ──> frozen evaluation
+                    ▲                                             │
+                    │                                             ▼
+              current harness                         layered failure evidence
+                    ▲                                             │
+                    └── outer loop: diagnose → propose → experiment → promote/reject
 ```
 
 The Controller alone owns the goal, splits, evaluator, model, budgets, guards, archive, and
@@ -44,6 +49,9 @@ The project contributes four reusable capabilities:
 4. **Protection against false progress.** Negative and rejected results remain first-class evidence;
    evaluator repairs, stronger models, extra retries, leakage, and data fixes are not mislabeled as
    autonomous self-improvement.
+5. **Uncertainty-aware promotion.** Publication-grade contracts compare incumbent and candidate on
+   matched questions, bootstrap question clusters, adjust for the pre-registered candidate search,
+   and keep quality primary while treating cost and latency as constraints—not a `score/token` ratio.
 
 Claims are separated by evidence type:
 
@@ -59,6 +67,11 @@ are well tested; live Pi proposal and rejection operate correctly; the sampled F
 bounded value; but autonomous FAB search has not yet reached the project's V3 efficacy threshold.
 The long-term goal is to make the final two statements converge—turning improvements that a human
 can diagnose and validate into improvements that the outer loop can discover reproducibly.
+
+This is system-level harness improvement, not yet recursive self-improvement. RSI would additionally
+require equal-budget, cross-generation evidence that an improved system becomes more effective at
+producing its *next* improvement. The project records that as a separate claim level rather than
+inferring it from one accepted edit or a higher benchmark score.
 
 ## Runtime adapters
 

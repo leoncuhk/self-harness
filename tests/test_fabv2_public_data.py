@@ -166,6 +166,9 @@ def test_live_evolution_claim_uses_replicated_selection():
     assert experiment.repeats == 3
     assert experiment.max_iterations == 3
     assert experiment.candidates == 2
+    assert len(experiment.cases_for_split("train")) == 8
+    assert len(experiment.cases_for_split("holdout")) == 8
+    assert experiment.measurement.enabled
 
 
 def test_public27_publication_arm_is_complete_and_frozen():

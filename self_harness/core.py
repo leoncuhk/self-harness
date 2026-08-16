@@ -48,6 +48,7 @@ from self_harness.ledger import (
     score_prediction,
     write_ledger,
 )
+from self_harness.measurement import MeasurementContract, load_measurement_contract
 from self_harness.signatures import cluster_split
 
 VALID_SPLITS = ("train", "holdout", "scorecard")
@@ -160,6 +161,7 @@ class Experiment:
     fingerprint_discipline: str = DEFAULT_FINGERPRINT_DISCIPLINE
     goal: GoalContract = dc_field(default_factory=GoalContract)
     diagnostics: DiagnosticContract = dc_field(default_factory=DiagnosticContract)
+    measurement: MeasurementContract = dc_field(default_factory=MeasurementContract)
 
     @property
     def guards_enabled(self) -> bool:
@@ -205,6 +207,7 @@ class Experiment:
             "cases": [asdict(case) for case in self.cases],
             "source_digests": source_digests,
             "diagnostics": self.diagnostics.to_dict(),
+            "measurement": self.measurement.to_dict(),
         }
         return hashlib.sha256(
             json.dumps(payload, sort_keys=True, default=str).encode()
@@ -737,6 +740,7 @@ class RunLayout:
             "diagnostics": experiment.diagnostics.to_dict(),
             "guards": experiment.guards,
             "budget": experiment.budget,
+            "measurement": experiment.measurement.to_dict(),
             "evaluation_fingerprint": experiment.evaluation_fingerprint,
         }
         (self.root / "manifest.json").write_text(json.dumps(payload, indent=2) + "\n")
@@ -1018,6 +1022,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
     )
     guards = dict(raw.get("guards", {}))
     budget = dict(raw.get("budget", {}))
+    measurement = load_measurement_contract(raw.get("measurement"))
     goal = load_goal_contract(raw.get("goal"))
     diagnostics = load_diagnostic_contract(
         raw.get("diagnostics"),
@@ -1131,6 +1136,7 @@ def load_experiment(path: str | Path, *, model_override: str | None = None) -> E
         fingerprint_discipline=fingerprint_discipline,
         goal=goal,
         diagnostics=diagnostics,
+        measurement=measurement,
     )
     validate_experiment(loaded)
     return loaded
@@ -1440,6 +1446,12 @@ def run_experiment(
     layout.write_manifest(experiment)
 
     iteration_limit = experiment.max_iterations if max_iterations is None else max_iterations
+    if iteration_limit > experiment.max_iterations:
+        msg = (
+            "max_iterations override cannot exceed the frozen experiment contract; "
+            "create a new versioned config"
+        )
+        raise ValueError(msg)
     baseline = build_baseline_variant(experiment)
     current = baseline
     baseline_train = run_split_repeated(
@@ -1586,6 +1598,8 @@ def run_experiment(
                 current_holdout=current_holdout,
                 candidate_train=train,
                 candidate_holdout=holdout,
+                measurement=experiment.measurement,
+                familywise_comparisons=experiment.max_iterations * experiment.candidates,
             )
             candidate_cost = [profile_split(train), profile_split(holdout)]
             budget_decision = None

@@ -10,6 +10,7 @@ The maintained documentation is deliberately small:
 6. [ADR 0002](adr/0002-agent-runtime-selection.md): replaceable Prime/Codex inner and Pi outer adapters.
 7. [ADR 0003](adr/0003-fab-layered-optimization.md): layered FAB diagnosis and typed evidence.
 8. [ADR 0004](adr/0004-declarative-domain-diagnostics.md): portable domain diagnostic contracts.
+9. [ADR 0005](adr/0005-uncertainty-aware-promotion.md): matched-question uncertainty and promotion semantics.
 
 Superseded plans, copied source repositories, oracle answers, and historical protocols are not kept
 in the active repository. Their useful conclusions are incorporated into the documents above.

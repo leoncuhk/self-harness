@@ -23,6 +23,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+from self_harness.measurement import MatchedEstimate, MeasurementContract, matched_question_estimate
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from self_harness.contracts import GoalContract
     from self_harness.core import SplitResult
@@ -43,10 +45,19 @@ class GateDecision:
     delta_ho_rate: float
     delta_in_score: float = 0.0
     delta_ho_score: float = 0.0
+    train_estimate: MatchedEstimate | None = None
+    holdout_estimate: MatchedEstimate | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the decision."""
-        return asdict(self)
+        payload = asdict(self)
+        payload["train_estimate"] = (
+            None if self.train_estimate is None else self.train_estimate.to_dict()
+        )
+        payload["holdout_estimate"] = (
+            None if self.holdout_estimate is None else self.holdout_estimate.to_dict()
+        )
+        return payload
 
 
 def _deltas(current: SplitResult, candidate: SplitResult) -> tuple[int, float]:
@@ -64,6 +75,8 @@ def decide(  # noqa: PLR0913 - the gate compares two splits before and after one
     candidate_train: SplitResult,
     candidate_holdout: SplitResult,
     goal: GoalContract | None = None,
+    measurement: MeasurementContract | None = None,
+    familywise_comparisons: int = 1,
 ) -> GateDecision:
     """Return the promotion decision for one candidate."""
     if gate not in VALID_GATES:
@@ -98,6 +111,8 @@ def decide(  # noqa: PLR0913 - the gate compares two splits before and after one
             delta_ho_score=delta_ho_score,
         )
 
+    train_estimate: MatchedEstimate | None = None
+    holdout_estimate: MatchedEstimate | None = None
     if gate == "objective":
         if goal is None:
             msg = "objective gate requires a goal contract"
@@ -127,6 +142,29 @@ def decide(  # noqa: PLR0913 - the gate compares two splits before and after one
                 candidate_ho,
             )
             holdout_improved = goal.improved(current_ho, candidate_ho)
+            if measurement is not None and measurement.enabled:
+                estimate_args = {
+                    "metric": goal.primary_metric,
+                    "direction": goal.direction,
+                    "effect_floor": goal.min_delta,
+                    "contract": measurement,
+                    "familywise_comparisons": familywise_comparisons,
+                }
+                train_estimate = matched_question_estimate(
+                    current=current_train,
+                    candidate=candidate_train,
+                    **estimate_args,
+                )
+                holdout_estimate = matched_question_estimate(
+                    current=current_holdout,
+                    candidate=candidate_holdout,
+                    **estimate_args,
+                )
+                non_degrading = (
+                    train_estimate.supports_non_degradation
+                    and holdout_estimate.supports_non_degradation
+                )
+                holdout_improved = holdout_estimate.supports_improvement
             improved = (
                 holdout_improved
                 if goal.require_holdout_improvement
@@ -138,10 +176,17 @@ def decide(  # noqa: PLR0913 - the gate compares two splits before and after one
                 if goal.require_holdout_improvement
                 else "either split may improve"
             )
+            uncertainty = ""
+            if train_estimate is not None and holdout_estimate is not None:
+                uncertainty = (
+                    f"; matched CI train=[{train_estimate.ci_low:+.4f},"
+                    f"{train_estimate.ci_high:+.4f}] validation=[{holdout_estimate.ci_low:+.4f},"
+                    f"{holdout_estimate.ci_high:+.4f}]"
+                )
             reason = (
                 f"objective gate ({goal.primary_metric}, {goal.direction}): "
                 f"Δ_in={delta_in_score:+.4f} Δ_ho={delta_ho_score:+.4f}; "
-                f"{improvement_rule}; "
+                f"{improvement_rule}{uncertainty}; "
                 + ("accepted" if accepted else "constraint, regression, or effect floor failed")
             )
     elif gate == "combined":
@@ -173,4 +218,6 @@ def decide(  # noqa: PLR0913 - the gate compares two splits before and after one
         delta_ho_rate=delta_ho_rate,
         delta_in_score=delta_in_score,
         delta_ho_score=delta_ho_score,
+        train_estimate=train_estimate,
+        holdout_estimate=holdout_estimate,
     )
