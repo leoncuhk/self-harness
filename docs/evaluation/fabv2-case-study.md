@@ -120,14 +120,48 @@ with a frozen data plane and non-degrading adaptive validation. This sequence de
 good outer loop must discover, but it is not evidence that the current atomic Pi proposer discovered
 the chain autonomously.
 
+## Unified hard-case regression and native control
+
+The q013 regression was then decomposed rather than waived. Chart's definitive merger proxy reports
+the July 28, 2025 close as $171.65, and its FY2024 10-K reports revenue of $4,160.3 million, SG&A of
+$547.4 million, and amortization separately at $193.9 million. The failed run had both a broken
+historical price route and a fabricated $638.9 million “filed SG&A” claim. Prompt rules alone did not
+repair this: after the price snapshot was added, q013 still scored only 0.600 because the live SEC
+ticker map no longer contained delisted GTLS.
+
+The evaluator data plane now supports bounded historical ticker-to-CIK indexes, official market
+observations, and checksummed verbatim SEC excerpts. With those routes plus the general q025
+forecast/FCFF and exact-line-item rules in the unified strong harness, a fresh rubric-blind
+GPT-5.6-sol + Codex regression produced:
+
+| Task | Gated / ungated | Wall time |
+|---|---:|---:|
+| q004 | 1.000 / 1.000 | 122.9 s |
+| q013 | 1.000 / 1.000 | 250.6 s |
+| q022 | 1.000 / 1.000 | 243.3 s |
+| q025 | 1.000 / 1.000 | 278.0 s |
+| **Mean** | **1.000 / 1.000** | — |
+
+q013 also passed an immediately preceding fresh run at 1.000. For attribution, a new q025 native
+Codex control retained the same model, deterministic tools, frozen data, timeout, and numeric judge
+but removed the project harness. It failed at 0.000 gated / 0.600 ungated, used 1,192,962 input
+tokens, and took 395.8 seconds. The unified strong arm used 653,863 input tokens and 278.0 seconds.
+Thus model capability and repaired data access were necessary but not sufficient on q025; the
+harness changed both correctness and efficiency in this sampled comparison.
+
+This is still targeted development evidence. The four cases were selected because they had failed,
+the final chain was human-directed, and only one unified four-case repeat has been run. It supports
+“the known hard cases are currently solved,” not “the autonomous outer loop improved itself,” “the
+Public-27 optimum was reached,” or “the system can enter the official leaderboard.”
+
 ## What is and is not established
 
 - The controller, frozen boundary, atomic proposer, guards, resume logic, scorecard isolation,
   artifact audit, and semantic novelty guard work.
 - The current bottleneck is mixed: the DeepSeek+Prime beneficiary stack is a major limitation, while
   coarse failure diagnosis and weak proposal search are method limitations.
-- No evolved harness has yet beaten the strong seed under the Public-24 contract. FAB efficacy has
-  not reached V3.
+- No autonomously evolved harness has yet beaten the strong seed under the Public-24 contract. The
+  later 4/4 result is a human-directed unified hard-case repair, not a Pi promotion.
 - The project cannot claim a global optimum, stable recursive compounding, or leaderboard readiness.
   Public questions and numeric rubrics are an unofficial diagnostic; the official Vals leaderboard
   is private and uses its own submission path.
@@ -135,6 +169,6 @@ the chain autonomously.
   prompts, tools, and budgets. Local Codex subscription authentication is not presently a Prime
   provider route, so that comparison has not been run.
 
-The strongest honest conclusion is: **a stronger model/runtime directly solves most of the sampled
-stuck cases, while the current Self-Harness implementation correctly rejects weak edits but has not
-yet demonstrated a stable improvement over its strong human seed.**
+The strongest honest conclusion is: **the unified system now solves all four sampled hard cases and
+the q025 native control shows independent harness value, while autonomous outer search has not yet
+demonstrated a stable improvement over its strong human seed or leaderboard readiness.**

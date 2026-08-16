@@ -16,6 +16,15 @@ promotion decision. The proposer may change only declared harness surfaces. “B
 validated candidate found under one recorded contract and budget; it never means a global optimum
 or an official FAB leaderboard result.
 
+The repository currently proves three different things at different evidence levels:
+
+- the deterministic coding fixture exercises both loops end to end without model spend;
+- the FAB controller rejects invalid, duplicate, overfit, and non-improving candidates under frozen
+  train/validation/scorecard contracts;
+- one human-directed harness construction sequence now solves all four sampled hard FAB tasks with
+  GPT-5.6-sol + Codex under one harness and data contract (4/4, each 1.0). This is a targeted
+  diagnostic result, not an autonomous outer-loop win or an official leaderboard submission.
+
 ## Runtime adapters
 
 - **Prime Agent is the current inner adapter** for FAB: persistent IPython state, evaluator-owned finance
@@ -26,11 +35,14 @@ or an official FAB leaderboard result.
 - **DeepAgents is not required.** It was useful background, but adds an unnecessary framework and
   dependency boundary to this implementation.
 
-The architecture does not depend on any of these frameworks. Before search, it distinguishes a weak
+The architecture does not depend on any of these frameworks. Plain Python owns the causal control
+plane; agent frameworks are replaceable execution adapters. Before search, the system distinguishes a weak
 beneficiary model or broken data route from an evolvable orchestration, finance-semantics,
 verification, or compiler failure. FAB candidates should pass typed source-period provenance,
 calculation, invariant, and answer-manifest artifacts through that inner flow; external market data
-must be frozen before a global promotion claim is credible.
+must be frozen before a global promotion claim is credible. The included GTLS fixtures demonstrate
+bounded, checksummed official-source snapshots for fragile historical facts; they do not imply that
+the entire Public-27 source universe is already frozen.
 
 Vertical behavior is supplied through a frozen declarative diagnostic contract. FAB owns its finance
 layers and facets; the generic Controller and proposer prompt contain no finance-specific rules. A
@@ -49,7 +61,7 @@ credentials for the configured model route.
 uv sync --extra dev
 uv run self-harness validate configs/coding_demo.toml
 uv run pytest -q
-uv run ruff check self_harness tests scripts
+uv run ruff check .
 ```
 
 The deterministic coding fixture proves both loops without model spend:
@@ -110,20 +122,34 @@ Numeric-24 development runs and one-case smoke runs are deliberately ineligible 
 
 ## Current FAB conclusion
 
-The latest Public-24 evolution evaluated six candidates and promoted none; the strong human harness
-remains best under that frozen one-repeat contract. A separate rubric-blind upper-bound diagnostic
-ran the same strong harness on four previously failed tasks with GPT-5.6-sol + Codex and passed 3/4
-(mean numeric credit 0.7917). Because both model and runtime changed, this shows that the beneficiary
-stack is a major bottleneck, not that model choice alone explains every failure. It is neither an
-evolved-harness win nor an official leaderboard score. Exact evidence and limitations are in the
-[FAB v2 case study](docs/evaluation/fabv2-case-study.md).
+The latest autonomous Public-24 evolution evaluated six candidates and promoted none; the strong
+human seed remains best under that frozen one-repeat DeepSeek+Prime contract. A later
+human-directed, Codex-assisted diagnostic isolated q025's forecast-provenance and FCFF errors, then
+exposed q013's separate historical-market-data and accounting-taxonomy failures.
 
-The human-directed, Codex-assisted q025 diagnostic case subsequently produced an experimental forecast-provenance harness that
-passes q025 at 1.000 in 3/3 independent Codex repeats, up from two clean baseline failures. It is
-kept under `benchmarks/fabv2/harnesses/experimental/` rather than promoted because one of three
-one-repeat regression controls failed. This is a successful local harness-construction example, not
-yet a globally better FAB harness. The resulting layered optimization decision is recorded in
-[ADR 0003](docs/adr/0003-fab-layered-optimization.md).
+The current unified strong harness combines the general fixes with evaluator-owned official SEC
+snapshots for the fragile historical facts. Under one rubric-blind GPT-5.6-sol + Codex protocol it
+scored q004=q013=q022=q025=1.0 (4/4). q013 also passed a separate fresh run at 1.0. On the critical
+q025 control, removing the project harness while retaining the same model, tools, data, and budget
+failed at gated 0.0 / ungated 0.6 and used roughly 1.19M input tokens versus the strong harness's
+0.65M. This is evidence that the harness independently helps this sampled task; it is not evidence
+that Pi autonomously discovered the final sequence.
+
+These four public tasks were used for diagnosis, so the result is in-sample and cannot establish a
+Public-27 optimum, cross-domain transfer, or leaderboard readiness. The official Vals score remains
+unknown. Exact evidence and limitations are in the [FAB v2 case study](docs/evaluation/fabv2-case-study.md),
+and the layered optimization decision is in [ADR 0003](docs/adr/0003-fab-layered-optimization.md).
 
 Process and workspace isolation are not a hostile-code sandbox. Live agents still require an OS or
 container boundary, least-privilege credentials, and an explicit network policy.
+
+## Local data and publication safety
+
+Raw `runs/`, caches, virtual environments, `.env`, and runtime copies are intentionally ignored.
+They can exceed 10GB because every rollout preserves full events and a private data/cache snapshot;
+none is required to install the package or clone the public repository. Publish only reviewed
+summaries and redacted artifacts. Never commit model credentials, licensed validation questions, or
+unreviewed traces, which may contain source text or model-provider metadata.
+
+Self-Harness is available under the [Apache License 2.0](LICENSE). FAB public-development assets retain
+their upstream terms and notices in [THIRD_PARTY_NOTICES.md](benchmarks/fabv2/THIRD_PARTY_NOTICES.md).
