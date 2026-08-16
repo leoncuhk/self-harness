@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "series": [
+    {
+      "ticker": "GTLS",
+      "field": "unadjusted_close",
+      "currency": "USD",
+      "coverage_start": "2025-07-28",
+      "coverage_end": "2025-07-28",
+      "source_type": "issuer_sec_filing",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/892553/000119312525198320/d52397ddefm14a.htm",
+      "rows": [
+        {
+          "date": "2025-07-28",
+          "close": 171.65
+        }
+      ]
+    }
+  ]
+}

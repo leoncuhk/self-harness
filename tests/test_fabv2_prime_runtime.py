@@ -43,6 +43,58 @@ def test_safe_calculator_rejects_code_execution(tmp_path: Path, monkeypatch):
     assert json.loads(ledger.read_text())["errors"] == 1
 
 
+def test_http_offline_mode_reuses_cache_and_rejects_misses(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("FAB_TOOLS_CACHE", str(tmp_path))
+    monkeypatch.setenv("FAB_TOOLS_OFFLINE", "1")
+    url = "https://example.test/frozen"
+    digest = fab_tools.hashlib.sha256(url.encode()).hexdigest()
+    (tmp_path / digest).write_bytes(b"frozen")
+
+    assert fab_tools._http(url) == b"frozen"  # noqa: SLF001
+    with pytest.raises(RuntimeError, match="offline cache miss"):
+        fab_tools._http("https://example.test/missing")  # noqa: SLF001
+
+
+def test_price_history_prefers_complete_frozen_official_series(tmp_path: Path, monkeypatch):
+    ledger = tmp_path / "usage.json"
+    snapshot = tmp_path / "market.json"
+    snapshot.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "series": [
+                    {
+                        "ticker": "TEST",
+                        "field": "unadjusted_close",
+                        "currency": "USD",
+                        "coverage_start": "2025-01-02",
+                        "coverage_end": "2025-01-02",
+                        "source_type": "issuer_sec_filing",
+                        "source_url": "https://example.test/filing",
+                        "rows": [{"date": "2025-01-02", "close": 12.34}],
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))
+    monkeypatch.setenv("FAB_MARKET_DATA", str(snapshot))
+    monkeypatch.setattr(fab_tools, "_http", lambda _url: pytest.fail("network fallback used"))
+
+    rows = fab_tools.price_history("test", "2025-01-02", "2025-01-02")
+
+    assert rows == [
+        {
+            "date": "2025-01-02",
+            "close": 12.34,
+            "currency": "USD",
+            "source_url": "https://example.test/filing",
+            "source_type": "issuer_sec_filing",
+        }
+    ]
+    assert json.loads(ledger.read_text())["calls"] == {"price_history": 1}
+
+
 def test_full_page_search_finds_text_beyond_fetch_prefix(tmp_path: Path, monkeypatch):
     ledger = tmp_path / "usage.json"
     monkeypatch.setenv("FAB_TOOLS_USAGE_FILE", str(ledger))

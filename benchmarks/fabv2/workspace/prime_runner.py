@@ -33,6 +33,7 @@ RUNTIME_FILES = (
     "runtime_policy.json",
     "runtime_policy.ts",
     "fab_tools.py",
+    "market_data.json",
     "model_provider.ts",
 )
 _TICKER_PATTERN = re.compile(

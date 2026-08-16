@@ -67,7 +67,7 @@ def _prepare_workspace(workspace: Path, qid: str, harness_dir: Path | None) -> N
     if harness_dir is not None:
         for name in SURFACES:
             shutil.copy2(harness_dir / name, workspace / name)
-    for name in ("fab_tools.py", "runtime_policy.json"):
+    for name in ("fab_tools.py", "market_data.json", "runtime_policy.json"):
         shutil.copy2(FAB_ROOT / "workspace" / name, workspace / name)
     shared_cache = FAB_ROOT / "workspace" / ".cache"
     if shared_cache.is_dir():
@@ -171,6 +171,7 @@ def _run_case(  # noqa: PLR0913 - explicit fields are part of the recorded proto
     env = os.environ.copy()
     env["FAB_TOOLS_CACHE"] = str(workspace / ".fab-cache")
     env["FAB_TOOLS_USAGE_FILE"] = str(workspace / "tool_usage.json")
+    env["FAB_MARKET_DATA"] = str(workspace / "market_data.json")
     started = time.monotonic()
     try:
         completed = subprocess.run(
@@ -271,6 +272,9 @@ def main() -> int:
         "judge": "frozen deterministic numeric judge",
         "rubric_visible_to_agent": False,
         "tool_state": "case-local usage ledger and pre-run cache snapshot",
+        "market_data_sha256": hashlib.sha256(
+            (FAB_ROOT / "workspace" / "market_data.json").read_bytes()
+        ).hexdigest(),
     }
     protocol_path = output_dir / "protocol.json"
     if not protocol_path.exists():

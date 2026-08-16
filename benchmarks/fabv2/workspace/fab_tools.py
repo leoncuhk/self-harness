@@ -107,10 +107,21 @@ def _cache_root() -> Path:
     return path
 
 
+def _offline() -> bool:
+    return os.environ.get("FAB_TOOLS_OFFLINE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _http(url: str) -> bytes:
     cached = _cache_root() / hashlib.sha256(url.encode()).hexdigest()
     if cached.exists():
         return cached.read_bytes()
+    if _offline():
+        raise RuntimeError(f"offline cache miss for {url}")
     request = Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310 - tool allows HTTPS
     body: bytes | None = None
     for attempt in range(4):
@@ -370,14 +381,51 @@ def search_page_text(
     return matches
 
 
+def _frozen_prices(ticker: str, start: str, end: str) -> list[dict[str, Any]] | None:
+    """Return a complete evaluator-owned slice, never a misleading partial slice."""
+    path = Path(os.environ.get("FAB_MARKET_DATA", Path(__file__).with_name("market_data.json")))
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text())
+    if payload.get("schema_version") != 1:
+        message = "unsupported market-data schema"
+        raise ValueError(message)
+    symbol = ticker.strip().upper()
+    for series in payload.get("series", []):
+        if (
+            str(series.get("ticker", "")).upper() != symbol
+            or series.get("field") != "unadjusted_close"
+            or start < str(series.get("coverage_start", ""))
+            or end > str(series.get("coverage_end", ""))
+        ):
+            continue
+        source = str(series["source_url"])
+        currency = str(series.get("currency", "USD"))
+        return [
+            {
+                "date": str(row["date"]),
+                "close": round(float(row["close"]), 4),
+                "currency": currency,
+                "source_url": source,
+                "source_type": str(series.get("source_type", "frozen_snapshot")),
+            }
+            for row in series.get("rows", [])
+            if start <= str(row["date"]) <= end
+        ]
+    return None
+
+
 def price_history(ticker: str, start_date: str, end_date: str) -> list[dict[str, Any]]:
-    """Return unadjusted Yahoo daily closes for a public symbol."""
+    """Return auditable unadjusted daily closes, preferring frozen official facts."""
     try:
         start = min(_date(start_date), MAX_END_DATE)
         end = min(_date(end_date), MAX_END_DATE)
         if start > end:
             message = "start_date is later than end_date"
             raise ValueError(message)  # noqa: TRY301 - recorded by the common failure path
+        if (frozen := _frozen_prices(ticker, start, end)) is not None:
+            _record("price_history")
+            return frozen
         period1 = int(datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=UTC).timestamp())
         period2 = int(datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=UTC).timestamp()) + 86400
         url = (
@@ -391,6 +439,9 @@ def price_history(ticker: str, start_date: str, end_date: str) -> list[dict[str,
             {
                 "date": datetime.fromtimestamp(stamp, tz=UTC).strftime("%Y-%m-%d"),
                 "close": round(float(close), 4),
+                "currency": result.get("meta", {}).get("currency") or "USD",
+                "source_url": url,
+                "source_type": "live_yahoo_chart",
             }
             for stamp, close in zip(timestamps, closes, strict=False)
             if close is not None
