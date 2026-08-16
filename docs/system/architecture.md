@@ -6,7 +6,7 @@
 ┌───────────────────────────────────────────────────────────────┐
 │ Frozen Self-Harness Controller                                │
 │ goal · splits · model · budgets · evaluator · guards · gate   │
-│ run candidates · aggregate telemetry · archive · select       │
+│ run · diagnose · aggregate telemetry · archive · select       │
 └──────────────────────────────┬────────────────────────────────┘
                                │ bounded visible train evidence
                     ┌──────────▼──────────┐
@@ -30,12 +30,27 @@ Only the Controller promotes a candidate. No runtime or proposer can change the 
 assignment, evaluator, model route, inference budget, data plane, resource gate, scorecard, or
 historical archive. Prime and Pi are current adapters, not architectural authorities.
 
+The system has four intentionally small planes:
+
+| Plane | Stable responsibility | Replaceable input |
+|---|---|---|
+| Control | freeze, execute, compare, promote, archive | experiment configuration |
+| Domain | name failure layers and interpret public telemetry | diagnostic contract |
+| Execution | solve one task and emit typed artifacts | inner runtime and harness surfaces |
+| Evaluation | measure the product independently | frozen evaluator and data snapshot |
+
+This decomposition is the portability boundary. A new vertical supplies domain, execution, and
+evaluation contracts; it does not fork the Controller.
+
 ## Readiness and failure layers
 
 Harness search starts only after the fixed beneficiary stack and frozen data plane can execute a
 representative task. Every measured failure is then routed to capability, data plane,
-research/orchestration, finance semantics/computation, verification, or answer compilation.
+research/orchestration, domain semantics/computation, verification, or answer compilation.
 Deterministic `diagnostic_facets` expose observed cross-layer signals; they do not prove causality.
+Domain-specific facets are declared in a frozen TOML profile and included in the evaluation
+fingerprint. The generic core retains only operational facets that have the same meaning across
+domains.
 
 Capability and data-plane failures are outside candidate surfaces. The correct outcome is a no-op
 and a new experiment contract or apparatus repair. Search may change only the declared harness
@@ -71,7 +86,8 @@ only product files, and runs CI outside the agent. Product changes never mutate 
 The Controller normalizes visible failing traces, adds non-causal diagnostic facets, clusters failure
 mechanisms, and builds one bounded context containing only task instructions, normalized experience,
 failure clusters, and current surfaces. The current Pi adapter receives that context with all tools
-disabled and returns one JSON object containing:
+disabled. It reads the experiment's diagnostic contract rather than a global finance prompt and
+returns one JSON object containing:
 
 - a root-cause claim and evidence;
 - predicted pass flips and regression risk;

@@ -7,6 +7,7 @@ This directory contains the assets needed for an unofficial Public-27 study:
 - `harnesses/minimal/` and `harnesses/strong/`: contract-matched starting points;
 - `workspace/`: Prime inner runner, evaluator-owned finance tools, and model provider;
 - `community/`: public fold and submission metadata.
+- `contracts/diagnostics.toml`: frozen finance failure layers and non-causal routing facets.
 
 The former FAB/model-library harness is intentionally absent. Prime executes a fresh `--no-session`
 rollout with private persistent computation, optional RLM specialists, evidence memory, verification,

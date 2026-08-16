@@ -12,6 +12,8 @@
 - `fabv2_context_v2.toml`: same 8/8/8 contract with aggregate proposer evidence compaction.
 
 Each TOML freezes the target, model, editable surfaces, split assignment, budgets, guards, and gate.
+It may also select a file-backed `[diagnostics]` contract. Domain profiles contain only public layer
+vocabulary and deterministic routing facets; their resolved content is fingerprinted into the run.
 Create a new versioned contract when any of these change; never rewrite a contract after reading its
 scorecard and report it as pre-registered.
 

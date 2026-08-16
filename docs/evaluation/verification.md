@@ -39,6 +39,7 @@ precision, and the full candidate ledger. Do not add gains from experiments with
 ## Integrity rules
 
 - Evaluator, split, model, budget, and gate fingerprints are frozen in the manifest.
+- The diagnostic contract is frozen and fingerprinted; changing its layers or rules starts a new arm.
 - Adaptive validation may select candidates and therefore is not called untouched.
 - Scorecard content never enters proposer context and is not inspected during development.
 - Apparatus failures leave both numerator and denominator; they are not task failures.
@@ -63,3 +64,6 @@ The q025 v5 profile is a replicated single-case success, not a V3 result: it was
 atomic proposer did not autonomously discover the sequence, and one regression control failed while
 the external price route varied. It is evidence for the layered design in ADR 0003, not for global
 promotion or official leaderboard readiness.
+
+The declarative FAB diagnostic profile is a software and search-allocation improvement at V0/V2. It
+does not raise the FAB efficacy claim: no new candidate has been promoted by running this profile.

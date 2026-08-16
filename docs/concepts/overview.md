@@ -40,6 +40,24 @@ The human belongs at the criterion/governance boundary, not in routine proposal 
 review can improve safety and evaluator validity, but must not silently tune the same scorecard later
 reported as untouched.
 
+## What transfers across domains
+
+The reusable object is not a universal prompt or one preferred Agent framework. It is the protocol:
+
+```text
+frozen objective + domain contract + inner artifact contract + external evaluator + promotion gate
+```
+
+The Controller, archive, budgets, split isolation, guards, and monotone selection are domain-neutral.
+A vertical supplies its task runtime, typed evidence artifacts, public diagnostic vocabulary, and
+frozen evaluator. FAB contributes source-period provenance and accounting invariants; coding
+contributes product diffs and CI failures; experimental science might contribute units, calibration,
+and physical measurements. Those concepts must not leak into one another's default proposer prompt.
+
+This yields a useful design test: adding a vertical should primarily add benchmark contracts and
+adapters. If it requires editing the gate or generic trace logic, the abstraction boundary is
+probably wrong.
+
 ## What current evidence supports
 
 - Harness engineering can materially change frozen-model behavior.
@@ -53,6 +71,9 @@ reported as untouched.
   acquisition policy when evaluations are expensive. It can guide which candidate to test, but it
   does not replace the frozen evaluator or causal gate and is unnecessary at the current small
   discrete search scale.
+- A better diagnosis vocabulary can reduce wasted search but is not itself improvement. Only a
+  candidate that clears frozen train, adaptive-validation, cost, and regression gates is evidence of
+  harness efficacy.
 
 ## Scientific claim language
 

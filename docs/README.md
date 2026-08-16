@@ -9,6 +9,7 @@ The maintained documentation is deliberately small:
 5. [ADR 0001](adr/0001-dual-loop-boundary.md): product/harness separation.
 6. [ADR 0002](adr/0002-agent-runtime-selection.md): current Prime/Pi runtime adapters.
 7. [ADR 0003](adr/0003-fab-layered-optimization.md): layered FAB diagnosis and typed evidence.
+8. [ADR 0004](adr/0004-declarative-domain-diagnostics.md): portable domain diagnostic contracts.
 
 Superseded plans, copied source repositories, oracle answers, and historical protocols are not kept
 in the active repository. Their useful conclusions are incorporated into the documents above.

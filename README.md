@@ -32,6 +32,11 @@ verification, or compiler failure. FAB candidates should pass typed source-perio
 calculation, invariant, and answer-manifest artifacts through that inner flow; external market data
 must be frozen before a global promotion claim is credible.
 
+Vertical behavior is supplied through a frozen declarative diagnostic contract. FAB owns its finance
+layers and facets; the generic Controller and proposer prompt contain no finance-specific rules. A
+new domain should add a runtime/artifact adapter, diagnostic profile, and frozen evaluator rather
+than fork the optimization loop.
+
 See [architecture](docs/system/architecture.md), [concepts](docs/concepts/overview.md), and the
 [verification standard](docs/evaluation/verification.md).
 
